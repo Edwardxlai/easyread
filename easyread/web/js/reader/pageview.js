@@ -92,58 +92,46 @@
     return boxes;
   }
 
+  const norm = (s) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const stem = (s) => norm(s).replace(/(ing|tion|tions|ed|es|s)$/, "");
+
+  function matchTokensInWords(words, tokens) {
+    if (!words || !words.length || !tokens || !tokens.length) return [];
+    const normWords = words.map((w) => norm(w[0]));
+    const stemWords = words.map((w) => stem(w[0]));
+    const stemTokens = tokens.map(stem);
+    const results = [];
+    for (let i = 0; i < words.length; i++) {
+      let tIdx = 0, wIdx = i;
+      while (tIdx < tokens.length && wIdx < words.length) {
+        const nw = normWords[wIdx], nt = tokens[tIdx];
+        const sw = stemWords[wIdx], st = stemTokens[tIdx];
+        if (nw === nt || sw === st) {
+          tIdx++;
+          wIdx++;
+        } else if (wIdx + 1 < words.length && (norm(words[wIdx][0] + words[wIdx + 1][0]) === nt || stem(words[wIdx][0] + words[wIdx + 1][0]) === st)) {
+          tIdx++;
+          wIdx += 2;
+        } else {
+          break;
+        }
+      }
+      if (tIdx === tokens.length) {
+        results.push({ start: i, end: wIdx - 1 });
+      }
+    }
+    return results;
+  }
+
   function findMatchedWords(words, block, sel) {
     if (!words || !words.length) return null;
-    const norm = (s) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 
-    // 1. Direct English Token Match
-    const selTokens = (sel.quote || "").match(/[A-Za-z0-9]+(?:[-'][A-Za-z0-9]+)*/g);
-    if (selTokens && selTokens.length > 0) {
-      const normSel = selTokens.map(norm).filter((t) => t && (t.length > 1 || /[0-9]/.test(t) || /[A-Z]/.test(t)));
-      if (normSel.length > 0) {
-        const normWords = words.map((w) => norm(w[0]));
-        for (let i = 0; i <= normWords.length - normSel.length; i++) {
-          let match = true;
-          for (let j = 0; j < normSel.length; j++) {
-            if (normWords[i + j] !== normSel[j] && !normWords[i + j].includes(normSel[j]) && !normSel[j].includes(normWords[i + j])) {
-              match = false;
-              break;
-            }
-          }
-          if (match) {
-            return { start: i, end: i + normSel.length - 1 };
-          }
-        }
-      }
-    }
-
-    // 2. Glossary Term Match
-    const glossary = (S.paper && S.paper.glossary) || [];
-    for (const item of glossary) {
-      if (item.zh && item.en && (sel.quote.includes(item.zh) || item.zh.includes(sel.quote.trim()))) {
-        const gTokens = item.en.match(/[A-Za-z0-9]+/g);
-        if (gTokens && gTokens.length) {
-          const normG = gTokens.map(norm).filter(Boolean);
-          const normWords = words.map((w) => norm(w[0]));
-          for (let i = 0; i <= normWords.length - normG.length; i++) {
-            let match = true;
-            for (let j = 0; j < normG.length; j++) {
-              if (normWords[i + j] !== normG[j]) { match = false; break; }
-            }
-            if (match) {
-              return { start: i, end: i + normG.length - 1 };
-            }
-          }
-        }
-      }
-    }
-
-    // 3. Sentence & Word-Level Proportional Alignment
     const zh = (block && (block.zh || (PR.textFor && PR.textFor(block.id)))) || "";
     const en = (block && block.en) || "";
     const s = sel.s != null ? sel.s : 0;
     const e = sel.e != null ? sel.e : (sel.total || zh.length);
 
+    // Split Chinese into sentences
     const zhSentRegex = /[^。！？\n]+[。！？\n]*/g;
     const zhSents = [];
     let m;
@@ -152,54 +140,83 @@
     }
     if (!zhSents.length) zhSents.push({ text: zh, start: 0, end: zh.length });
 
-    const enProtected = en.replace(/\b(et al|i\.e|e\.g|Fig|al)\./gi, "$1\u2022");
+    // Split English into sentences (protecting abbreviations like et al.)
+    const enClean = en.replace(/\b(et al|i\.e|e\.g|Fig|al)\./gi, "$1\u2022");
     const enSentRegex = /[^.!?\n]+[.!?\n]*/g;
     const enSents = [];
-    while ((m = enSentRegex.exec(enProtected)) !== null) {
+    while ((m = enSentRegex.exec(enClean)) !== null) {
       enSents.push({ text: m[0], start: m.index, end: m.index + m[0].length });
     }
     if (!enSents.length) enSents.push({ text: en, start: 0, end: en.length });
 
-    const overlappingZh = [];
-    for (let k = 0; k < zhSents.length; k++) {
-      if (s < zhSents[k].end && e > zhSents[k].start) {
-        overlappingZh.push(k);
+    // 1. Identify which sentence(s) the user selected in Chinese
+    let kStart = zhSents.findIndex((z) => s >= z.start && s < z.end);
+    if (kStart < 0) kStart = s >= zh.length ? zhSents.length - 1 : 0;
+    let kEnd = zhSents.findIndex((z) => (e - 1) >= z.start && (e - 1) < z.end);
+    if (kEnd < 0) kEnd = Math.max(kStart, zhSents.length - 1);
+
+    // Map to target English sentence indices
+    const numZh = Math.max(1, zhSents.length - 1);
+    const numEn = Math.max(1, enSents.length - 1);
+    const enStart = Math.min(enSents.length - 1, Math.round((kStart * numEn) / numZh));
+    const enEnd = Math.min(enSents.length - 1, Math.max(enStart, Math.round((kEnd * numEn) / numZh)));
+
+    // Word range of the target English sentence(s)
+    const charStart = enSents[enStart].start;
+    const charEnd = enSents[enEnd].end;
+    const wSentStart = Math.max(0, Math.floor((charStart / Math.max(1, en.length)) * words.length) - 2);
+    const wSentEnd = Math.min(words.length - 1, Math.ceil((charEnd / Math.max(1, en.length)) * words.length) + 2);
+    const targetWordMid = (wSentStart + wSentEnd) / 2;
+
+    // Candidate tokens to look for
+    const tokenLists = [];
+    const selTokens = (sel.quote || "").match(/[A-Za-z0-9]+(?:[-'][A-Za-z0-9]+)*/g);
+    if (selTokens && selTokens.length > 0) {
+      const n = selTokens.map(norm).filter((t) => t && t.length > 1);
+      if (n.length) tokenLists.push(n);
+    }
+
+    // Glossary tokens
+    const glossary = (S.paper && S.paper.glossary) || [];
+    for (const item of glossary) {
+      if (item.zh && item.en && (sel.quote.includes(item.zh) || item.zh.includes(sel.quote.trim()))) {
+        const g = item.en.match(/[A-Za-z0-9]+/g);
+        if (g && g.length) {
+          const n = g.map(norm).filter(Boolean);
+          if (n.length) tokenLists.push(n);
+        }
       }
     }
 
-    if (overlappingZh.length > 0) {
-      const kFirst = overlappingZh[0];
-      const kLast = overlappingZh[overlappingZh.length - 1];
-
-      const enIdxFirst = Math.min(enSents.length - 1, Math.round(kFirst * (enSents.length - 1) / Math.max(1, zhSents.length - 1)));
-      const enIdxLast = Math.min(enSents.length - 1, Math.round(kLast * (enSents.length - 1) / Math.max(1, zhSents.length - 1)));
-
-      const sentStartZh = zhSents[kFirst].start;
-      const sentLenZhFirst = Math.max(1, zhSents[kFirst].end - sentStartZh);
-      const frac0 = Math.max(0, Math.min(1, (s - sentStartZh) / sentLenZhFirst));
-
-      const sentEndZh = zhSents[kLast].end;
-      const sentLenZhLast = Math.max(1, sentEndZh - zhSents[kLast].start);
-      const frac1 = Math.max(0, Math.min(1, (e - zhSents[kLast].start) / sentLenZhLast));
-
-      const enCharStart = enSents[enIdxFirst].start + Math.floor(frac0 * enSents[enIdxFirst].text.length);
-      const enCharEnd = enSents[enIdxLast].start + Math.ceil(frac1 * enSents[enIdxLast].text.length);
-
-      const fracEn0 = Math.max(0, Math.min(1, enCharStart / Math.max(1, en.length)));
-      const fracEn1 = Math.max(fracEn0, Math.min(1, enCharEnd / Math.max(1, en.length)));
-
-      const wStart = Math.min(words.length - 1, Math.floor(fracEn0 * words.length));
-      const wEnd = Math.min(words.length - 1, Math.max(wStart, Math.ceil(fracEn1 * words.length) - 1));
-
-      return { start: wStart, end: wEnd };
+    const candidates = [];
+    for (const tokens of tokenLists) {
+      candidates.push(...matchTokensInWords(words, tokens));
     }
 
-    const totalZh = Math.max(1, sel.total || zh.length);
-    const r0 = Math.max(0, Math.min(1, s / totalZh));
-    const r1 = Math.max(r0, Math.min(1, e / totalZh));
-    const wStart = Math.min(words.length - 1, Math.floor(r0 * words.length));
-    const wEnd = Math.min(words.length - 1, Math.max(wStart, Math.ceil(r1 * words.length) - 1));
-    return { start: wStart, end: wEnd };
+    if (candidates.length > 0) {
+      let best = null, bestScore = Infinity;
+      for (const c of candidates) {
+        const mid = (c.start + c.end) / 2;
+        const isInside = (c.start >= wSentStart && c.end <= wSentEnd);
+        // Heavy penalty if candidate belongs to a different sentence:
+        const sentPenalty = isInside ? 0 : 500 + Math.abs(mid - targetWordMid) * 10;
+        const score = sentPenalty + Math.abs(mid - targetWordMid);
+        if (score < bestScore) {
+          bestScore = score;
+          best = c;
+        }
+      }
+      if (best) return best;
+    }
+
+    // Fallback: sentence proportional
+    const zSent = zhSents[kStart];
+    const sentFrac0 = Math.max(0, Math.min(1, (s - zSent.start) / Math.max(1, zSent.text.length)));
+    const sentFrac1 = Math.max(sentFrac0, Math.min(1, (e - zSent.start) / Math.max(1, zSent.text.length)));
+    const sentWordCount = wSentEnd - wSentStart + 1;
+    const start = wSentStart + Math.floor(sentFrac0 * sentWordCount);
+    const end = Math.min(wSentEnd, Math.max(start, wSentStart + Math.ceil(sentFrac1 * sentWordCount) - 1));
+    return { start, end };
   }
 
   function applySelHighlight(sel, loc) {
