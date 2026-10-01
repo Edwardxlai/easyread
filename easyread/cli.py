@@ -1,6 +1,7 @@
 """命令行。给人用，也给对话里的 agent 用（它在对话里翻译、追加讨论时走这些命令）。
 
   easyread serve [--open] [--port N]      启动（或复用已在跑的）服务
+  easyread stop                           暂停任务并退出本机服务
   easyread list                           列出文献库
   easyread import 论文.pdf|arXiv编号 [--no-translate]
   easyread translate ID [--pages 3-5]     排队翻译（需要服务在跑；否则直接前台译）
@@ -66,7 +67,28 @@ def cmd_serve(a):
             webbrowser.open(url)
         return
     from .server import serve
-    serve(a.port, a.open)
+    serve(a.port, a.open, exit_on_close=a.exit_on_close)
+
+
+def cmd_stop(a):
+    import time
+    url = running_server()
+    if not url:
+        out("EasyRead 服务已关闭。")
+        return
+    with urllib.request.urlopen(url + "/api/lifecycle", timeout=3) as response:
+        token = json.loads(response.read())["token"]
+    req = urllib.request.Request(url + "/api/shutdown", data=b"{}",
+                                 headers={"X-Token": token, "Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=3):
+        pass
+    end = time.monotonic() + 15
+    while time.monotonic() < end:
+        if not running_server():
+            out("EasyRead 服务已退出，未完成的翻译已暂停。")
+            return
+        time.sleep(0.2)
+    sys.exit("服务还在退出中，请稍后重试。")
 
 
 def cmd_list(a):
@@ -208,7 +230,10 @@ def main(argv=None):
         sys.stdout.reconfigure(encoding="utf-8")
     ap = argparse.ArgumentParser(prog="easyread", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd")
-    p = sub.add_parser("serve"); p.add_argument("--open", action="store_true"); p.add_argument("--port", type=int); p.set_defaults(fn=cmd_serve)
+    p = sub.add_parser("serve"); p.add_argument("--open", action="store_true"); p.add_argument("--port", type=int)
+    p.add_argument("--exit-on-close", action="store_true", help="最后一个网页关闭后自动暂停任务并退出")
+    p.set_defaults(fn=cmd_serve)
+    p = sub.add_parser("stop"); p.set_defaults(fn=cmd_stop)
     p = sub.add_parser("list"); p.set_defaults(fn=cmd_list)
     p = sub.add_parser("import"); p.add_argument("source"); p.add_argument("--no-translate", action="store_true"); p.set_defaults(fn=cmd_import)
     p = sub.add_parser("translate"); p.add_argument("id"); p.add_argument("--pages"); p.set_defaults(fn=cmd_translate)

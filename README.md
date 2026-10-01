@@ -85,6 +85,10 @@ easyread
 
 浏览器会打开 `http://127.0.0.1:8765`。服务只监听本机。
 
+使用 `start.cmd` / `start.sh` 启动时，关闭最后一个书库或阅读页面后，服务会在约 8 秒后自动退出。刷新、切换页面或只关闭部分标签页不会立即退出。未完成的翻译会暂停，已保存的译文和笔记会保留；下次启动后可手动继续翻译。
+
+也可以在设置中点击「退出 EasyRead」，或运行 `easyread stop`（Windows 可双击 `stop.cmd`）。若需要持续在后台运行，请使用 `easyread serve --open`；命令行启动时可添加 `--exit-on-close` 启用关页退出。
+
 ## 桌面版（Electron）
 
 桌面版复用同一套本地 Python 服务和 Web 界面，由 Electron 负责启动服务并显示窗口。开发环境需要 Node.js 22+、Python 3.10+ 和 PyInstaller：

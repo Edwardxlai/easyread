@@ -11,6 +11,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import tempfile
 import threading
@@ -72,6 +73,8 @@ def who(cfg: dict) -> str:
 _NO_WINDOW = 0x08000000 if hasattr(subprocess, "CREATE_NO_WINDOW") else 0
 _CLAUDE_ARGS = ["--output-format", "json", "--allowedTools", "Read", "--strict-mcp-config",
                 "--disable-slash-commands", "--no-session-persistence"]
+_processes: set[subprocess.Popen] = set()
+_process_lock = threading.Lock()
 
 
 def claude_path(c: dict) -> str | None:
@@ -83,9 +86,43 @@ def codex_path(c: dict) -> str | None:
 
 
 def _popen(args: list[str], cwd: Path):
-    return subprocess.Popen(args, cwd=str(cwd), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+    proc = subprocess.Popen(args, cwd=str(cwd), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                             text=True, encoding="utf-8", errors="replace", creationflags=_NO_WINDOW,
-                            env=netcheck.proxy_env())
+                            env=netcheck.proxy_env(), start_new_session=os.name != "nt")
+    with _process_lock:
+        _processes.difference_update(p for p in list(_processes) if p.poll() is not None)
+        _processes.add(proc)
+    return proc
+
+
+def _kill(proc):
+    if proc.poll() is not None:
+        return
+    if os.name == "nt":
+        # CLI 包装器可能还有子进程；只终止 EasyRead 自己启动的这一棵进程树。
+        try:
+            subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                           creationflags=_NO_WINDOW, timeout=5)
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+    else:
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except OSError:
+            pass
+    if proc.poll() is None:
+        try:
+            proc.kill()
+        except OSError:
+            pass
+
+
+def stop_all():
+    with _process_lock:
+        processes = list(_processes)
+    for proc in processes:
+        _kill(proc)
 
 
 def run_claude(c: dict, prompt: str, cwd: Path, cancel=None) -> str:
@@ -144,11 +181,15 @@ def _communicate(proc, stdin_text: str, timeout: int, cancel) -> str:
         t.join(0.5)
         waited += 0.5
         if cancel is not None and cancel.is_set():
-            proc.kill()
+            _kill(proc)
             raise Cancelled()
         if waited > timeout:
-            proc.kill()
+            _kill(proc)
             raise EngineError(f"超过 {timeout} 秒没有结果")
+    with _process_lock:
+        _processes.discard(proc)
+    if cancel is not None and cancel.is_set():
+        raise Cancelled()
     if proc.returncode not in (0, None) and not result.get("out"):
         raise EngineError((result.get("err") or "")[-500:] or f"退出码 {proc.returncode}")
     return result.get("out", "")
@@ -157,7 +198,28 @@ def _communicate(proc, stdin_text: str, timeout: int, cancel) -> str:
 # ---------- OpenAI 兼容接口 ----------
 def run_openai(c: dict, prompt: str, images: list[Path], cancel=None) -> str:
     from . import openai_api  # 它要用本文件的 EngineError，放这里免得循环导入
-    return openai_api.complete(c, prompt, images, cancel)
+    if cancel is None:
+        return openai_api.complete(c, prompt, images, cancel)
+    result = {}
+
+    def request():
+        try:
+            result["text"] = openai_api.complete(c, prompt, images, cancel)
+        except Exception as e:  # 将网络错误交还给翻译线程
+            result["error"] = e
+
+    worker = threading.Thread(target=request, daemon=True)
+    if cancel.is_set():
+        raise Cancelled()
+    worker.start()
+    while worker.is_alive():
+        if cancel.wait(0.1):
+            raise Cancelled()  # 不等待一个可能阻塞数分钟的 HTTP 请求
+    if "error" in result:
+        raise result["error"]
+    if cancel.is_set():
+        raise Cancelled()
+    return result["text"]
 
 
 def parse_json(text: str):

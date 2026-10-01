@@ -16,7 +16,8 @@ from . import __version__, chat, chat_models, chat_store, cli_models, config, de
 from .log import log, setup as setup_log, tail
 from .jobs import Jobs
 from .library import Library
-from .store import now_iso, write_json_atomic
+from .lifecycle import PageSessions
+from .store import now_iso, read_json, write_json_atomic
 
 WEB = config.WEB
 mimetypes.add_type("image/webp", ".webp")
@@ -31,10 +32,38 @@ def _safe(base: Path, rel: str) -> Path | None:
 
 
 class App:
-    def __init__(self, cfg: dict):
+    def __init__(self, cfg: dict, exit_on_close: bool = False):
         self.lib = Library(config.library_dir(cfg))
         self.jobs = Jobs(self.lib)
         self.token = os.urandom(12).hex()
+        self.pages = PageSessions(exit_on_close)
+        self.closing = threading.Event()
+        self.close_lock = threading.Lock()
+        self.shutdown_worker = None
+        self.httpd = None
+
+    def request_shutdown(self):
+        with self.close_lock:
+            if self.closing.is_set():
+                return
+            self.closing.set()
+            self.pages.stop()
+
+            def finish():
+                try:
+                    self.jobs.close()
+                    engines.stop_all()
+                finally:
+                    self.httpd.shutdown()
+            self.shutdown_worker = threading.Thread(target=finish, daemon=True)
+            self.shutdown_worker.start()
+
+    def watch_pages(self):
+        while not self.closing.wait(0.5):
+            if self.pages.expired():
+                log.info("阅读页面已关闭，暂停任务并退出服务")
+                self.request_shutdown()
+                return
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -135,6 +164,39 @@ class Handler(BaseHTTPRequestHandler):
             raise ValueError("文件太大")
         return self.rfile.read(n) if n else b""
 
+    def _session(self, query):
+        """长连接由服务端保活，不依赖后台标签页可能被浏览器节流的计时器。"""
+        if query.get("token", [None])[0] != self.app.token:
+            return self._json(403, {"error": "bad token"})
+        page = query.get("page", [""])[0]
+        if not page or len(page) > 80:
+            return self._json(400, {"error": "bad page"})
+        connection = self.app.pages.open(page)
+        if connection is None:
+            return self._json(503, {"error": "EasyRead 正在退出"})
+        self.close_connection = True
+        try:
+            self.connection.settimeout(5)
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.wfile.write(b"data: connected\n\n")
+            self.wfile.flush()
+            while not self.app.closing.wait(2):
+                if not self.app.pages.connected(page, connection):
+                    break
+                self.wfile.write(b": heartbeat\n\n")
+                self.wfile.flush()
+            if self.app.closing.is_set():
+                self.wfile.write(b"event: shutdown\ndata: stopped\n\n")
+                self.wfile.flush()
+        except OSError:
+            pass  # 页面或浏览器关闭，长连接随之断开
+        finally:
+            self.app.pages.close(page, connection)
+
     # ---------- GET ----------
     def do_HEAD(self):
         self.do_GET()
@@ -150,6 +212,11 @@ class Handler(BaseHTTPRequestHandler):
         url = urlparse(self.path)
         path = unquote(url.path)
         app, lib = self.app, self.app.lib
+        if path == "/api/lifecycle":
+            return self._json(200, {"token": app.token, "exit_on_close": app.pages.enabled,
+                                    "grace_seconds": app.pages.grace})
+        if path == "/api/session":
+            return self._session(parse_qs(url.query))
         if path in ("/", "/index.html"):
             return self._file(WEB / "library.html")
         if path.startswith("/read/"):
@@ -236,6 +303,18 @@ class Handler(BaseHTTPRequestHandler):
         path = unquote(url.path)
         q = {k: v[0] for k, v in parse_qs(url.query).items()}
         app, lib = self.app, self.app.lib
+
+        if path == "/api/session/close":
+            body = json.loads(self._body() or b"{}")
+            app.pages.close(str(body.get("page", "")))
+            return self._json(200, {"ok": True})
+        if path == "/api/shutdown":
+            self._body()
+            self._json(200, {"ok": True})
+            app.request_shutdown()
+            return
+        if app.closing.is_set():
+            return self._json(503, {"error": "EasyRead 正在退出，请重新打开后继续"})
 
         if path == "/api/import":  # 请求体就是 PDF 文件
             data = self._body()
@@ -368,10 +447,10 @@ class _Server(ThreadingHTTPServer):
     allow_reuse_address = os.name != "nt"
 
 
-def serve(port: int | None = None, open_browser: bool = False, path: str = "/"):
+def serve(port: int | None = None, open_browser: bool = False, path: str = "/", exit_on_close: bool = False):
     setup_log(config.LOG_PATH)
     cfg = config.load()
-    app = App(cfg)
+    app = App(cfg, exit_on_close=exit_on_close)
     Handler.app = app
     detect.warm(cfg)
     port = cfg["port"] if port is None else port
@@ -379,6 +458,7 @@ def serve(port: int | None = None, open_browser: bool = False, path: str = "/"):
         httpd = _Server(("127.0.0.1", port), Handler)
     except OSError:
         httpd = _Server(("127.0.0.1", 0), Handler)
+    app.httpd = httpd
     url = f"http://127.0.0.1:{httpd.server_address[1]}"
     if not config.temp_library():
         write_json_atomic(config.SERVER_INFO, {"url": url, "pid": os.getpid(), "started": now_iso()})
@@ -386,7 +466,18 @@ def serve(port: int | None = None, open_browser: bool = False, path: str = "/"):
     print(f"EasyRead 已启动：{url}  文献库：{app.lib.root}", flush=True)
     if open_browser:
         threading.Timer(0.4, lambda: webbrowser.open(url + path)).start()
+    if app.pages.enabled:
+        threading.Thread(target=app.watch_pages, daemon=True).start()
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
         pass
+    finally:
+        app.closing.set()
+        app.pages.stop()
+        app.jobs.close()
+        engines.stop_all()
+        httpd.server_close()
+        if not config.temp_library() and (read_json(config.SERVER_INFO, {}) or {}).get("pid") == os.getpid():
+            config.SERVER_INFO.unlink(missing_ok=True)
+        log.info("EasyRead 服务已退出，未完成的翻译已暂停")

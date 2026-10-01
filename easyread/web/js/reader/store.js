@@ -52,7 +52,7 @@
 
   function rebuildReader() { S.reader = applyOps(JSON.parse(JSON.stringify(serverReader || {})), outbox); }
   function saveOutbox() { if (!PR.ls.set(outboxKey, outbox)) setStatus("error", "浏览器存储已满，修改只在内存里，请尽快导出"); }
-  function setStatus(s, text) { PR.store.status = s; PR.emit("status", { s, text, pending: outbox.length }); }
+  function setStatus(s, text) { PR.store.status = s; if (!PR.exited) PR.emit("status", { s, text, pending: outbox.length }); }
   function statusIdle() {
     if (mode === "static") setStatus("local", outbox.length ? "存在本浏览器" : "离线版");
     else setStatus("saved", "已保存");
@@ -73,10 +73,11 @@
     else statusIdle();
   };
 
-  function scheduleFlush(ms) { clearTimeout(flushT); flushT = setTimeout(flush, ms); }
+  function scheduleFlush(ms) { clearTimeout(flushT); if (!PR.exited) flushT = setTimeout(flush, ms); }
+  PR.on("exit", () => { clearTimeout(retryT); clearTimeout(flushT); });
 
   async function flush() {
-    if (mode !== "server" || flushing || !outbox.length) return;
+    if (mode !== "server" || flushing || !outbox.length || PR.exited) return;
     flushing = true;
     const batch = outbox.slice();
     try {
@@ -96,6 +97,7 @@
       retryMs = 1500;
       if (outbox.length) scheduleFlush(50); else statusIdle();
     } catch (e) {
+      if (PR.exited) return;
       setStatus("offline", "未连上本地服务，" + outbox.length + " 条修改暂存在浏览器");
       clearTimeout(retryT);
       retryT = setTimeout(flush, retryMs);
@@ -144,12 +146,14 @@
 
   /* ---------- 轮询：翻译方追加讨论/译文、后台翻译进度、另一个标签页改了笔记 ---------- */
   async function poll() {
-    if (mode !== "server" || document.hidden) return;
+    if (mode !== "server" || document.hidden || PR.exited) return;
     let v;
     try {
       v = await (await fetch(base() + "/versions", { cache: "no-store" })).json();
+      if (PR.exited) return;
       if (PR.store.status === "offline") flush();
     } catch (e) {
+      if (PR.exited) return;
       if (!outbox.length) setStatus("offline", "未连上本地服务（只读）");
       return;
     }
@@ -159,6 +163,7 @@
     for (const name of changed) {
       if (name === "reader" && (flushing || outbox.length)) continue; // 自己正在写，等写完
       const d = await (await fetch(base() + "/part/" + name, { cache: "no-store" })).json();
+      if (PR.exited) return;
       S.versions[name] = d.version;
       if (name === "reader") { serverReader = d.data; rebuildReader(); } else S[name] = d.data || {};
     }
@@ -168,7 +173,8 @@
   PR.poll = poll;
   PR.startPolling = function () {
     if (mode !== "server") return;
-    setInterval(poll, 2500);
+    const polling = setInterval(poll, 2500);
+    PR.on("exit", () => clearInterval(polling));
     document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(); });
     window.addEventListener("focus", poll);
     window.addEventListener("online", flush);
@@ -181,16 +187,19 @@
   /* 让模型做事（回答问题、重译一段）：交给服务的小任务队列 */
   PR.ask = async function (kind, body) {
     const job = await PR.api(base() + "/" + kind, { method: "POST", body });
+    if (PR.exited) return job;
     PR.emit("job-started", job);
     const t = setInterval(async () => {
       const list = (await PR.api("/api/jobs?pid=" + encodeURIComponent(PR.pid))).jobs;
+      if (PR.exited) return;
       const j = list.find((x) => x.id === job.id);
-      if (!j || ["done", "error"].includes(j.state)) {
+      if (!j || ["done", "error", "paused"].includes(j.state)) {
         clearInterval(t);
         await poll();
         PR.emit("job-finished", j || job);
       }
     }, 2000);
+    PR.on("exit", () => clearInterval(t));
     return job;
   };
 

@@ -44,6 +44,7 @@
       h += "<div>译文：" + (i.pages ? i.done_pages + " / " + i.pages + " 页" : "尚未处理") + (full ? " · 全文" : "") + "</div>";
       const failed = Object.keys(j.failed || {}).map(Number).sort((a, b) => a - b);
       if (j.state === "error") h += '<div class="err">上次翻译出错：' + PR.esc(j.error || j.message) + "</div>";
+      if (j.state === "paused") h += '<div class="hint">已暂停，已译的部分保留。点击下面的按钮继续。</div>';
       if (j.state === "partial" && failed.length) h += '<div class="err">第 ' + PR.esc(pageList(failed)) + " 页没译成功：" + PR.esc(j.error || "") + "</div>";
       h += '<div class="row2" style="margin-top:8px">' +
         (j.state === "partial" && failed.length ? '<button class="btn sm accent" data-d="retry-failed">重试这 ' + failed.length + " 页</button>" : "") +

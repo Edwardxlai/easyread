@@ -34,6 +34,7 @@
   }, 5000);
 
   const onScroll = PR.throttle(() => {
+    if (PR.exited) return;
     const max = document.documentElement.scrollHeight - innerHeight;
     PR.$("#progress i").style.width = (max > 0 ? (scrollY / max) * 100 : 0) + "%";
     const id = PR.readingBlock();
@@ -114,6 +115,7 @@
   async function boot() {
     PR.applyPrefs();
     try { await PR.load(); } catch (e) {
+      if (PR.exited) return;
       PR.$("#paper").innerHTML = '<div class="pending">读不到论文：' + PR.esc(e.message) + '。<a href="/">回文献库</a></div>';
       return;
     }
@@ -122,6 +124,7 @@
       if (p.reader) { Object.assign(PR.prefs, p.reader); PR.applyPrefs(); }
       PR.useServerUi(p);
     }
+    if (PR.exited) return;
     if (PR.store.mode === "static") PR.$("#backBtn").style.display = "none";
     PR.applyFeatures();
     const m = S.paper.meta || {};
@@ -136,9 +139,17 @@
     PR.renderJobState();
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", PR.debounce(() => { PR.fitWide(); PR.renderMargin(); }, 150));
-    if (document.fonts) document.fonts.ready.then(() => { PR.fitWide(); PR.layoutMargin(); });
-    new ResizeObserver(PR.debounce(() => PR.layoutMargin(), 80)).observe(PR.$("#paper"));
+    const onResize = PR.debounce(() => { if (!PR.exited) { PR.fitWide(); PR.renderMargin(); } }, 150);
+    window.addEventListener("resize", onResize);
+    if (document.fonts) document.fonts.ready.then(() => { if (!PR.exited) { PR.fitWide(); PR.layoutMargin(); } });
+    const layout = PR.debounce(() => { if (!PR.exited) PR.layoutMargin(); }, 80);
+    const observer = new ResizeObserver(layout);
+    observer.observe(PR.$("#paper"));
+    PR.on("exit", () => {
+      observer.disconnect(); layout.cancel(); onResize.cancel(); saveProgress.cancel();
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onResize);
+    });
     PR.startPolling();
 
     if (location.hash && document.getElementById(location.hash.slice(1))) {

@@ -23,7 +23,9 @@
   };
 
   L.load = async function () {
+    if (PR.exited) return;
     const d = await PR.api("/api/library");
+    if (PR.exited) return;
     PR.token = d.token;
     L.engine = d.engine;
     L.engineLabel = d.engine_label;
@@ -37,8 +39,10 @@
   };
 
   let pollT;
+  PR.on("exit", () => clearTimeout(pollT));
   function schedule() {
     clearTimeout(pollT);
+    if (PR.exited) return;
     const busy = L.items.some((i) => i.job && ["queued", "running"].includes(i.job.state));
     pollT = setTimeout(() => L.load().catch(() => schedule()), busy ? 2500 : 15000);
   }
@@ -87,6 +91,7 @@
   }
 
   L.render = function () {
+    if (PR.exited) return;
     PR.renderSide();
     const list = filtered();
     const view = L.VIEWS.find((v) => v[0] === L.view) || L.VIEWS[0];
@@ -117,6 +122,7 @@
       engineChip.pending = true;
       const r = await PR.api("/api/engines").catch(() => null);
       engineChip.pending = false;
+      if (PR.exited) return;
       L.engineReady = r ? r.ready : true;
       const f = r && r.found && r.found[L.engine];
       L.engineHint = f && !f.found ? "本机没找到 " + L.engineLabel : L.engine === "openai" ? "API 还没填 Key" : "";

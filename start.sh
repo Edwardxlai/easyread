@@ -10,4 +10,4 @@ if [ ! -x .venv/bin/python ]; then
     python3 -m venv .venv && .venv/bin/python -m pip install -q -e .
   fi
 fi
-exec .venv/bin/python -m easyread serve --open
+exec .venv/bin/python -m easyread serve --open --exit-on-close

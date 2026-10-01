@@ -79,6 +79,10 @@ easyread
 
 Your browser opens `http://127.0.0.1:8765`. The server only listens on localhost.
 
+When launched with `start.cmd` / `start.sh`, the server exits about 8 seconds after the last library or reader tab closes. Refreshing, navigating, or closing only some tabs does not immediately stop it. Unfinished translations are paused; saved translations and notes are preserved. You can resume translation manually after restarting.
+
+You can also choose “退出 EasyRead” (Exit EasyRead) in Settings or run `easyread stop` (`stop.cmd` on Windows). For a persistent background server, use `easyread serve --open`; add `--exit-on-close` to opt into automatic shutdown from the command line.
+
 ## Usage
 
 1. Open Settings (top right) and pick a translation engine.
