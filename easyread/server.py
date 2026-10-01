@@ -189,8 +189,16 @@ class Handler(BaseHTTPRequestHandler):
                     opened["status"] = "reading"
                 ws.patch_item(opened)
                 _warm(ws.root)
+                layout = ws.load("layout") or {}
+                if not any(v.get("words") for v in layout.values() if isinstance(v, dict)):
+                    try:
+                        layout = pdfwork.locate(ws.root)
+                    except Exception as e:
+                        log.warning("自动补充 words 失败: %s", e)
+                data = {n: ws.load(n) for n in ("paper", "discussion", "reader", "item", "job")}
+                data["layout"] = layout
                 return self._json(200, {
-                    **{n: ws.load(n) for n in ("paper", "discussion", "reader", "layout", "item", "job")},
+                    **data,
                     "versions": ws.versions(), "token": app.token, "id": ws.id,
                     "engine": config.load().get("engine")})
             if action == "versions":
@@ -215,7 +223,7 @@ class Handler(BaseHTTPRequestHandler):
                     w = 1000
                 variant = pdfwork.page_variant(ws.root, rel, w)
                 return self._file(variant or _safe(ws.root, rel), cache=True)
-            if ws and (rel.split("/", 1)[0] in ("pages", "figures") or rel == "source.pdf"):
+            if ws and (rel.split("/", 1)[0] in ("pages", "figures", "extract") or rel == "source.pdf"):
                 return self._file(_safe(ws.root, rel), cache=rel != "source.pdf")
         return self._json(404, {"error": "not found"})
 

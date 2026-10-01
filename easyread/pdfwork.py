@@ -154,7 +154,30 @@ def locate(root: Path) -> dict:
                 if b < 0:
                     b = text.find(tail, a)
             end = b + len(tail) - 1 if b >= 0 else min(expected_end, len(idx) - 1)
+            block_chars = [chars[idx[k]] for k in range(a, min(end, len(idx) - 1) + 1)
+                           if 0.055 <= chars[idx[k]][2] and chars[idx[k]][4] <= 0.93]
+            words = []
+            if block_chars:
+                curr_w = [block_chars[0]]
+                for c in block_chars[1:]:
+                    prev = curr_w[-1]
+                    same_line = abs(c[2] - prev[2]) < 0.006
+                    gap = c[1] - prev[3] if same_line else 999
+                    if not same_line or gap > 0.002:
+                        w_text = "".join(x[0] for x in curr_w)
+                        words.append([w_text, round(min(x[1] for x in curr_w), 4), round(min(x[2] for x in curr_w), 4),
+                                      round(max(x[3] for x in curr_w), 4), round(max(x[4] for x in curr_w), 4)])
+                        curr_w = [c]
+                    else:
+                        curr_w.append(c)
+                if curr_w:
+                    w_text = "".join(x[0] for x in curr_w)
+                    words.append([w_text, round(min(x[1] for x in curr_w), 4), round(min(x[2] for x in curr_w), 4),
+                                  round(max(x[3] for x in curr_w), 4), round(max(x[4] for x in curr_w), 4)])
+
             layout[bid] = {"page": pn, "box": _box(chars, idx, a, end), "src": "text" if b >= 0 else "head"}
+            if words:
+                layout[bid]["words"] = words
             cursor[pn] = end
             break
     _extend_captioned(paper.get("blocks", []), layout)

@@ -62,45 +62,204 @@
 
   let activeSel = null;
 
-  function applySelHighlight(sel, loc) {
-    const selHl = PR.$(".pv-hl-sel");
-    if (!selHl || !loc || !loc.box) return;
-    const [x0, y0, x1, y1] = loc.box;
-    const H = y1 - y0;
-    const total = sel.total || Math.max(1, sel.quote ? sel.quote.length : 1);
-    const r0 = Math.max(0, Math.min(1, (sel.s != null ? sel.s : 0) / total));
-    const r1 = Math.max(r0, Math.min(1, (sel.e != null ? sel.e : total) / total));
-
-    const lines = Math.max(1, Math.round(H / 0.018));
-    const lineH = Math.min(0.04, Math.max(0.014, H / lines));
-    let subTop = y0 + r0 * H;
-    let subBottom = y0 + r1 * H;
-    if (subBottom - subTop < lineH * 0.9) {
-      const pad = (lineH * 0.9 - (subBottom - subTop)) / 2;
-      subTop = Math.max(y0, subTop - pad);
-      subBottom = Math.min(y1, subBottom + pad);
-      if (subBottom - subTop < lineH * 0.9) {
-        if (subTop <= y0 + 0.001) subBottom = Math.min(y1, subTop + lineH * 0.9);
-        else subTop = Math.max(y0, subBottom - lineH * 0.9);
+  function wordsToLineBoxes(words) {
+    if (!words || !words.length) return [];
+    const boxes = [];
+    let curr = [words[0]];
+    for (let i = 1; i < words.length; i++) {
+      const w = words[i];
+      const prev = curr[curr.length - 1];
+      if (Math.abs(w[2] - prev[2]) < 0.007) {
+        curr.push(w);
+      } else {
+        boxes.push([
+          Math.min(...curr.map((x) => x[1])),
+          Math.min(...curr.map((x) => x[2])),
+          Math.max(...curr.map((x) => x[3])),
+          Math.max(...curr.map((x) => x[4])),
+        ]);
+        curr = [w];
       }
     }
-    subTop = Math.max(y0 - 0.002, subTop);
-    subBottom = Math.min(y1 + 0.002, Math.max(subTop + lineH * 0.8, subBottom));
+    if (curr.length > 0) {
+      boxes.push([
+        Math.min(...curr.map((x) => x[1])),
+        Math.min(...curr.map((x) => x[2])),
+        Math.max(...curr.map((x) => x[3])),
+        Math.max(...curr.map((x) => x[4])),
+      ]);
+    }
+    return boxes;
+  }
 
-    Object.assign(selHl.style, {
-      left: (x0 * 100 - 0.8) + "%",
-      top: (subTop * 100 - 0.3) + "%",
-      width: ((x1 - x0) * 100 + 1.6) + "%",
-      height: ((subBottom - subTop) * 100 + 0.6) + "%"
-    });
-    selHl.classList.add("on");
+  function findMatchedWords(words, block, sel) {
+    if (!words || !words.length) return null;
+    const norm = (s) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+
+    // 1. Direct English Token Match
+    const selTokens = (sel.quote || "").match(/[A-Za-z0-9]+(?:[-'][A-Za-z0-9]+)*/g);
+    if (selTokens && selTokens.length > 0) {
+      const normSel = selTokens.map(norm).filter((t) => t && (t.length > 1 || /[0-9]/.test(t) || /[A-Z]/.test(t)));
+      if (normSel.length > 0) {
+        const normWords = words.map((w) => norm(w[0]));
+        for (let i = 0; i <= normWords.length - normSel.length; i++) {
+          let match = true;
+          for (let j = 0; j < normSel.length; j++) {
+            if (normWords[i + j] !== normSel[j] && !normWords[i + j].includes(normSel[j]) && !normSel[j].includes(normWords[i + j])) {
+              match = false;
+              break;
+            }
+          }
+          if (match) {
+            return { start: i, end: i + normSel.length - 1 };
+          }
+        }
+      }
+    }
+
+    // 2. Glossary Term Match
+    const glossary = (S.paper && S.paper.glossary) || [];
+    for (const item of glossary) {
+      if (item.zh && item.en && (sel.quote.includes(item.zh) || item.zh.includes(sel.quote.trim()))) {
+        const gTokens = item.en.match(/[A-Za-z0-9]+/g);
+        if (gTokens && gTokens.length) {
+          const normG = gTokens.map(norm).filter(Boolean);
+          const normWords = words.map((w) => norm(w[0]));
+          for (let i = 0; i <= normWords.length - normG.length; i++) {
+            let match = true;
+            for (let j = 0; j < normG.length; j++) {
+              if (normWords[i + j] !== normG[j]) { match = false; break; }
+            }
+            if (match) {
+              return { start: i, end: i + normG.length - 1 };
+            }
+          }
+        }
+      }
+    }
+
+    // 3. Sentence & Word-Level Proportional Alignment
+    const zh = (block && (block.zh || (PR.textFor && PR.textFor(block.id)))) || "";
+    const en = (block && block.en) || "";
+    const s = sel.s != null ? sel.s : 0;
+    const e = sel.e != null ? sel.e : (sel.total || zh.length);
+
+    const zhSentRegex = /[^。！？\n]+[。！？\n]*/g;
+    const zhSents = [];
+    let m;
+    while ((m = zhSentRegex.exec(zh)) !== null) {
+      zhSents.push({ text: m[0], start: m.index, end: m.index + m[0].length });
+    }
+    if (!zhSents.length) zhSents.push({ text: zh, start: 0, end: zh.length });
+
+    const enProtected = en.replace(/\b(et al|i\.e|e\.g|Fig|al)\./gi, "$1\u2022");
+    const enSentRegex = /[^.!?\n]+[.!?\n]*/g;
+    const enSents = [];
+    while ((m = enSentRegex.exec(enProtected)) !== null) {
+      enSents.push({ text: m[0], start: m.index, end: m.index + m[0].length });
+    }
+    if (!enSents.length) enSents.push({ text: en, start: 0, end: en.length });
+
+    const overlappingZh = [];
+    for (let k = 0; k < zhSents.length; k++) {
+      if (s < zhSents[k].end && e > zhSents[k].start) {
+        overlappingZh.push(k);
+      }
+    }
+
+    if (overlappingZh.length > 0) {
+      const kFirst = overlappingZh[0];
+      const kLast = overlappingZh[overlappingZh.length - 1];
+
+      const enIdxFirst = Math.min(enSents.length - 1, Math.round(kFirst * (enSents.length - 1) / Math.max(1, zhSents.length - 1)));
+      const enIdxLast = Math.min(enSents.length - 1, Math.round(kLast * (enSents.length - 1) / Math.max(1, zhSents.length - 1)));
+
+      const sentStartZh = zhSents[kFirst].start;
+      const sentLenZhFirst = Math.max(1, zhSents[kFirst].end - sentStartZh);
+      const frac0 = Math.max(0, Math.min(1, (s - sentStartZh) / sentLenZhFirst));
+
+      const sentEndZh = zhSents[kLast].end;
+      const sentLenZhLast = Math.max(1, sentEndZh - zhSents[kLast].start);
+      const frac1 = Math.max(0, Math.min(1, (e - zhSents[kLast].start) / sentLenZhLast));
+
+      const enCharStart = enSents[enIdxFirst].start + Math.floor(frac0 * enSents[enIdxFirst].text.length);
+      const enCharEnd = enSents[enIdxLast].start + Math.ceil(frac1 * enSents[enIdxLast].text.length);
+
+      const fracEn0 = Math.max(0, Math.min(1, enCharStart / Math.max(1, en.length)));
+      const fracEn1 = Math.max(fracEn0, Math.min(1, enCharEnd / Math.max(1, en.length)));
+
+      const wStart = Math.min(words.length - 1, Math.floor(fracEn0 * words.length));
+      const wEnd = Math.min(words.length - 1, Math.max(wStart, Math.ceil(fracEn1 * words.length) - 1));
+
+      return { start: wStart, end: wEnd };
+    }
+
+    const totalZh = Math.max(1, sel.total || zh.length);
+    const r0 = Math.max(0, Math.min(1, s / totalZh));
+    const r1 = Math.max(r0, Math.min(1, e / totalZh));
+    const wStart = Math.min(words.length - 1, Math.floor(r0 * words.length));
+    const wEnd = Math.min(words.length - 1, Math.max(wStart, Math.ceil(r1 * words.length) - 1));
+    return { start: wStart, end: wEnd };
+  }
+
+  function applySelHighlight(sel, loc) {
+    const selContainer = PR.$(".pv-hl-sel");
+    if (!selContainer || !loc) return;
+    selContainer.innerHTML = "";
+
+    const block = PR.blockById[sel.anchor];
+    const words = loc.words || [];
+    let lineBoxes = [];
+
+    if (words.length > 0) {
+      const match = findMatchedWords(words, block, sel);
+      if (match && match.start <= match.end) {
+        const matched = words.slice(match.start, match.end + 1);
+        lineBoxes = wordsToLineBoxes(matched);
+      }
+    }
+
+    if (!lineBoxes.length && loc.box) {
+      const [x0, y0, x1, y1] = loc.box;
+      const H = y1 - y0;
+      const total = sel.total || Math.max(1, sel.quote ? sel.quote.length : 1);
+      const r0 = Math.max(0, Math.min(1, (sel.s != null ? sel.s : 0) / total));
+      const r1 = Math.max(r0, Math.min(1, (sel.e != null ? sel.e : total) / total));
+      const lines = Math.max(1, Math.round(H / 0.018));
+      const lineH = Math.min(0.04, Math.max(0.014, H / lines));
+      let subTop = y0 + r0 * H;
+      let subBottom = y0 + r1 * H;
+      if (subBottom - subTop < lineH * 0.9) {
+        const pad = (lineH * 0.9 - (subBottom - subTop)) / 2;
+        subTop = Math.max(y0, subTop - pad);
+        subBottom = Math.min(y1, subBottom + pad);
+      }
+      lineBoxes.push([x0, subTop, x1, subBottom]);
+    }
+
+    if (!lineBoxes.length) return;
+
+    let minTop = Infinity, maxBottom = -Infinity;
+    for (const [x0, y0, x1, y1] of lineBoxes) {
+      minTop = Math.min(minTop, y0);
+      maxBottom = Math.max(maxBottom, y1);
+      const rect = document.createElement("div");
+      rect.className = "pv-hl-rect on";
+      Object.assign(rect.style, {
+        left: (x0 * 100 - 0.25) + "%",
+        top: (y0 * 100 - 0.2) + "%",
+        width: ((x1 - x0) * 100 + 0.5) + "%",
+        height: ((y1 - y0) * 100 + 0.4) + "%"
+      });
+      selContainer.appendChild(rect);
+    }
 
     const scroller = PR.$(".pv-scroll");
     const img = PR.$(".pv-page img");
     const doSelScroll = () => {
       const h = PR.$(".pv-page").offsetHeight;
       if (!h || !scroller) return;
-      const midY = ((subTop + subBottom) / 2) * h + 18;
+      const midY = ((minTop + maxBottom) / 2) * h + 18;
       const curTop = scroller.scrollTop;
       const curBottom = curTop + scroller.clientHeight;
       if (midY < curTop + 40 || midY > curBottom - 40) {
@@ -113,7 +272,7 @@
   PR.clearSelectionHighlight = function () {
     activeSel = null;
     const selHl = PR.$(".pv-hl-sel");
-    if (selHl) selHl.classList.remove("on");
+    if (selHl) selHl.innerHTML = "";
   };
 
   PR.highlightSelection = function (sel) {
@@ -166,7 +325,7 @@
       applySelHighlight(activeSel, loc);
     } else {
       const selHl = PR.$(".pv-hl-sel");
-      if (selHl) selHl.classList.remove("on");
+      if (selHl) selHl.innerHTML = "";
     }
   }
 
