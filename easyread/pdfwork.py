@@ -212,12 +212,18 @@ def page_variant(root: Path, rel: str, width: int) -> Path | None:
         return None
     out = root / "pages" / f"w{width}" / src.name
     if not out.exists():
-        from PIL import Image
-        out.parent.mkdir(exist_ok=True)
-        with Image.open(src) as im:
-            if im.width <= width:
-                return src
-            im.resize((width, round(im.height * width / im.width)), Image.LANCZOS).save(out, "WEBP", quality=80, method=4)
+        try:
+            from PIL import Image
+        except ImportError:
+            return src
+        try:
+            out.parent.mkdir(exist_ok=True)
+            with Image.open(src) as im:
+                if im.width <= width:
+                    return src
+                im.resize((width, round(im.height * width / im.width)), Image.LANCZOS).save(out, "WEBP", quality=80, method=4)
+        except Exception:
+            return src
     return out
 
 
@@ -226,9 +232,15 @@ PANEL_WIDTH = 1000  # 原页面板默认要的宽度（阅读页按面板宽度�
 
 def warm_variants(root: Path, width: int = PANEL_WIDTH) -> None:
     """后台把整篇的面板图都先生成好，打开原页面板时不用等。"""
-    for src in sorted((root / "pages").glob("page-*.webp")):
+    pages_dir = root / "pages"
+    if not pages_dir.exists():
+        return
+    for src in sorted(pages_dir.glob("page-*.webp")):
         if not (root / "pages" / f"w{width}" / src.name).exists():
-            page_variant(root, f"pages/{src.name}", width)
+            try:
+                page_variant(root, f"pages/{src.name}", width)
+            except Exception:
+                pass
 
 
 def prepare(root: Path) -> list[dict]:

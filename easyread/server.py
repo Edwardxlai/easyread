@@ -209,7 +209,12 @@ class Handler(BaseHTTPRequestHandler):
             _, _, pid, rel = path.split("/", 3)
             ws = lib.ws(pid)
             if ws and rel.startswith("pages/") and "w=" in url.query:  # 原页面板用的小一号图，第一次请求时生成
-                return self._file(pdfwork.page_variant(ws.root, rel, int(parse_qs(url.query)["w"][0])), cache=True)
+                try:
+                    w = int(parse_qs(url.query)["w"][0])
+                except (KeyError, IndexError, ValueError):
+                    w = 1000
+                variant = pdfwork.page_variant(ws.root, rel, w)
+                return self._file(variant or _safe(ws.root, rel), cache=True)
             if ws and (rel.split("/", 1)[0] in ("pages", "figures") or rel == "source.pdf"):
                 return self._file(_safe(ws.root, rel), cache=rel != "source.pdf")
         return self._json(404, {"error": "not found"})

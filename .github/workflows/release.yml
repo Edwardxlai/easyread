@@ -35,8 +35,8 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-      - name: Install backend build tools
-        run: python -m pip install --upgrade pip pyinstaller
+      - name: Install backend build tools and dependencies
+        run: python -m pip install --upgrade pip pyinstaller .
       - name: Install JavaScript dependencies
         run: npm ci
       - name: Use the tag as the app version

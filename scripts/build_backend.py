@@ -30,6 +30,14 @@ def python_with_pyinstaller() -> list[str]:
     raise SystemExit("未找到 PyInstaller。请运行：python -m pip install pyinstaller")
 
 
+def check_dependencies(python: list[str]) -> None:
+    required = ["pypdfium2", "pdfplumber", "PIL", "pypdf"]
+    for mod in required:
+        probe = subprocess.run(python + ["-c", f"import {mod}"], cwd=ROOT, capture_output=True)
+        if probe.returncode != 0:
+            raise SystemExit(f"缺少后端依赖 '{mod}'。请在打包前运行：python -m pip install -e .")
+
+
 def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8")  # Windows 控制台默认不是 UTF-8，下面的中文提示会让脚本崩掉
     OUT.mkdir(parents=True, exist_ok=True)
@@ -40,10 +48,17 @@ def main() -> None:
         elif old.is_dir():
             shutil.rmtree(old)
     python = python_with_pyinstaller()
+    check_dependencies(python)
     cmd = python + ["-m", "PyInstaller", "--noconfirm", "--clean", "--onefile",
                     "--name", "easyread-backend", "--distpath", str(OUT),
                     "--workpath", str(WORK), "--specpath", str(WORK),
-                    "--collect-all", "easyread", str(ROOT / "scripts" / "backend_entry.py")]
+                    "--collect-all", "easyread",
+                    "--collect-all", "pypdfium2",
+                    "--collect-all", "pypdfium2_raw",
+                    "--collect-all", "pdfplumber",
+                    "--collect-all", "PIL",
+                    "--collect-all", "pypdf",
+                    str(ROOT / "scripts" / "backend_entry.py")]
     subprocess.run(cmd, cwd=ROOT, check=True)
     print(f"后端已生成：{OUT / ('easyread-backend.exe' if os.name == 'nt' else 'easyread-backend')}")
 
