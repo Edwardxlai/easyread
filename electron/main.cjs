@@ -140,6 +140,15 @@ async function createWindow() {
     if (/^https?:/i.test(target)) shell.openExternal(target);
     return { action: "deny" };
   });
+  // Electron has no built-in right-click menu. The web app handles its own
+  // (paragraph menu etc.) with preventDefault; everywhere else offer the
+  // basic text actions for inputs and selected text.
+  mainWindow.webContents.on("context-menu", (_event, params) => {
+    const items = params.isEditable
+      ? [{ role: "cut" }, { role: "copy" }, { role: "paste" }, { type: "separator" }, { role: "selectAll" }]
+      : params.selectionText.trim() ? [{ role: "copy" }] : [];
+    if (items.length) Menu.buildFromTemplate(items).popup({ window: mainWindow });
+  });
   mainWindow.once("ready-to-show", () => mainWindow.show());
   mainWindow.on("closed", () => { mainWindow = undefined; });
   await mainWindow.loadURL(url);
@@ -147,8 +156,12 @@ async function createWindow() {
 
 // Keep the web application's own header at the top of the content area. The
 // default Electron File/Edit/View/Window strip would otherwise create a second
-// toolbar row above it.
-Menu.setApplicationMenu(null);
+// toolbar row above it. macOS is different: its menu bar lives at the top of
+// the screen, not inside the window, and Cmd+C/V/X/A/Z only work when an Edit
+// menu provides those roles — so keep a minimal menu there.
+Menu.setApplicationMenu(process.platform === "darwin"
+  ? Menu.buildFromTemplate([{ role: "appMenu" }, { role: "editMenu" }, { role: "windowMenu" }])
+  : null);
 
 app.whenReady().then(createWindow);
 app.on("before-quit", stopBackend);
