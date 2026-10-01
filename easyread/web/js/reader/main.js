@@ -9,7 +9,12 @@
     const line = innerHeight * 0.3;
     let best = null;
     for (const el of PR.$$("#paper > .blk, #paper > .paper-head")) {
-      if (el.getBoundingClientRect().top <= line) best = el; else break;
+      const r = el.getBoundingClientRect();
+      if (r.top <= line) {
+        if (r.bottom >= 60) best = el;
+      } else {
+        break;
+      }
     }
     return best ? best.dataset.id : "head";
   };

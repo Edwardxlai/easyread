@@ -129,7 +129,11 @@
   PR.syncPage = function (force) {
     if (PR.side !== "pages") return;
     if (!force && (!PR.$(".pv-follow input").checked || Date.now() < holdUntil)) return;
-    const id = (PR.currentBlock && PR.currentBlock()) || PR.readingBlock();
+    const id = force ? ((PR.currentBlock && PR.currentBlock()) || PR.readingBlock()) : PR.readingBlock();
+    if (id === "head") {
+      showPage(1, null);
+      return;
+    }
     const b = PR.blockById[id];
     if (!b) return;
     if (!force && id === pvBlock) return;

@@ -96,9 +96,17 @@ def _anchors(en: str) -> tuple[str, str]:
     return head, tail
 
 
+def _x_overlap(b1: list[float], b2: list[float], min_overlap: float = 0.03) -> bool:
+    return max(b1[0], b2[0]) < min(b1[2], b2[2]) - min_overlap
+
+
 def _box(chars, idx, a: int, b: int):
-    sel = [chars[idx[k]] for k in range(a, min(b, len(idx) - 1) + 1)]
-    return [min(c[1] for c in sel), min(c[2] for c in sel), max(c[3] for c in sel), max(c[4] for c in sel)]
+    # 过滤掉非正文区域的离群字符（页眉顶部 < 0.055，页脚底部 > 0.93）
+    valid_k = [k for k in range(a, min(b, len(idx) - 1) + 1)
+               if 0.055 <= chars[idx[k]][2] and chars[idx[k]][4] <= 0.93]
+    sel = [chars[idx[k]] for k in (valid_k if valid_k else range(a, min(b, len(idx) - 1) + 1))]
+    return [round(min(c[1] for c in sel), 4), round(min(c[2] for c in sel), 4),
+            round(max(c[3] for c in sel), 4), round(max(c[4] for c in sel), 4)]
 
 
 def block_english(block: dict) -> str:
@@ -137,8 +145,15 @@ def locate(root: Path) -> dict:
                 a = text.find(head)
             if a < 0:
                 continue
-            b = text.find(tail, a) if tail else -1
-            end = b + len(tail) - 1 if b >= 0 else min(a + len(_norm(block_english(block))), len(idx) - 1)
+            expected_end = a + len(_norm(block_english(block)))
+            b = -1
+            if tail:
+                # 优先在预期长度附近向后找，避免段落前半部分包含结尾短语导致提前截断
+                search_end = min(len(text), expected_end + 200)
+                b = text.rfind(tail, a, search_end)
+                if b < 0:
+                    b = text.find(tail, a)
+            end = b + len(tail) - 1 if b >= 0 else min(expected_end, len(idx) - 1)
             layout[bid] = {"page": pn, "box": _box(chars, idx, a, end), "src": "text" if b >= 0 else "head"}
             cursor[pn] = end
             break
@@ -150,32 +165,51 @@ def locate(root: Path) -> dict:
 
 
 def _extend_captioned(blocks: list[dict], layout: dict):
-    """表格/图只匹配到了题注，把框往上撑到前一个同页块的下沿（题注在上方的往下撑）。"""
+    """表格/图只匹配到了题注，把框往上撑到同栏前一个块的下沿（题注在上方的往下撑）。"""
     for i, block in enumerate(blocks):
         loc = layout.get(block.get("id"))
         if block.get("type") not in ("table", "figure") or not loc or loc.get("src") == "manual":
             continue
         page = loc["page"]
         x0, y0, x1, y1 = loc["box"]
+        wide = (x1 - x0) > 0.55 or (x0 < 0.25 and x1 > 0.75)
+        bx0 = 0.10 if wide else max(0.06, x0 - 0.02)
+        bx1 = 0.90 if wide else min(0.94, x1 + 0.02)
+        test_box = [bx0, y0, bx1, y1]
         if block.get("caption_pos", "below") == "below":
-            prev = next((layout[b["id"]] for b in reversed(blocks[:i]) if layout.get(b.get("id"), {}).get("page") == page), None)
-            y0 = prev["box"][3] + 0.005 if prev and prev["box"][3] < y0 else 0.08
+            above = [l["box"][3] for l in layout.values()
+                     if l["page"] == page and l != loc and _x_overlap(l["box"], test_box) and l["box"][3] < y0 - 0.01]
+            if above:
+                top = max(above) + 0.006
+            else:
+                same_page = [l["box"][1] for l in layout.values() if l["page"] == page and l != loc]
+                top = max(0.26, min(same_page)) if page == 1 else 0.08
+            loc["box"] = [round(bx0, 4), round(top, 4), round(bx1, 4), round(y1, 4)]
         else:
-            nxt = next((layout[b["id"]] for b in blocks[i + 1:] if layout.get(b.get("id"), {}).get("page") == page), None)
-            y1 = nxt["box"][1] - 0.005 if nxt and nxt["box"][1] > y1 else 0.92
-        loc["box"] = [min(x0, 0.15), round(y0, 4), max(x1, 0.85), round(y1, 4)]
+            below = [l["box"][1] for l in layout.values()
+                     if l["page"] == page and l != loc and _x_overlap(l["box"], test_box) and l["box"][1] > y1 + 0.01]
+            if below:
+                bottom = min(below) - 0.006
+            else:
+                bottom = 0.92
+            loc["box"] = [round(bx0, 4), round(y0, 4), round(bx1, 4), round(bottom, 4)]
 
 
 def _clamp_overlaps(layout: dict):
-    """只匹配到开头的块按长度估了结尾，可能压到下一块；截到下一块上沿。"""
+    """只匹配到开头的块按长度估了结尾，可能压到同栏下一块；截到同栏下一块上沿。"""
     by_page: dict[int, list] = {}
     for loc in layout.values():
         by_page.setdefault(loc["page"], []).append(loc)
     for locs in by_page.values():
-        locs.sort(key=lambda l: l["box"][1])
-        for cur, nxt in zip(locs, locs[1:]):
-            if cur["src"] in ("head", "text") and cur["box"][3] > nxt["box"][1] > cur["box"][1]:
-                cur["box"][3] = round(nxt["box"][1] - 0.002, 4)
+        locs.sort(key=lambda l: (l["box"][1], l["box"][0]))
+        for cur in locs:
+            if cur.get("src") != "head":
+                continue
+            nxt_col = [nxt for nxt in locs if nxt != cur and _x_overlap(cur["box"], nxt["box"]) and nxt["box"][1] > cur["box"][1]]
+            if nxt_col:
+                nxt = min(nxt_col, key=lambda l: l["box"][1])
+                if cur["box"][3] > nxt["box"][1]:
+                    cur["box"][3] = round(nxt["box"][1] - 0.002, 4)
 
 
 def _fill_gaps(blocks: list[dict], layout: dict):
@@ -185,13 +219,17 @@ def _fill_gaps(blocks: list[dict], layout: dict):
         if not bid or bid in layout or not block.get("page"):
             continue
         page = block["page"]
+        prev = next((layout[b["id"]] for b in reversed(blocks[:i]) if layout.get(b.get("id"), {}).get("page") == page), None)
         nxt = next((layout[b["id"]] for b in blocks[i + 1:] if layout.get(b.get("id"), {}).get("page") == page), None)
-        bottom = nxt["box"][1] if nxt else 0.92
-        above = [l["box"][3] for l in layout.values() if l["page"] == page and l["box"][3] <= bottom + 0.001]
-        top = max(above) if above else 0.08
+        ref = prev or nxt
+        x0, x1 = (ref["box"][0], ref["box"][2]) if ref else (0.10, 0.90)
+        bottom = nxt["box"][1] - 0.005 if nxt else 0.92
+        above = [l["box"][3] for l in layout.values()
+                 if l["page"] == page and _x_overlap(l["box"], [x0, 0, x1, 1]) and l["box"][3] <= bottom + 0.001]
+        top = max(above) + 0.005 if above else (prev["box"][3] + 0.005 if prev else 0.08)
         if bottom - top < 0.01:
             bottom = top + 0.04
-        layout[bid] = {"page": page, "box": [0.12, round(top, 4), 0.88, round(bottom, 4)], "src": "between"}
+        layout[bid] = {"page": page, "box": [round(x0, 4), round(top, 4), round(x1, 4), round(bottom, 4)], "src": "between"}
 
 
 def engine_image(root: Path, n: int) -> Path:

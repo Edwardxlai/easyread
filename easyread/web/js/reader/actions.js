@@ -42,6 +42,9 @@
     el.classList.add("current");
     if (opts && opts.scroll) PR.centerOn(el);  // J/K：放到屏幕中间
     if (!opts || opts.bar !== false) showBar();
+    if (PR.syncPage && PR.$ && PR.$(".pv-follow input") && PR.$(".pv-follow input").checked) {
+      PR.syncPage(true);
+    }
   };
 
   function showBar() {
