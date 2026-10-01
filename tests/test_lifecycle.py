@@ -243,6 +243,8 @@ class ServerLifecycleTest(unittest.TestCase):
         self.assertEqual(self.process.wait(timeout=15), 0)
         self.assertFalse((self.home / ".server.json").exists())
         with socket.socket() as probe:
+            if os.name != "nt":  # 与服务端相同，允许 POSIX 上的 TIME_WAIT 连接
+                probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             probe.bind(("127.0.0.1", int(self.url.rsplit(":", 1)[1])))
 
     def test_shutdown_requires_token_and_notifies_all_tabs(self):
