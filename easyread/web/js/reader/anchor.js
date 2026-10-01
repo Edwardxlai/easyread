@@ -101,14 +101,19 @@
     const e = offsetOf(zh, range.endContainer, range.endOffset);
     const quote = text.slice(s, e);
     if (!quote.trim()) return null;
-    return { anchor: zh.closest(".blk").dataset.id, key: zh.dataset.key, quote, prefix: text.slice(Math.max(0, s - 32), s), suffix: text.slice(e, e + 32), rect: range.getBoundingClientRect() };
+    return { anchor: zh.closest(".blk").dataset.id, key: zh.dataset.key, quote, prefix: text.slice(Math.max(0, s - 32), s), suffix: text.slice(e, e + 32), rect: range.getBoundingClientRect(), s, e, total: text.length };
   }
   PR.hasPendingSelection = () => !!pendingSel && selbar().classList.contains("open");
 
   function showSelbar() {
     pendingSel = readSelection();
     const bar = selbar();
-    if (!pendingSel) { bar.classList.remove("open"); return; }
+    if (!pendingSel) {
+      bar.classList.remove("open");
+      PR.clearSelectionHighlight && PR.clearSelectionHighlight();
+      return;
+    }
+    PR.highlightSelection && PR.highlightSelection(pendingSel);
     PR.hideBlockbar && PR.hideBlockbar();
     const pen = PR.prefs.pen === "underline" ? "underline" : "marker";
     bar.innerHTML = '<span class="pens"><button data-pen="marker" class="' + (pen === "marker" ? "on" : "") + '" title="荧光笔：涂底色">' + PR.icon("marker", "sm") + "</button>" +
@@ -128,7 +133,7 @@
   }
   document.addEventListener("mouseup", (e) => { if (!(e.target.closest && e.target.closest("#selbar, #blockbar"))) setTimeout(showSelbar, 10); });
   document.addEventListener("keyup", (e) => { if (e.shiftKey && e.key.startsWith("Arrow")) showSelbar(); });
-  document.addEventListener("selectionchange", PR.debounce(() => { const s = getSelection(); if (!s || s.isCollapsed) selbar().classList.remove("open"); }, 120));
+  document.addEventListener("selectionchange", PR.debounce(() => { const s = getSelection(); if (!s || s.isCollapsed) { selbar().classList.remove("open"); PR.clearSelectionHighlight && PR.clearSelectionHighlight(); } }, 120));
 
   PR.selectionAction = function (kind, color) {
     if (!pendingSel) return;
@@ -136,6 +141,7 @@
     selbar().classList.remove("open");
     getSelection().removeAllRanges();
     pendingSel = null;
+    PR.clearSelectionHighlight && PR.clearSelectionHighlight();
     if (kind === "en") { PR.toggleEn(anchor, true); return; }
     if (kind === "copy") { navigator.clipboard.writeText(quote).then(() => PR.toast("已复制")); return; }
     if (kind === "chat") { PR.chatAsk({ anchor, quote }); return; }

@@ -35,7 +35,8 @@
   PR.togglePages = function (force) {
     const open = force != null ? force : PR.side !== "pages";
     PR.openSide(open ? "pages" : null);
-    if (open) PR.syncPage(true); else pair(null);
+    if (open) { PR.syncPage(true); if (activeSel) PR.highlightSelection(activeSel); }
+    else { pair(null); PR.clearSelectionHighlight && PR.clearSelectionHighlight(); }
   };
   PR.openPage = function (page, blockId) {
     pvBlock = blockId || null;
@@ -58,6 +59,82 @@
     if (s && !preloaded.has(s)) { preloaded.add(s); const im = new Image(); im.decoding = "async"; im.src = s; }
   }
   PR.preloadPage = () => { const b = PR.blockById[PR.readingBlock()]; if (b && b.page) preload(b.page); };
+
+  let activeSel = null;
+
+  function applySelHighlight(sel, loc) {
+    const selHl = PR.$(".pv-hl-sel");
+    if (!selHl || !loc || !loc.box) return;
+    const [x0, y0, x1, y1] = loc.box;
+    const H = y1 - y0;
+    const total = sel.total || Math.max(1, sel.quote ? sel.quote.length : 1);
+    const r0 = Math.max(0, Math.min(1, (sel.s != null ? sel.s : 0) / total));
+    const r1 = Math.max(r0, Math.min(1, (sel.e != null ? sel.e : total) / total));
+
+    const lines = Math.max(1, Math.round(H / 0.018));
+    const lineH = Math.min(0.04, Math.max(0.014, H / lines));
+    let subTop = y0 + r0 * H;
+    let subBottom = y0 + r1 * H;
+    if (subBottom - subTop < lineH * 0.9) {
+      const pad = (lineH * 0.9 - (subBottom - subTop)) / 2;
+      subTop = Math.max(y0, subTop - pad);
+      subBottom = Math.min(y1, subBottom + pad);
+      if (subBottom - subTop < lineH * 0.9) {
+        if (subTop <= y0 + 0.001) subBottom = Math.min(y1, subTop + lineH * 0.9);
+        else subTop = Math.max(y0, subBottom - lineH * 0.9);
+      }
+    }
+    subTop = Math.max(y0 - 0.002, subTop);
+    subBottom = Math.min(y1 + 0.002, Math.max(subTop + lineH * 0.8, subBottom));
+
+    Object.assign(selHl.style, {
+      left: (x0 * 100 - 0.8) + "%",
+      top: (subTop * 100 - 0.3) + "%",
+      width: ((x1 - x0) * 100 + 1.6) + "%",
+      height: ((subBottom - subTop) * 100 + 0.6) + "%"
+    });
+    selHl.classList.add("on");
+
+    const scroller = PR.$(".pv-scroll");
+    const img = PR.$(".pv-page img");
+    const doSelScroll = () => {
+      const h = PR.$(".pv-page").offsetHeight;
+      if (!h || !scroller) return;
+      const midY = ((subTop + subBottom) / 2) * h + 18;
+      const curTop = scroller.scrollTop;
+      const curBottom = curTop + scroller.clientHeight;
+      if (midY < curTop + 40 || midY > curBottom - 40) {
+        scroller.scrollTo({ top: Math.max(0, midY - scroller.clientHeight / 2), behavior: "smooth" });
+      }
+    };
+    img && img.complete ? doSelScroll() : img && img.addEventListener("load", doSelScroll, { once: true });
+  }
+
+  PR.clearSelectionHighlight = function () {
+    activeSel = null;
+    const selHl = PR.$(".pv-hl-sel");
+    if (selHl) selHl.classList.remove("on");
+  };
+
+  PR.highlightSelection = function (sel) {
+    if (!sel || !sel.anchor) {
+      PR.clearSelectionHighlight();
+      return;
+    }
+    const loc = S.layout && S.layout[sel.anchor];
+    if (!loc || !loc.box) {
+      PR.clearSelectionHighlight();
+      return;
+    }
+    activeSel = sel;
+    if (PR.side === "pages") {
+      if (loc.page !== pvPage || sel.anchor !== pvBlock) {
+        showPage(loc.page, sel.anchor);
+      } else {
+        applySelHighlight(sel, loc);
+      }
+    }
+  };
 
   function showPage(page, blockId) {
     const list = pages();
@@ -85,6 +162,12 @@
         scroller.scrollTo({ top: Math.max(0, ((y0 + y1) / 2) * h + 18 - scroller.clientHeight / 2), behavior: "smooth" }); };
       img.complete ? doScroll() : img.addEventListener("load", doScroll, { once: true });
     } else hl.classList.remove("on");
+    if (activeSel && activeSel.anchor === blockId && loc && loc.page === pvPage) {
+      applySelHighlight(activeSel, loc);
+    } else {
+      const selHl = PR.$(".pv-hl-sel");
+      if (selHl) selHl.classList.remove("on");
+    }
   }
 
   /* 译文里和原页框对应的那段也标出来（同一个颜色），一眼看出左右是哪两段 */
