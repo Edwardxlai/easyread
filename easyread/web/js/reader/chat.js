@@ -9,8 +9,13 @@
   "use strict";
   const S = PR.state;
   const panel = () => PR.$("#chatpanel");
-  const st = { loaded: false, threads: [], cur: null, localSeq: 0, models: [], def: "", model: "", answerStyle: "standard", listOpen: false, menuOpen: false, usageOpen: false, limits: null, refs: [], auto: null, noAuto: false, streaming: null, draft: "" };
-  const styleOf = (t) => t && t.answer_style === "ste100" ? "ste100" : "standard";
+  const st = { loaded: false, threads: [], cur: null, localSeq: 0, models: [], def: "", model: "", answerStyle: "standard", steBilingual: true, listOpen: false, menuOpen: false, usageOpen: false, limits: null, refs: [], auto: null, noAuto: false, streaming: null, draft: "" };
+  const isSte = (style) => style === "ste100" || style === "ste100_bilingual";
+  const styleOf = (t) => t && isSte(t.answer_style) ? t.answer_style : "standard";
+  function setStyle(style) {
+    st.answerStyle = style;
+    if (isSte(style)) st.steBilingual = style === "ste100_bilingual";
+  }
 
   PR.canChat = () => PR.store.mode === "server";
   /* 在线演示 / 离线版：带着对话记录时可以看，不能问 */
@@ -53,7 +58,7 @@
     if (st.loaded && !force) return;
     if (!PR.canChat()) {
       st.threads = (S.chat && S.chat.threads) || []; st.cur = st.cur || (st.threads[0] || {}).id || null; st.loaded = true;
-      st.answerStyle = styleOf(thread());
+      setStyle(styleOf(thread()));
       return;
     }
     try {
@@ -64,7 +69,7 @@
       if (!st.model || !st.models.some((m) => m.id === st.model)) st.model = st.def;
       if (!modelsOnly) {
         if (st.cur && !st.threads.some((t) => t.id === st.cur)) st.cur = null;
-        if (st.cur) st.answerStyle = styleOf(thread());
+        if (st.cur) setStyle(styleOf(thread()));
       }
       st.loaded = true;
     } catch (e) { PR.toast("读不到对话记录：" + PR.esc(e.message)); }
@@ -121,7 +126,7 @@
     }
     const live = st.streaming && st.streaming.msg === m;
     return '<div class="cm ai' + (m.error ? " err" : "") + '" data-id="' + PR.esc(m.id || "") + '"><div class="who"><span class="av">' + PR.icon("sparkle", "sm") + "</span>" + PR.esc(m.model || "AI") +
-      (m.answer_style === "ste100" ? '<span class="cm-style">ASD-STE100</span>' : "") + (live ? ' <span class="spin"></span>' : "") + "</div>" +
+      (isSte(m.answer_style) ? '<span class="cm-style">ASD-STE100' + (m.answer_style === "ste100_bilingual" ? " · 中英对照" : "") + '</span>' : "") + (live ? ' <span class="spin"></span>' : "") + "</div>" +
       '<div class="body">' + (m.error ? PR.esc(m.error) : m.content ? PR.mdBlocks(m.content) : '<p class="thinking"><i></i><i></i><i></i></p>') + "</div>" +
       (!live && !m.error && m.id ? '<div class="acts"><button data-c="copy">' + PR.icon("copy", "sm") + "复制</button>" + (PR.canChat() ? '<button data-c="pin" title="作为 AI 讨论放到这段旁边">' + PR.icon("note", "sm") + "放到页边</button>" : "") +
         (m.usage && m.usage.calls ? '<span class="cm-usage" title="输入 ' + PR.fmtTokens(m.usage.input) + "（缓存命中 " + PR.fmtTokens(m.usage.cached) + "），输出 " + PR.fmtTokens(m.usage.output) + '">' + PR.fmtTokens(m.usage.input + m.usage.output) + " token</span>" : "") + "</div>" : "") + "</div>";
@@ -130,7 +135,7 @@
     const counts = markCounts();
     const colors = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
     const sug = ["这段在说什么？用大白话讲一遍", "这个公式每一项是什么意思？怎么推出来的？", "这里的结论靠得住吗？有什么前提？"];
-    if (st.answerStyle === "ste100") sug.unshift("总结这篇论文的主要问题、方法、结果和局限");
+    if (isSte(st.answerStyle)) sug.unshift("总结这篇论文的主要问题、方法、结果和局限");
     if (colors.length) sug.unshift("我标" + colorName(colors[0]) + "的那些地方，彼此有什么联系？", "把我划过线的内容串成一条主线讲讲");
     return '<div class="ch-empty">' + PR.logo("hero") + "<b>边读边问</b><p>默认带上你正在读的段落；把正文里选中的文字拖到输入框，可以引用多段一起问。" + (colors.length ? "问到“标" + colorName(colors[0]) + "的”“划线”时，会自动找出你的 " + Object.values(counts).reduce((a, b) => a + b, 0) + " 处标记。" : "") + "</p>" +
       '<div class="chips">' + sug.map((q) => '<button data-c="suggest">' + PR.esc(q) + "</button>").join("") + "</div></div>";
@@ -148,8 +153,9 @@
       '<hr><button data-c="manage">' + PR.icon("gear", "sm") + "管理模型…</button></div>" : "";
     const style = '<div class="ch-style"><label for="chatAnswerStyle">回答方式</label><select id="chatAnswerStyle"' + (st.streaming ? " disabled" : "") + '>' +
       '<option value="standard"' + (st.answerStyle === "standard" ? " selected" : "") + '>普通问答</option>' +
-      '<option value="ste100"' + (st.answerStyle === "ste100" ? " selected" : "") + '>ASD-STE100 问答</option></select>' +
-      (st.answerStyle === "ste100" ? '<span class="ch-style-hint">简明中文回答</span>' : "") + '</div>';
+      '<option value="ste100"' + (isSte(st.answerStyle) ? " selected" : "") + '>ASD-STE100 问答</option></select>' +
+      (isSte(st.answerStyle) ? '<label class="ch-bilingual" title="用于下一次回答"><input type="checkbox" id="chatSteBilingual"' + (st.steBilingual ? " checked" : "") + (st.streaming ? " disabled" : "") + '>中英文对照</label>' +
+        '<span class="ch-style-hint">' + (st.steBilingual ? "中文在上，英文在下" : "简明中文回答") + '</span>' : "") + '</div>';
     return '<div class="ch-compose">' + style + (chips ? '<div class="ch-chips">' + chips + "</div>" : "") +
       '<textarea id="chatInput" rows="1" placeholder="问点什么…">' + PR.esc(st.draft) + "</textarea>" +
       '<div class="ch-bar"><button class="ch-model" data-c="menu" title="换模型">' + PR.esc(m.label) + PR.icon("chevron", "sm") + "</button>" + menu +
@@ -247,7 +253,7 @@
     const row = b.closest(".ch-thread[data-t]");
     if (c === "close") return PR.toggleChat(false);
     if (c === "list") { st.listOpen = !st.listOpen; st.menuOpen = false; return render(); }
-    if (c === "new") { if (st.streaming) return; st.cur = null; st.listOpen = false; st.model = st.def; st.answerStyle = "standard"; st.refs = []; st.noAuto = false; autoContext(); render(); return focusInput(); }
+    if (c === "new") { if (st.streaming) return; st.cur = null; st.listOpen = false; st.model = st.def; st.answerStyle = "standard"; st.steBilingual = true; st.refs = []; st.noAuto = false; autoContext(); render(); return focusInput(); }
     if (c === "menu") { st.menuOpen = !st.menuOpen; st.listOpen = st.usageOpen = false; return render(); }
     if (c === "usage") { st.usageOpen = !st.usageOpen; st.listOpen = st.menuOpen = false; return render(); }
     if (c === "model") { st.model = b.dataset.m; st.menuOpen = false; return render(); }
@@ -272,7 +278,7 @@
       if (!(await PR.confirm({ title: "删除这个对话？", body: "「" + t.title + "」。已经放到页边的讨论不受影响。", ok: "删除", danger: true, at: row }))) return;
       if (!t.local) await PR.api("/api/p/" + PR.pid + "/chat/delete", { method: "POST", body: { thread: t.id } });
       st.threads = st.threads.filter((x) => x !== t);
-      if (st.cur === t.id) { st.cur = null; st.answerStyle = "standard"; }
+      if (st.cur === t.id) { st.cur = null; st.answerStyle = "standard"; st.steBilingual = true; }
       return render();
     }
     const card = b.closest(".cm.ai");
@@ -291,12 +297,17 @@
     st.cur = row.dataset.t; st.listOpen = false;
     const t = thread();
     if (t && t.model && st.models.some((m) => m.id === t.model)) st.model = t.model;
-    st.answerStyle = styleOf(t);
+    setStyle(styleOf(t));
     render();
   });
   document.addEventListener("change", (e) => {
-    if (e.target.id !== "chatAnswerStyle" || st.streaming) return;
-    st.answerStyle = e.target.value === "ste100" ? "ste100" : "standard";
+    if (st.streaming) return;
+    if (e.target.id === "chatAnswerStyle") {
+      st.answerStyle = e.target.value === "ste100" ? (st.steBilingual ? "ste100_bilingual" : "ste100") : "standard";
+    } else if (e.target.id === "chatSteBilingual" && isSte(st.answerStyle)) {
+      st.steBilingual = e.target.checked;
+      st.answerStyle = st.steBilingual ? "ste100_bilingual" : "ste100";
+    } else return;
     const t = thread();
     if (t) t.answer_style = st.answerStyle;
     render();

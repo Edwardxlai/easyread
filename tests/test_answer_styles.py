@@ -15,6 +15,8 @@ from easyread.server import Handler
 from easyread.store import Workspace, write_json_atomic
 
 ANSWER = "## 结果\n误差为 2%。器件计算 $y=Wx$。\n\n## 局限\n测试采用室温和固定权重。"
+BILINGUAL_ANSWER = ("## 中文回答\n室温下，误差为 2%。器件计算 $y=Wx$。\n\n"
+                    "## 英文回答\nAt room temperature, the error is 2%. The device calculates $y=Wx$.")
 
 
 class AnswerStyleTest(unittest.TestCase):
@@ -55,7 +57,7 @@ class AnswerStyleTest(unittest.TestCase):
             "r": {"anchor": "b", "quote": "red selection", "body": "red private note", "color": "pink"},
             "b": {"anchor": "c", "quote": "blue selection", "body": "blue private note", "color": "blue"},
         }})
-        for style in ("standard", "ste100"):
+        for style in ("standard", "ste100", "ste100_bilingual"):
             with self.subTest(style=style):
                 plain = chat.prompt(self.ws, [{"role": "user", "content": "总结论文"}], "b", "", "openai", answer_style=style)
                 self.assertNotIn("red private note", plain)
@@ -66,7 +68,7 @@ class AnswerStyleTest(unittest.TestCase):
 
     def test_all_modes_and_engines_require_renderable_math_output(self):
         for engine in ("openai", "claude", "codex"):
-            for style in ("standard", "ste100"):
+            for style in ("standard", "ste100", "ste100_bilingual"):
                 with self.subTest(engine=engine, style=style):
                     prompt = chat.prompt(self.ws, [{"role": "user", "content": "推导这个公式"}], "eq", "", engine, answer_style=style)
                     self.assertIn("行内公式只用 $TeX$", prompt)
@@ -74,6 +76,24 @@ class AnswerStyleTest(unittest.TestCase):
                     self.assertIn("不要用 \\(\\) 或 \\[\\]", prompt)
                     self.assertIn("不要把公式放进反引号或代码块", prompt)
                     self.assertIn("不要在公式中插入空行", prompt)
+
+    def test_bilingual_prompt_uses_chinese_then_equivalent_english_for_each_engine(self):
+        messages = [{"role": "assistant", "content": "Previously only Chinese."},
+                    {"role": "user", "content": "总结论文"}]
+        for engine in ("openai", "claude", "codex"):
+            with self.subTest(engine=engine):
+                prompt = chat.prompt(self.ws, messages, "b", "引用", engine, answer_style="ste100_bilingual")
+                self.assertIn("本次开启中英文对照", prompt)
+                self.assertLess(prompt.index("## 中文回答"), prompt.index("## 英文回答"))
+                self.assertIn("两个版本必须表达相同内容", prompt)
+                self.assertIn("数值、单位、公式、实验条件、范围", prompt)
+                self.assertIn("技术名词保留论文中的准确用词", prompt)
+                self.assertIn("不要在其中一个版本独立添加结论", prompt)
+                self.assertNotIn("只输出中文回答", prompt)
+                self.assertNotIn("用中文，直接", prompt)
+                for fact in ("Previously only Chinese.", "引用", "A source fact with $x$.",
+                             "A test condition.", "2%", "$$y=2x$$", "A final limitation."):
+                    self.assertIn(fact, prompt)
 
     def test_ste_prompt_preserves_source_conditions_and_requirement_strength(self):
         source = "At room temperature, this design may reduce loss. Only some devices were tested. The operator should check the sample. Use no more than 5 V."
@@ -167,6 +187,47 @@ class AnswerStyleTest(unittest.TestCase):
             saved = chat_store.get(self.ws, tid)
             self.assertEqual(saved["answer_style"], "standard")
             self.assertEqual(saved["messages"][1]["answer_style"], "ste100")
+
+    def test_bilingual_mode_survives_followup_switch_and_pin_without_rewriting_history(self):
+        self.start_server()
+        engine = {"engine": "openai"}
+        model = {"id": "m", "name": "Model", "engine": "openai", "model": "test"}
+        with patch("easyread.server.config.load", return_value={}), \
+             patch("easyread.server.chat_models.engine_cfg", return_value=(engine, model)), \
+             patch("easyread.server.chat.stream", return_value=iter([BILINGUAL_ANSWER])) as stream:
+            events = self.post({"text": "中英总结论文", "anchor": "b", "answer_style": "ste100_bilingual"})
+            tid = events[0]["thread"]
+            self.assertEqual(events[0]["answer_style"], "ste100_bilingual")
+            saved = chat_store.get(self.ws, tid)
+            self.assertEqual(saved["answer_style"], "ste100_bilingual")
+            self.assertEqual([m["answer_style"] for m in saved["messages"]], ["ste100_bilingual"] * 2)
+            self.assertEqual(saved["messages"][1]["content"], BILINGUAL_ANSWER)
+            chat_store.pin(self.ws, tid, events[-1]["id"])
+            self.assertEqual(self.ws.load("discussion")["entries"][0]["body"], BILINGUAL_ANSWER)
+            stream.return_value = iter([BILINGUAL_ANSWER])
+            inherited = self.post({"thread": tid, "text": "再解释一下"})
+            self.assertEqual(inherited[0]["answer_style"], "ste100_bilingual")
+            self.assertIn("本次开启中英文对照", stream.call_args.args[1])
+            stream.return_value = iter([ANSWER])
+            chinese = self.post({"thread": tid, "text": "仅中文解释", "answer_style": "ste100"})
+            self.assertEqual(chinese[0]["answer_style"], "ste100")
+            self.assertIn("只输出中文回答", stream.call_args.args[1])
+            self.assertNotIn("本次开启中英文对照", stream.call_args.args[1])
+            saved = chat_store.get(self.ws, tid)
+            self.assertEqual(saved["answer_style"], "ste100")
+            self.assertEqual(saved["messages"][1]["content"], BILINGUAL_ANSWER)
+            self.assertEqual(saved["messages"][1]["answer_style"], "ste100_bilingual")
+            self.assertEqual(saved["messages"][-1]["answer_style"], "ste100")
+
+    def test_bilingual_note_reply_preserves_both_languages_and_formulas(self):
+        write_json_atomic(self.ws.root / "reader.json", {"notes": {
+            "n1": {"id": "n1", "anchor": "b", "kind": "question", "body": "解释"},
+        }})
+        chat_store.append(self.ws, "t-note", {"content": "解释", "note": "n1", "answer_style": "ste100_bilingual"},
+                          BILINGUAL_ANSWER, "m", "Model")
+        entry = self.ws.load("discussion")["entries"][0]
+        self.assertEqual(entry["reply_to"], "n1")
+        self.assertEqual(entry["body"], BILINGUAL_ANSWER)
 
     def test_invalid_mode_is_http_400_before_any_model_call(self):
         self.start_server()

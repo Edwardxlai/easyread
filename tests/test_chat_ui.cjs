@@ -5,6 +5,7 @@ const vm = require("node:vm");
 const { test } = require("node:test");
 
 const answer = "## 结果\n误差为 2%。器件计算 $y=Wx$。\n\n## 局限\n测试采用室温和固定权重。";
+const bilingualAnswer = "## 中文回答\n室温下，器件计算 $y=Wx$。误差为 2%。\n\n## 英文回答\nAt room temperature, the device calculates $y=Wx$. The error is 2%.";
 const source = name => fs.readFileSync(path.join(__dirname, "../easyread/web/js/reader/" + name + ".js"), "utf8");
 const settled = () => new Promise(resolve => setImmediate(resolve));
 
@@ -24,11 +25,16 @@ async function reader(threads = [], options = {}) {
         value: (html.match(/<option value="([^"]+)" selected/) || [])[1],
         disabled: /id="chatAnswerStyle" disabled/.test(html),
       });
+      if (html.includes('id="chatSteBilingual"')) nodes.set("#chatSteBilingual", {
+        id: "chatSteBilingual", checked: /id="chatSteBilingual" checked/.test(html),
+        disabled: /id="chatSteBilingual"[^>]* disabled/.test(html),
+      });
+      else nodes.delete("#chatSteBilingual");
     },
   });
   nodes.set("#chatpanel", panel);
   const PR = {
-    state: {}, store: { mode: "server" }, pid: "test", token: "test-token", side: null,
+    state: { chat: { threads } }, store: { mode: options.offline ? "static" : "server" }, pid: "test", token: "test-token", side: null,
     $: selector => nodes.get(selector) || null,
     on(name, fn) { events.set(name, fn); }, openSide(side) { this.side = side; }, readingBlock: () => null, blockById: {}, myNotes: () => [],
     api: async () => ({ threads: structuredClone(threads), models: [{ id: "m", label: "Model" }, { id: "m2", label: "Other model" }], default: "m" }),
@@ -53,7 +59,7 @@ async function reader(threads = [], options = {}) {
           opts.signal.addEventListener("abort", () => ctrl.error(Object.assign(new Error("Stopped"), { name: "AbortError" })));
           finish = () => {
             const events = [{ thread: "new", model: "Model", answer_style: requests.at(-1).answer_style },
-              { t: answer }, { done: true, id: "answer" }];
+              { t: options.answer || answer }, { done: true, id: "answer" }];
             ctrl.enqueue(new TextEncoder().encode(events.map(e => JSON.stringify(e) + "\n").join("")));
             ctrl.close();
           };
@@ -86,6 +92,7 @@ test("STE selection reaches the request, stays fixed during streaming, and copie
   assert.equal(r.nodes.get("#chatAnswerStyle").value, "standard");
   r.nodes.get("#chatInput").value = "总结论文";
   await r.dispatch("change", { id: "chatAnswerStyle", value: "ste100" });
+  await r.dispatch("change", { id: "chatSteBilingual", checked: false });
   assert.equal(r.nodes.get("#chatInput").value, "总结论文");
   const sending = r.click("send");
   await settled();
@@ -102,6 +109,88 @@ test("STE selection reaches the request, stays fixed during streaming, and copie
   assert.ok(r.panel.innerHTML.includes(answer));
   await r.click("copy", { dataset: { id: "answer" } });
   assert.deepEqual(r.copied, [answer]);
+});
+
+test("new STE questions default to Chinese then English, freeze both controls during streaming, and copy both versions", async () => {
+  const r = await reader([], { answer: bilingualAnswer, markup: true });
+  assert.equal(r.nodes.has("#chatSteBilingual"), false);
+  r.nodes.get("#chatInput").value = "总结论文";
+  await r.dispatch("change", { id: "chatAnswerStyle", value: "ste100" });
+  assert.equal(r.nodes.get("#chatSteBilingual").checked, true);
+  assert.ok(r.panel.innerHTML.includes("中文在上，英文在下"));
+  const sending = r.click("send");
+  await settled();
+  assert.equal(r.requests[0].answer_style, "ste100_bilingual");
+  assert.equal(r.nodes.get("#chatSteBilingual").disabled, true);
+  await r.dispatch("change", { id: "chatSteBilingual", checked: false });
+  await r.emit("settings-saved");
+  r.finish();
+  await sending;
+  assert.equal(r.nodes.get("#chatSteBilingual").checked, true);
+  assert.equal(r.nodes.get("#chatSteBilingual").disabled, false);
+  assert.ok(r.panel.innerHTML.includes("ASD-STE100 · 中英对照"));
+  assert.ok(r.panel.innerHTML.indexOf("中文回答") < r.panel.innerHTML.indexOf("英文回答"));
+  assert.equal((r.panel.innerHTML.match(/class="katex"/g) || []).length, 2);
+  await r.click("copy", { dataset: { id: "answer" } });
+  assert.deepEqual(r.copied, [bilingualAnswer]);
+});
+
+test("bilingual and existing Chinese conversations restore their own switches; changing the switch preserves old answers and draft", async () => {
+  const r = await reader([
+    { id: "both", title: "Both", answer_style: "ste100_bilingual", messages: [{ id: "a", role: "assistant", content: bilingualAnswer, answer_style: "ste100_bilingual" }] },
+    { id: "zh", title: "Chinese", answer_style: "ste100", messages: [{ id: "b", role: "assistant", content: answer, answer_style: "ste100" }] },
+    { id: "old", title: "Old", messages: [] },
+  ]);
+  await r.selectThread("both");
+  assert.equal(r.nodes.get("#chatSteBilingual").checked, true);
+  r.nodes.get("#chatInput").value = "下一问";
+  await r.dispatch("change", { id: "chatSteBilingual", checked: false });
+  assert.equal(r.nodes.get("#chatInput").value, "下一问");
+  assert.ok(r.panel.innerHTML.includes(bilingualAnswer));
+  assert.ok(r.panel.innerHTML.includes("ASD-STE100 · 中英对照"));
+  await r.emit("settings-saved");
+  assert.equal(r.nodes.get("#chatSteBilingual").checked, false);
+  await r.selectThread("zh");
+  assert.equal(r.nodes.get("#chatSteBilingual").checked, false);
+  await r.selectThread("both");
+  assert.equal(r.nodes.get("#chatSteBilingual").checked, false);
+  await r.click("copy", { dataset: { id: "a" } });
+  assert.deepEqual(r.copied, [bilingualAnswer]);
+  await r.selectThread("old");
+  assert.equal(r.nodes.has("#chatSteBilingual"), false);
+  await r.click("new");
+  await r.dispatch("change", { id: "chatAnswerStyle", value: "ste100" });
+  assert.equal(r.nodes.get("#chatSteBilingual").checked, true);
+});
+
+test("turning bilingual off and on changes only subsequent request mode", async () => {
+  const r = await reader();
+  await r.dispatch("change", { id: "chatAnswerStyle", value: "ste100" });
+  await r.dispatch("change", { id: "chatSteBilingual", checked: false });
+  r.nodes.get("#chatInput").value = "仅中文";
+  const first = r.click("send");
+  await settled();
+  assert.equal(r.requests[0].answer_style, "ste100");
+  r.finish(); await first;
+  await r.dispatch("change", { id: "chatSteBilingual", checked: true });
+  r.nodes.get("#chatInput").value = "中英对照";
+  const second = r.click("send");
+  await settled();
+  assert.equal(r.requests[1].answer_style, "ste100_bilingual");
+  r.finish(); await second;
+  await r.dispatch("change", { id: "chatAnswerStyle", value: "standard" });
+  assert.equal(r.nodes.has("#chatSteBilingual"), false);
+});
+
+test("offline bilingual history retains both versions, formulas and copy without a composer", async () => {
+  const r = await reader([{ id: "both", title: "Both", answer_style: "ste100_bilingual", messages: [
+    { id: "a", role: "assistant", content: bilingualAnswer, answer_style: "ste100_bilingual" },
+  ] }], { offline: true, markup: true });
+  assert.ok(r.panel.innerHTML.includes("ASD-STE100 · 中英对照"));
+  assert.equal((r.panel.innerHTML.match(/class="katex"/g) || []).length, 2);
+  assert.equal(r.nodes.has("#chatSteBilingual"), false);
+  await r.click("copy", { dataset: { id: "a" } });
+  assert.deepEqual(r.copied, [bilingualAnswer]);
 });
 
 test("each saved conversation restores its mode; legacy and new conversations start in normal mode", async () => {
@@ -238,6 +327,7 @@ test("Markdown export includes all conversations and complete answers, online an
   const chat = { threads: [
     { messages: [{ role: "user", content: "first" }, { role: "assistant", content: answer, model: "Model" }] },
     { messages: [{ role: "user", content: "second" }, { role: "assistant", content: "normal answer", model: "Model" }] },
+    { answer_style: "ste100_bilingual", messages: [{ role: "user", content: "third" }, { role: "assistant", content: bilingualAnswer, model: "Model", answer_style: "ste100_bilingual" }] },
   ] };
   for (const mode of ["server", "static"]) {
     let go, blob, downloaded = false;
@@ -263,6 +353,7 @@ test("Markdown export includes all conversations and complete answers, online an
     assert.ok(text.includes("first"));
     assert.ok(text.includes("second"));
     assert.ok(text.includes("normal answer"));
+    assert.ok(text.includes(bilingualAnswer));
   }
 });
 

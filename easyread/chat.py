@@ -169,9 +169,13 @@ def prompt(ws: Workspace, messages: list[dict], anchor: str | None, quote: str, 
             if engine == "claude" else "")
     want, colors = wants_marks(ask)
     marks = _marks(ws, colors) if want else _marks_summary(ws)
-    style = (answer_styles.STE100_INSTRUCTIONS if answer_style == answer_styles.STE100
-             else "用中文，直接、具体，能举例就举例。\n")
-    whole = _paper_context(ws) if answer_style == answer_styles.STE100 else ""
+    if answer_style == answer_styles.STE100_BILINGUAL:
+        style = answer_styles.STE100_BILINGUAL_INSTRUCTIONS
+    elif answer_style == answer_styles.STE100:
+        style = answer_styles.STE100_INSTRUCTIONS
+    else:
+        style = "用中文，直接、具体，能举例就举例。\n"
+    whole = _paper_context(ws) if answer_styles.is_ste100(answer_style) else ""
     return ("你在陪读者读一篇学术论文，回答他边读边冒出来的问题。\n" + style
             + "区分“论文里写了什么”和“你的补充解释”，论文里没有的内容不要说成是论文说的。"
             "行内公式只用 $TeX$，行间公式只用 $$TeX$$。"
