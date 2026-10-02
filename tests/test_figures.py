@@ -133,6 +133,61 @@ class FigureTest(unittest.TestCase):
         self.assertEqual(prompts_en.todo([b]), {"fig1#image": "Accuracy"})
         self.assertIn("image_zh", prompts.rules("ja"))
 
+    def auto_figure(self):
+        ws = Workspace(self.root)
+        block = {"id": "fig1", "type": "figure", "page": 1,
+                 "src": figures.crop(self.root, 1, [.5, .4, .9, .7]), "caption_zh": "保留的译文"}
+        write_json_atomic(self.root / "paper.json", {"meta": {"page_count": 2}, "blocks": [block]})
+        write_json_atomic(self.root / "layout.json", {"fig1": {"page": 1, "box": [.1, .3, .9, .9], "src": "graphic"}})
+        return ws, block
+
+    def test_updated_layout_replaces_stale_auto_crop_once_and_keeps_notes(self):
+        ws, old = self.auto_figure()
+        write_json_atomic(self.root / "reader.json", {"notes": {"n": {"body": "已有笔记"}}})
+        notes = (self.root / "reader.json").read_bytes()
+        self.assertEqual(figures.fill(ws), 1)
+        updated = ws.load("paper")["blocks"][0]
+        self.assertNotEqual(updated["src"], old["src"])
+        self.assertEqual(updated["caption_zh"], old["caption_zh"])
+        self.assertEqual((self.root / "reader.json").read_bytes(), notes)
+        with mock.patch.object(figures.pdfwork, "crop") as crop:
+            self.assertEqual(figures.fill(ws), 0)
+        crop.assert_not_called()
+
+    def test_manual_box_and_custom_image_are_not_replaced(self):
+        for manual in ({"box": [.5, .4, .9, .7]}, {"src": "figures/custom.webp"}):
+            ws, old = self.auto_figure()
+            ws.update("paper", lambda p: p["blocks"][0].update(manual))
+            with mock.patch.object(figures.pdfwork, "crop") as crop:
+                self.assertEqual(figures.fill(ws), 0)
+            crop.assert_not_called()
+
+    def test_concurrent_retranslation_does_not_get_overwritten(self):
+        ws, old = self.auto_figure()
+        original_crop = figures.crop
+
+        def recrop(*args):
+            ws.update("paper", lambda p: p["blocks"][0].update({"src": "figures/new.webp", "caption_zh": "新的译文"}))
+            return original_crop(*args)
+
+        with mock.patch.object(figures, "crop", side_effect=recrop):
+            self.assertEqual(figures.fill(ws), 0)
+        self.assertEqual(ws.load("paper")["blocks"][0]["src"], "figures/new.webp")
+
+    def test_failed_refresh_retains_existing_crop(self):
+        ws, old = self.auto_figure()
+        with mock.patch.object(figures, "crop", side_effect=ValueError("bad crop")), mock.patch.object(figures.log, "exception"):
+            self.assertEqual(figures.fill(ws), 0)
+        self.assertEqual(ws.load("paper")["blocks"][0], old)
+
+    def test_deleted_cached_image_is_recreated(self):
+        ws, old = self.auto_figure()
+        self.assertEqual(figures.fill(ws), 1)
+        src = ws.load("paper")["blocks"][0]["src"]
+        (self.root / src).unlink()
+        self.assertEqual(figures.fill(ws), 1)
+        self.assertTrue((self.root / src).is_file())
+
 
 if __name__ == "__main__":
     unittest.main()
