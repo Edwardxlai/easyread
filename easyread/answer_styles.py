@@ -2,25 +2,28 @@
 
 DEFAULT = "standard"
 STE100 = "ste100"
+STE100_BILINGUAL = "ste100_bilingual"
 
 
 def parse(value=None) -> str:
     if value is None:
         return DEFAULT
-    if value not in (DEFAULT, STE100):
-        raise ValueError("回答方式只能是 standard / ste100")
+    if value not in (DEFAULT, STE100, STE100_BILINGUAL):
+        raise ValueError("回答方式只能是 standard / ste100 / ste100_bilingual")
     return value
 
 
+def is_ste100(value: str) -> bool:
+    return value in (STE100, STE100_BILINGUAL)
+
+
 # Original instructions based on ASD-STE100 Issue 9 (2025-01-15).
-# STE is an English standard. This mode applies its clarity principles to Chinese.
+# STE is an English standard. These modes use its clarity principles for answers.
 # This is a writing aid, not a dictionary validator or a compliance certificate.
 # Reference: https://www.asd-ste100.org/STE_faq.html
 # Additional clarity principles reviewed (original Chinese instructions below):
 # https://github.com/danyuchn/asd-ste100-skill/blob/7d4a135a199a5d7447c4886bcd7ffe742a627bc9/SKILL.md
-STE100_INSTRUCTIONS = """本次使用 ASD-STE100 问答模式。以前的对话只提供语境，不决定本次的语言和格式。
-只输出中文回答，不附英文答案、英文草稿或双语对照。专业名词、缩略语、代码和公式可以保留必要的原文。
-ASD-STE100 是英文标准。本模式借鉴 Issue 9 的简明技术写作原则，用这些原则组织中文答案；不要把英文的词数限制机械地套到中文，也不要声称中文答案符合英文标准。
+_STE100_RULES = """ASD-STE100 是英文标准。本模式借鉴 Issue 9 的简明技术写作原则；不要把英文的词数限制机械地套到中文，也不要声称中文答案符合英文标准。
 - 用简明、直接的短句，每句表达一个主要意思，每段围绕一个主题。三个或更多步骤、条件或并列要点用列表。
 - 优先用主动表达，明确谁做什么、动作涉及哪个对象。不知道行为主体时不要猜测，也不要省掉主语造成歧义。
 - 读者需要操作说明时，先说适用条件，再按顺序列出动作和必要的结果或限制；每一步说明一个动作。不要把描述性结论改成操作命令。
@@ -33,3 +36,13 @@ ASD-STE100 是英文标准。本模式借鉴 Issue 9 的简明技术写作原则
 区分论文证据和补充解释。当前正文不完整或只给了节选时，涉及全文的结论必须说明这个范围。
 输出前先检查事实、数值、条件、范围和语气强度是否忠于依据，再检查术语是否一致和表达是否清楚；不要输出检查过程，也不要声称答案已通过 STE 词典校验或标准认证。
 """
+
+_STE100_INTRO = "本次使用 ASD-STE100 问答模式。以前的对话只提供语境，不决定本次的语言和格式。\n"
+STE100_INSTRUCTIONS = (_STE100_INTRO
+                       + "只输出中文回答，不附英文答案、英文草稿或双语对照。专业名词、缩略语、代码和公式可以保留必要的原文。\n"
+                       + _STE100_RULES)
+STE100_BILINGUAL_INSTRUCTIONS = (_STE100_INTRO + """本次开启中英文对照。先在内部按简明技术写作原则组织英文答案，再忠实翻译成自然的中文。不要输出草稿或检查过程。
+最终只输出两部分，严格按此顺序：先用独立一行的 Markdown 标题“## 中文回答”给出完整中文答案，再用“## 英文回答”给出对应的完整英文答案。每部分内的小标题使用 ###。
+两个版本必须表达相同内容。解释和步骤按相同顺序逐项对应。数值、单位、公式、实验条件、范围、因果关系、例外和不确定性必须一致；不要在其中一个版本独立添加结论。
+英文使用短句、主动表达和一致的术语。技术名词保留论文中的准确用词，不用含义不准确的常用词代替。中文保留必要的原文术语和缩略语，必要时在首次出现处解释，便于读者核对。
+""" + _STE100_RULES)
