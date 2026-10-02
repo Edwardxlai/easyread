@@ -80,7 +80,7 @@ def crop(root: Path, page: int, box: list[float], out_name: str, scale: float = 
 
 _MATH = re.compile(r"\$[^$]*\$")
 _ALNUM = re.compile(r"[a-z0-9]")
-LOCATE_VERSION = "3"  # 跨栏段落保留独立区域；旧论文打开时重算。
+LOCATE_VERSION = "4"  # 图像边界不受题注所在栏限制；旧论文打开时重算。
 
 
 def _norm(s: str) -> str:
@@ -190,7 +190,7 @@ def _locate(root: Path) -> dict:
                 layout[bid]["boxes"] = boxes
             cursor[pn] = end
             break
-    _extend_captioned(paper.get("blocks", []), layout)
+    _extend_captioned(paper.get("blocks", []), layout, root)
     _clamp_overlaps(layout)
     _fill_gaps(paper.get("blocks", []), layout)
     write_json_atomic(root / "layout.json", layout)
@@ -231,11 +231,18 @@ def _page_locs(layout: dict, page: int) -> list[dict]:
             for box in loc.get("boxes") or [loc["box"]]]
 
 
-def _extend_captioned(blocks: list[dict], layout: dict):
-    """表格/图只匹配到了题注，把框往上撑到同一栏里上方最近一块的下沿（题注在上方的往下撑）。"""
+def _extend_captioned(blocks: list[dict], layout: dict, root: Path | None = None):
+    """图优先用 PDF 图形边界；表格或无法识别的图按题注所在栏估算。"""
+    from .figure_geometry import locate_figures
+    visual = locate_figures(root, blocks, layout) if root else {}
     for block in blocks:
         loc = layout.get(block.get("id"))
         if block.get("type") not in ("table", "figure") or not loc or loc.get("src") == "manual":
+            continue
+        if block["id"] in visual:
+            loc["box"] = visual[block["id"]]
+            loc.pop("boxes", None)
+            loc["src"] = "graphic"
             continue
         x0, y0, x1, y1 = loc["box"]
         others = [l for l in _page_locs(layout, loc["page"]) if l["_parent"] is not loc]
