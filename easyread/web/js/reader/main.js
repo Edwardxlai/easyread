@@ -113,6 +113,7 @@
   /* ---------- 启动 ---------- */
   async function boot() {
     PR.applyPrefs();
+    PR.libraryNav.readerBack(PR.pid);
     try { await PR.load(); } catch (e) {
       PR.$("#paper").innerHTML = '<div class="pending">读不到论文：' + PR.esc(e.message) + '。<a href="/">回文献库</a></div>';
       return;

@@ -13,7 +13,25 @@
   PR.$("#sort").value = L.sort;
 
   L.byId = (id) => L.items.find((i) => i.id === id);
-  L.openReader = (id) => { location.href = "/read/" + id; };
+  function readerUrl(id) {
+    const main = PR.$(".main"), row = PR.$$(".row").find((r) => r.dataset.id === id);
+    const bounds = main.getBoundingClientRect(), rect = row && row.getBoundingClientRect();
+    const view = L.VIEWS.find((v) => v[0] === L.view) || L.VIEWS[0];
+    return PR.libraryNav.readerUrl(id, {
+      view: L.view, tag: L.tag, q: L.q, sort: L.sort, label: view[1],
+      scroll: main.scrollTop,
+      offset: rect && rect.top >= bounds.top && rect.bottom <= bounds.bottom ? rect.top - bounds.top : null,
+    });
+  }
+  L.openReader = (id) => { location.href = readerUrl(id); };
+  // 详情和最近阅读里的链接也记录来源；保留 Ctrl/Cmd 点击、鼠标中键等正常链接行为。
+  function prepareReaderLink(e) {
+    const link = e.target.closest("a[href]");
+    if (!link || !link.closest("#detail, #side")) return;
+    const match = (link.getAttribute("href") || "").match(/^\/read\/([a-zA-Z0-9_-]+)(?:\?|$)/);
+    if (match) link.href = readerUrl(match[1]);
+  }
+  ["click", "auxclick", "contextmenu"].forEach((name) => document.addEventListener(name, prepareReaderLink, true));
   L.patch = async function (id, fields) {
     const it = L.byId(id);
     if (it) { Object.assign(it, fields.meta_override ? {} : fields); L.render(); }  // 先改界面，再存盘
@@ -136,6 +154,31 @@
     PR.renderDetail && PR.renderDetail();
   };
 
+  function restoreReturn() {
+    const state = PR.libraryNav.restore();
+    if (!state) return;
+    L.view = L.VIEWS.some((v) => v[0] === state.view) ? state.view : "all";
+    L.tag = state.tag && L.cats().includes(state.tag) ? state.tag : null;
+    L.q = state.q;
+    L.sort = ["opened", "added", "year", "title"].includes(state.sort) ? state.sort : "opened";
+    PR.$("#q").value = L.q;
+    PR.$("#sort").value = L.sort;
+    L.selected = filtered().some((i) => i.id === state.paper) ? state.paper : null;
+    PR.$(".lib").classList.toggle("has-detail", !!L.selected);
+    L.render();
+    requestAnimationFrame(() => {
+      const main = PR.$(".main"), row = PR.$$(".row").find((r) => r.dataset.id === state.paper);
+      main.scrollTop = state.scroll;
+      if (!row) return;  // 论文被移出分类或不再符合筛选时，保留分类和搜索条件。
+      if (state.offset !== null) main.scrollTop += row.getBoundingClientRect().top - main.getBoundingClientRect().top - state.offset;
+      // 固定标题栏会遮住最上方的行，居中确保能看到刚读过的论文。
+      const rect = row.getBoundingClientRect(), bounds = main.getBoundingClientRect();
+      const head = PR.$(".list-head");
+      if (rect.top < bounds.top + head.offsetHeight || rect.bottom > bounds.bottom) row.scrollIntoView({ block: "center" });
+      PR.$("#list").focus({ preventScroll: true });
+    });
+  }
+
   /* ---------- 事件 ---------- */
   PR.$("#list").addEventListener("click", (e) => {
     const r = e.target.closest(".row");
@@ -175,10 +218,10 @@
 
   PR.onSettingsSaved = () => L.load();
   // 从阅读页按“返回”回来时浏览器可能直接用缓存的旧页面：重新取一次，在读状态、进度马上更新
-  window.addEventListener("pageshow", (e) => { if (e.persisted) L.load().catch(() => {}); });
+  window.addEventListener("pageshow", (e) => { if (e.persisted) L.load().then(restoreReturn).catch(() => {}); });
   // 等侧栏、详情这些脚本都加载完再取数据：数据先到、脚本还没到时会出错
   document.addEventListener("DOMContentLoaded", () => {
-    PR.loadPrefs().then((p) => { if (p.reader && p.reader.theme) PR.applyTheme(p.reader.theme); PR.useServerUi(p); L.useServerSide(p); });
-    L.load().catch((e) => { PR.$("#list").innerHTML = '<div class="empty-state"><div class="big">连不上本地服务</div>' + PR.esc(e.message) + "</div>"; });
+    const prefsReady = PR.loadPrefs().then((p) => { if (p.reader && p.reader.theme) PR.applyTheme(p.reader.theme); PR.useServerUi(p); L.useServerSide(p); }).catch(() => {});
+    Promise.all([prefsReady, L.load()]).then(restoreReturn).catch((e) => { PR.$("#list").innerHTML = '<div class="empty-state"><div class="big">连不上本地服务</div>' + PR.esc(e.message) + "</div>"; });
   });
 })(window.PR);
