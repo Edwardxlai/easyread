@@ -174,7 +174,7 @@
     let msg = "";
     try {
       const u = await PR.checkUpdate(true);
-      if (!u.latest) msg = PR.t("没连上 GitHub，稍后再试");
+      if (!u.latest || u.failed) msg = PR.t("没连上 GitHub，稍后再试");  // failed 时 latest 是旧缓存，不能说“已经是最新版”
     } catch (err) { msg = PR.t("检查失败：") + PR.esc(err.message); }
     if (box.isConnected) box.innerHTML = panelInner(msg);
   });

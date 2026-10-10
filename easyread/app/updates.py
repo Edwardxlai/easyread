@@ -46,8 +46,11 @@ def _fetch() -> dict:
 
 
 def check(force: bool = False) -> dict:
-    """{"current", "latest", "newer", "url", "notes", "published", "enabled"}。force：手动点“检查更新”，关掉自动检查也照样问。"""
-    out = {"current": __version__, "latest": "", "newer": False, "enabled": bool(config.load().get("check_updates", True))}
+    """{"current", "latest", "newer", "url", "notes", "published", "enabled", "failed"}。force：手动点“检查更新”，关掉自动检查也照样问。
+
+    failed：这次真去问了 GitHub 但没问到。latest 仍是上次缓存的版本，页面不能据此说“已经是最新版”。
+    """
+    out = {"current": __version__, "latest": "", "newer": False, "enabled": bool(config.load().get("check_updates", True)), "failed": False}
     if not out["enabled"] and not force:
         return out
     with _lock:  # 两个页面同时打开只问一次
@@ -59,6 +62,7 @@ def check(force: bool = False) -> dict:
             except Exception as e:  # noqa: BLE001  没网、限流、GitHub 改了格式：都当没有新版本
                 log.info("检查新版本没成功：%s", e)
                 cache = {**cache, "checked": time.time()}
+                out["failed"] = True
             try:
                 write_json_atomic(_path(), cache)
             except OSError:

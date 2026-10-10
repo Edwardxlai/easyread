@@ -51,6 +51,15 @@ class UpdatesTest(unittest.TestCase):
         self.assertFalse(u["newer"])
         self.assertEqual(self.calls, 1)
 
+    def test_forced_check_offline_reports_failure(self):
+        # #54：缓存里是旧版本时手动检查没联上网，不能当成“已经是最新版”
+        with self.fake(tag="v0.0.1"):
+            self.assertFalse(updates.check()["failed"])
+        with self.fake(fail=True):
+            u = updates.check(force=True)
+        self.assertTrue(u["failed"])
+        self.assertEqual(u["latest"], "0.0.1")
+
     def test_disabled_does_not_ask(self):
         config.save({"check_updates": False})
         with self.fake():
