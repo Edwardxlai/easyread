@@ -11,9 +11,13 @@ from easyread.engines import openai_api
 from easyread.engines.engines import Cancelled, EngineError
 
 
+class EventStream(io.BytesIO):
+    headers = {"Content-Type": "text/event-stream"}
+
+
 def sse(events, done=False):
     data = b"".join(("data: " + json.dumps(e) + "\n\n").encode() for e in events)
-    return io.BytesIO(data + (b"data: [DONE]\n\n" if done else b""))
+    return EventStream(data + (b"data: [DONE]\n\n" if done else b""))
 
 
 class APIStreamErrorsTest(unittest.TestCase):
@@ -85,6 +89,15 @@ class APIStreamErrorsTest(unittest.TestCase):
             with self.assertRaises(EngineError):
                 self.run_stream(io.BytesIO(payload + b"data: [DONE]\n\n"))
 
+    def test_complete_does_not_return_truncated_or_broken_stream(self):
+        first = {"choices": [{"delta": {"content": "部分回答"}}]}
+        for end, message in [({"choices": [{"finish_reason": "length"}]}, "截断"), (None, "提前结束")]:
+            response = sse([first] + ([end] if end else []), done=bool(end))
+            with self.subTest(end=end), patch.object(openai_api, "_open", return_value=response), \
+                    self.assertRaisesRegex(EngineError, message):
+                openai_api.complete({"model": "fake"}, "q", [])
+            self.assertTrue(response.closed)
+
     def test_already_cancelled_stream_does_not_call_api(self):
         cancel = threading.Event()
         cancel.set()
@@ -96,7 +109,7 @@ class APIStreamErrorsTest(unittest.TestCase):
         now = 1700000000
         for header, wait in [(formatdate(now + 12, usegmt=True), 12), ("invalid", 10), ("nan", 10), ("7", 7), ("0", 0)]:
             error = urllib.error.HTTPError("http://example.invalid", 429, "limited", {"Retry-After": header}, None)
-            response = io.BytesIO(json.dumps({"choices": [{"message": {"content": "ok"}}]}).encode())
+            response = sse([{"choices": [{"delta": {"content": "ok"}, "finish_reason": "stop"}]}], done=True)
             with self.subTest(header=header), patch.object(openai_api, "_open", side_effect=[error, response]), \
                     patch.object(openai_api, "_sleep") as sleep, patch.object(openai_api.time, "time", return_value=now),                     patch.object(openai_api.random, "uniform", return_value=1):
                 self.assertEqual(openai_api.complete({"model": "fake"}, "q", []), "ok")

@@ -113,13 +113,15 @@ _BACKOFF = (10, 20, 40, 60, 60)
 
 
 def complete(o: dict, prompt: str, images: list[Path], cancel=None, meter=None) -> str:
-    body = _body(o, prompt, images, False, None if kind(o) == "responses" else 0.2)
-    res = None
+    # 也用流式请求，收齐了再整段交出去：一次性返回要等整批译完才有第一个字节，推理模型一批常要好几分钟，
+    # 中转站前面的 Cloudflare 等不了这么久（约 100 秒没有回包就断开，报 524）；流式一直有数据在传，不会被断开
+    body = _body(o, prompt, images, True, None if kind(o) == "responses" else 0.2)
+    text, used = "", {}
     for attempt in range(len(_BACKOFF) + 1):  # 限流、服务端错误、网络抖动：等一会儿再试
         if cancel is not None and cancel.is_set():
             raise Cancelled()
         try:
-            res = _fetch(o, body, cancel)
+            text, used = _fetch(o, body, cancel)
             break
         except urllib.error.HTTPError as e:
             if e.code in (429, 500, 502, 503, 504) and attempt < len(_BACKOFF):
@@ -131,22 +133,21 @@ def complete(o: dict, prompt: str, images: list[Path], cancel=None, meter=None) 
                 _sleep(5, cancel)
                 continue
             raise EngineError(tr("连不上接口：{err}", err=e))
-    if meter is not None and isinstance(res, dict):
-        meter.add(**usage.from_openai(res))
-    return _responses_text(res) if kind(o) == "responses" else _chat_text(res)
+    if meter is not None:
+        meter.add(**used)
+    return text
 
 
-def _fetch(o: dict, body: dict, cancel) -> dict:
-    """发请求、读完整个回答。请求放在线程里，点取消就不再等它（这次调用的回答丢掉），不然要等接口返回，常常一两分钟。"""
+def _fetch(o: dict, body: dict, cancel) -> tuple[str, dict]:
+    """发请求、读完整个回答，给（全文, 用量）。请求放在线程里，点取消就不再等它（这次调用的回答丢掉），
+    不然要等接口开始返回，常常要一分钟。"""
     if cancel is None:
-        with _open(o, body, False) as r:
-            return json.loads(r.read())
+        return _read(o, body, threading.Event())
     box: dict = {}
 
     def run():
         try:
-            with _open(o, body, False) as r:
-                box["res"] = json.loads(r.read())
+            box["res"] = _read(o, body, cancel)
         except BaseException as e:  # 原样交回主线程，限流重试、连不上这些分支照旧
             box["err"] = e
     t = threading.Thread(target=run, daemon=True)
@@ -158,6 +159,26 @@ def _fetch(o: dict, body: dict, cancel) -> dict:
     if "err" in box:
         raise box["err"]
     return box["res"]
+
+
+def _read(o: dict, body: dict, cancel) -> tuple[str, dict]:
+    with _open(o, body, True) as r:
+        if "json" in r.headers.get("Content-Type", ""):  # 接口不认 stream，照旧一次性返回了整段
+            res = json.loads(r.read())
+            return (_responses_text(res) if kind(o) == "responses" else _chat_text(res)), usage.from_openai(res)
+        last = _LastUsage()
+        pieces = _responses_pieces(r, cancel, last) if kind(o) == "responses" else _chat_pieces(r, cancel, last)
+        return "".join(pieces), last.used
+
+
+class _LastUsage:
+    """流式回答的用量只留最后一份：有的接口每一块都带上累计用量，一块一记就把一次调用记成了好几次。"""
+
+    def __init__(self):
+        self.used: dict = {}
+
+    def add(self, **used):
+        self.used = used
 
 
 def _chat_text(res) -> str:

@@ -4,7 +4,7 @@ import threading
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from easyread.engines import openai_api
+from easyread.engines import openai_api, usage
 
 SEEN = []
 
@@ -36,14 +36,21 @@ class FakeAPI(BaseHTTPRequestHandler):
             time.sleep(3)
         if body.get("model") == "fixed-temp" and "temperature" in body:
             return self._send(400, {"error": {"message": "invalid temperature: only 1 is allowed for this model"}})
+        stream = body.get("stream") and body.get("model") != "json-only"  # json-only：像不认 stream 的接口，照旧一次性返回
         if self.path.endswith("/responses"):
-            if body.get("stream"):
-                evs = [{"type": "response.created"}, {"type": "response.output_text.delta", "delta": "你"},
-                       {"type": "response.output_text.delta", "delta": "好"}, {"type": "response.completed"}]
+            if stream:
+                evs = [{"type": "response.created"}, {"type": "response.reasoning_text.delta", "delta": "想一想"},
+                       {"type": "response.output_text.delta", "delta": "你"}, {"type": "response.output_text.delta", "delta": "好"},
+                       {"type": "response.completed", "response": {"status": "completed", "usage": {"input_tokens": 9, "output_tokens": 2}}}]
                 return self._send(200, b"".join(b"event: x\ndata: " + json.dumps(e).encode() + b"\n\n" for e in evs), "text/event-stream")
             return self._send(200, {"object": "response", "status": "completed", "output": [
                 {"type": "reasoning", "content": [{"type": "reasoning_text", "text": "想一想"}]},
                 {"type": "message", "content": [{"type": "output_text", "text": '{"ok": true}'}]}]})
+        if stream:  # 推理过程不算回答；有的接口每一块都带累计用量
+            evs = [{"choices": [{"delta": {"role": "assistant", "reasoning_content": "想一想"}}], "usage": {"prompt_tokens": 7, "completion_tokens": 1}},
+                   {"choices": [{"delta": {"content": "chat-"}}], "usage": {"prompt_tokens": 7, "completion_tokens": 2}},
+                   {"choices": [{"delta": {"content": "ok"}, "finish_reason": "stop"}], "usage": {"prompt_tokens": 7, "completion_tokens": 3}}]
+            return self._send(200, b"".join(b"data: " + json.dumps(e).encode() + b"\n\n" for e in evs) + b"data: [DONE]\n\n", "text/event-stream")
         return self._send(200, {"choices": [{"message": {"content": "chat-ok"}, "finish_reason": "stop"}]})
 
 
@@ -63,12 +70,32 @@ class OpenAIApiTest(unittest.TestCase):
         SEEN.clear()
 
     def test_responses_complete(self):
-        out = openai_api.complete({"base_url": self.base, "model": "m", "api": "responses"}, "问题", [])
-        self.assertEqual(out, '{"ok": true}')                 # 只要 message，不要推理过程
+        meter = usage.Meter()
+        out = openai_api.complete({"base_url": self.base, "model": "m", "api": "responses"}, "问题", [], meter=meter)
+        self.assertEqual(out, "你好")                          # 只要 message，不要推理过程
         path, body = SEEN[0]
         self.assertEqual(path, "/v1/responses")
+        self.assertIs(body["stream"], True)
         self.assertNotIn("temperature", body)
         self.assertEqual(body["input"][0]["content"][0], {"type": "input_text", "text": "问题"})
+        self.assertEqual((meter.data["calls"], meter.data["input"], meter.data["output"]), (1, 9, 2))
+
+    def test_chat_complete_streams_and_counts_usage_once(self):
+        # 一次性返回要等整批译完，推理模型常要几分钟，中转站前面的 Cloudflare 等不了（524）：翻译也走流式
+        meter = usage.Meter()
+        self.assertEqual(openai_api.complete({"base_url": self.base, "model": "m"}, "q", [], meter=meter), "chat-ok")
+        body = SEEN[0][1]
+        self.assertIs(body["stream"], True)
+        self.assertEqual(body["stream_options"], {"include_usage": True})
+        self.assertEqual((meter.data["calls"], meter.data["input"], meter.data["output"]), (1, 7, 3))  # 只记最后一份
+
+    def test_complete_reads_whole_json_when_stream_is_ignored(self):
+        for api, want in [("chat", "chat-ok"), ("responses", '{"ok": true}')]:  # responses 照样只要 message
+            with self.subTest(api=api):
+                meter = usage.Meter()
+                o = {"base_url": self.base, "model": "json-only", "api": api}
+                self.assertEqual(openai_api.complete(o, "q", [], meter=meter), want)
+                self.assertEqual(meter.data["calls"], 1)
 
     def test_responses_stream(self):
         o = {"base_url": self.base, "model": "m", "api": "responses"}
