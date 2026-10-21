@@ -6,7 +6,7 @@ const { test } = require("node:test");
 
 /* 版面用 document 坐标的 top / height 表示；视口 800 高，记的是 240（30%）那条线 */
 function reader({ mode = "server", progress = {}, scrollY = 0 } = {}) {
-  const layout = new Map([["head", { top: 0, height: 200 }]]);
+  const layout = new Map([["b-head", { top: 0, height: 200 }]]);
   const timers = [], toasts = [], scrolls = [], on = new Map(), classes = new Set();
   const sandbox = {
     scrollY, innerHeight: 800,
@@ -14,8 +14,8 @@ function reader({ mode = "server", progress = {}, scrollY = 0 } = {}) {
       documentElement: { scrollHeight: 5000 },  // 可滚 4200
       fonts: null,
       getElementById: id => {
-        const box = layout.get(id.replace(/^b-/, ""));
-        return box ? { getBoundingClientRect: () => ({ top: box.top - sandbox.scrollY, height: box.height }) } : null;
+        const box = layout.get(id);
+        return box ? { id, getBoundingClientRect: () => ({ top: box.top - sandbox.scrollY, height: box.height }) } : null;
       },
     },
     window: {
@@ -32,6 +32,7 @@ function reader({ mode = "server", progress = {}, scrollY = 0 } = {}) {
     plain: s => s, textFor: id => "正文 " + id, readingLine: () => 240,
     throttle: fn => fn,  // 多久记一次由 util.js 的节流管，这里只看记了什么
     readingBlock: () => "head",
+    $$: () => [...layout.keys()].filter(id => id.startsWith("orig-")).map(id => sandbox.document.getElementById(id)),
     $: (sel) => (sel === "#paper" ? { classList: { add: (c) => classes.add(c), remove: (c) => classes.delete(c) } } : null),
     blockById: {}, store: { mode },
     commit: op => { PR.committed.push(op); PR.state.reader.progress = { block: op.block, off: op.off, ratio: op.ratio }; },
@@ -43,7 +44,8 @@ function reader({ mode = "server", progress = {}, scrollY = 0 } = {}) {
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../../easyread/web/js/reader/progress.js"), "utf8"), sandbox);
   return {
     PR, sandbox, toasts, scrolls, on, classes,
-    block(id, top, height) { layout.set(id, { top, height }); },
+    block(id, top, height) { layout.set("b-" + id, { top, height }); },
+    page(n, top, height) { layout.set("orig-" + n, { top, height }); },
     read(id) { PR.readingBlock = () => id; },
     settle: async (n = 0) => { timers.splice(0, n || timers.length).forEach(fn => fn()); await new Promise(r => setImmediate(r)); },
   };
@@ -54,6 +56,66 @@ test("progress records the block, the position inside it, and the document ratio
   r.block("p2", 1000, 2000);  // 240 那条线落在块顶下 640，块高 2000
   r.read("p2");
   assert.deepEqual({ ...r.PR.progressOp() }, { op: "progress", block: "p2", off: 0.32, ratio: 0.33 });
+});
+
+test("original PDF pages save their page anchor and offset when leaving", () => {
+  const r = reader({ scrollY: 1400 });
+  r.page(1, 200, 800); r.page(2, 1000, 2000); r.page(3, 3000, 1000);
+  assert.deepEqual({ ...r.PR.progressOp() }, { op: "progress", block: "orig-2", off: 0.32, ratio: 0.33 });
+  r.PR.watchProgress();
+  r.on.get("pagehide")();
+  assert.equal(r.PR.committed[0].block, "orig-2");
+  assert.equal(r.PR.flushed, true);
+});
+
+test("reopening an original PDF restores the page offset after resizing", () => {
+  const first = reader({ scrollY: 1400 });
+  first.page(2, 1000, 2000);
+  const r = reader({ progress: first.PR.progressOp() });
+  r.page(2, 700, 1000);
+  r.PR.state.paper.blocks = [{ id: "later-heading", type: "heading" }];
+  assert.equal(r.PR.restoreProgress(), true);
+  assert.deepEqual(r.scrolls, [780]);
+  assert.equal(r.PR.progressOp().block, "orig-2");
+  assert.equal(r.PR.progressOp().off, 0.32);
+  assert.deepEqual(r.toasts, [{ text: "已回到上次读到第 2 页", label: "回到顶部" }]);
+});
+
+test("mixed papers save the latest translated block or original page above the reading line", () => {
+  const r = reader({ scrollY: 1400 });
+  r.page(1, 200, 800); r.page(2, 1200, 1000); r.page(3, 3000, 1000);
+  r.block("p1", 1000, 200); r.read("p1");
+  assert.equal(r.PR.progressOp().block, "orig-2");
+  r.block("p2", 1500, 500); r.read("p2");
+  assert.equal(r.PR.progressOp().block, "p2");
+});
+
+test("an original page below the reading line does not replace the header", () => {
+  const r = reader();
+  r.page(1, 300, 1000);
+  assert.equal(r.PR.progressOp().block, "head");
+});
+
+test("legacy PDF progress recorded as head falls back to its document ratio", () => {
+  for (const off of [undefined, 1]) {
+    const r = reader({ progress: { block: "head", ratio: 0.5, off } });
+    r.page(1, 200, 2000); r.page(2, 2200, 2000);
+    assert.equal(r.PR.restoreProgress(), true);
+    assert.deepEqual(r.scrolls, [2100]);
+  }
+});
+
+test("a real position inside a tall header still takes precedence over ratio", () => {
+  const r = reader({ progress: { block: "head", off: 0.5, ratio: 0.2 } });
+  r.block("head", 0, 1000);
+  assert.equal(r.PR.restoreProgress(), true);
+  assert.deepEqual(r.scrolls, [260]);
+});
+
+test("a missing original page falls back to the document ratio", () => {
+  const r = reader({ progress: { block: "orig-9", off: 0.4, ratio: 0.5 } });
+  assert.equal(r.PR.restoreProgress(), true);
+  assert.deepEqual(r.scrolls, [2100]);
 });
 
 test("leaving captures the final scroll before sending pending operations", () => {

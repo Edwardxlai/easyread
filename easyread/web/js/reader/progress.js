@@ -10,11 +10,18 @@
   const SETTLE = [900, 2200, 4000];  // 字体、图片、图注陆续排进来，各对一次
 
   const maxScroll = () => Math.max(0, document.documentElement.scrollHeight - innerHeight);
+  const element = (block) => block && (/^orig-\d+$/.test(block) ? document.getElementById(block) : document.getElementById("b-" + block));
 
   /* 现在读到哪儿，写成一条 progress 操作 */
   PR.progressOp = function () {
-    const block = PR.readingBlock();
-    const el = document.getElementById("b-" + block);
+    let block = PR.readingBlock();
+    let el = element(block);
+    // 未整理的 PDF 原页没有正文块，也需要记住页码和页内位置。
+    for (const page of PR.$$("#paper .orig-page")) {
+      const top = page.getBoundingClientRect().top;
+      if (top > PR.readingLine()) break;
+      if (!el || top >= el.getBoundingClientRect().top) { block = page.id; el = page; }
+    }
     const box = el ? el.getBoundingClientRect() : null;
     const off = box && box.height > 0 ? (PR.readingLine() - box.top) / box.height : 0;
     const max = maxScroll();
@@ -47,7 +54,8 @@
 
   /* 记下的位置换算成 scrollTop：以块为准，没有 off 就按块顶对线 */
   function target(p) {
-    const el = p.block && document.getElementById("b-" + p.block);
+    // 旧版把读到原页的进度记成 head；越过标题的记录按全文比例恢复。
+    const el = p.block === "head" && p.ratio > 0 && (p.off == null || p.off >= 1) ? null : element(p.block);
     if (el) {
       const box = el.getBoundingClientRect();
       if (box.height > 0) return Math.max(0, Math.round(scrollY + box.top + box.height * (p.off ?? 0) - PR.readingLine()));
@@ -57,6 +65,8 @@
 
   /* 上次读到哪儿；back：已经回来了，还是只问一句要不要去 */
   function lastRead(p, back) {
+    const page = /^orig-(\d+)$/.exec(p.block);
+    if (page) return back ? PR.t("已回到上次读到第 {page} 页", { page: +page[1] }) : PR.t("上次读到第 {page} 页", { page: +page[1] });
     let h = null;
     for (const x of S.paper.blocks || []) { if (x.type === "heading") h = x; if (x.id === p.block) break; }
     const b = PR.blockById[p.block];
