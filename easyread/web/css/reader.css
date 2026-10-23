@@ -135,8 +135,8 @@ table.tbl td .sub { color: var(--ink-3); }
 .caption .zh { display: table; margin: 0 auto; }
 .caption .en { width: fit-content; margin-left: auto; margin-right: auto; }
 .caption .label { font-weight: 600; color: var(--ink); margin-right: .15em; }
-.blk-figure img { display: block; max-width: 100%; margin: 0 auto; border-radius: 2px; mix-blend-mode: multiply; }
-:root[data-theme="dark"] .blk-figure img { mix-blend-mode: normal; filter: invert(.88) hue-rotate(180deg); }
+/* 图片保持原色，透明区域按 PDF 的白纸底色显示。 */
+.blk-figure img { display: block; max-width: 100%; margin: 0 auto; border-radius: 2px; background: #fff; }
 .figure-media { margin: 0 auto; }
 .figure-translation { margin: .8em auto 0; padding: .65em .85em .7em; max-width: 42em; border-left: 2px solid var(--accent); border-radius: 4px; background: var(--accent-soft); font-size: .86em; line-height: 1.7; }
 .figure-translation-label { margin-bottom: .2em; font: 11.5px/1.4 var(--ui); letter-spacing: .06em; color: var(--accent); }
@@ -162,7 +162,6 @@ table.tbl td .sub { color: var(--ink-3); }
 .orig-page { margin: 0 0 2em; }
 .orig-page figcaption { font: 12.5px var(--ui); color: var(--ink-3); margin-bottom: 6px; }
 .orig-page img { width: 100%; display: block; background: #fff; box-shadow: 0 0 0 1px var(--rule), 0 4px 14px rgba(0,0,0,.06); }
-:root[data-theme="dark"] .orig-page img { filter: invert(.9) hue-rotate(180deg) contrast(.9); }
 
 /* 行内：引用、交叉引用、划线 */
 a.cite, a.xref { color: var(--accent); text-decoration: none; border-bottom: 1px dotted color-mix(in srgb, var(--accent) 45%, transparent); cursor: pointer; font-variant-numeric: lining-nums; }

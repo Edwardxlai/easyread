@@ -58,8 +58,6 @@ body.resizing .side-panel { transition: none; }
 .pv-page { position: relative; margin: 0 auto; width: calc(100% * var(--pv-zoom, 1)); background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.12), 0 6px 24px rgba(0,0,0,.08); }
 .pv-page + .pv-page { margin-top: 18px; }
 .pv-page img { display: block; width: 100%; height: 100%; object-fit: contain; }
-:root[data-theme="dark"] .pv-page img { filter: invert(.9) hue-rotate(180deg) contrast(.9); }
-:root[data-theme="dark"] .pv-page { background: #111; }
 .pv-hl { position: absolute; inset: 0; pointer-events: none; transition: opacity .25s ease; opacity: 0; }
 .pv-region { position: absolute; border-radius: 3px; background: rgba(236, 196, 92, .22); box-shadow: 0 0 0 2px rgba(214, 160, 40, .55); }
 .pv-hl.on { opacity: 1; }

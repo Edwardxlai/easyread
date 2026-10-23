@@ -41,7 +41,6 @@
 .row.on { background: var(--surface); box-shadow: 0 0 0 1px var(--rule); }
 .row.on::before, .row.on + .row::before { display: none; }
 .thumb { width: 52px; height: 68px; border-radius: 3px; background: #fff center top / cover no-repeat; box-shadow: 0 0 0 1px var(--rule), 0 1px 3px rgba(0,0,0,.08); }
-:root[data-theme="dark"] .thumb { filter: invert(.88) hue-rotate(180deg); }
 .thumb.blank { background: var(--surface-2); display: grid; place-items: center; color: var(--ink-3); }
 .row .t1 { font: 600 16px/1.5 var(--serif-zh); color: var(--ink); letter-spacing: .01em; display: flex; gap: 6px; align-items: baseline; }
 .row .t1 .star { color: #c9a24a; flex: none; }
