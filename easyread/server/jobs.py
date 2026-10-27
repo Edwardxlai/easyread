@@ -90,6 +90,24 @@ class Jobs:
             elif job.get("state") == "confirm":
                 self._write(ws, state="done", message=tr("已导入，未整理") if job.get("read") else tr("已导入，未翻译"))
 
+    def enqueue_figures(self, ws: Workspace, body: dict):
+        from . import figure_jobs
+        if not (config.load().get("figure_images") or {}).get("enabled"):
+            raise ValueError(tr("请先在设置中开启生成译图"))
+        ids = figure_jobs.select(ws, body)
+
+        def apply(job):
+            if job.get("state") in ("queued", "running"):
+                raise ValueError(tr("这篇论文已有任务在排队或运行，请等它结束，或先取消再重试。"))
+            job.update(type="figure-images", state="queued", message=tr("译图排队中"),
+                       figure_ids=ids, force=body.get("force", False), translate=True, read=False,
+                       model="", target="", translation_extra="", done=0, total=len(ids),
+                       error="", failed={}, image_failed={}, updated=now_iso(), usage={})
+        with self.lock:
+            ws.update("job", apply)
+            self.bulk.put(ws.id)
+        return {"ok": True, "count": len(ids)}
+
     def stop_model_work(self, ids: list[str] | None = None) -> int:
         """一键停止：只停用模型的部分（翻译、整理原文、等确认页数的），原页照样渲染。
         还在排队、原页没渲染的改成只渲染；ids 为空就是全部。返回停了几篇。"""
@@ -110,7 +128,7 @@ class Jobs:
                         ev.set()
                 elif state == "confirm":
                     self._write(ws, state="done", message=tr("已导入，未整理") if job.get("read") else tr("已导入，未翻译"))
-                elif (ws.load("paper") or {}).get("meta", {}).get("pages"):
+                elif job.get("type") == "figure-images" or (ws.load("paper") or {}).get("meta", {}).get("pages"):
                     self._write(ws, state="cancelled", message=tr("已取消"))
                 else:  # 留在队里，轮到时只渲染原页
                     self._write(ws, type="prepare", translate=False, read=False, message=tr("排队中"))
@@ -125,6 +143,9 @@ class Jobs:
                 log.exception("Cannot resume task; unreadable data file: %s", e.path)
                 continue
             if job.get("state") in ("queued", "running"):
+                if job.get("type") == "figure-images" and job.get("state") == "running":
+                    self._write(ws, state="cancelled", message=tr("译图任务因服务重启而中断，已保存的图片保留；可手动补齐"))
+                    continue  # An in-flight generation may have consumed quota; never blindly repeat it.
                 self._write(ws, state="queued", message=tr("排队中（服务重启后继续）"))
                 self.bulk.put(ws.id)
 
@@ -173,6 +194,9 @@ class Jobs:
                     self.cancels.pop(pid, None)
 
     def _run_bulk(self, ws: Workspace, job: dict, cancel: threading.Event):
+        if job.get("type") == "figure-images":
+            from . import figure_jobs
+            return figure_jobs.run(self, ws, job, config.load(), cancel)
         cfg = engine_for(config.load(), job.get("model"))
         cfg = {**cfg, "translation_extra": job.get("translation_extra", "")}
         if job.get("target"):

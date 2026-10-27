@@ -81,6 +81,13 @@
   }
   PR.on("rendered", prepare);
   PR.on("block-rendered", prepare);
+  // A missing/corrupt generated asset falls back to the original and text,
+  // including in offline exports. Capture is required: image errors do not bubble.
+  document.addEventListener("error", e => {
+    if (!e.target.matches?.('[data-translated-figure]')) return;
+    const block = e.target.closest('.blk');
+    if (block) PR.failFigureImage(block.dataset.id, e.target.getAttribute('src'));
+  }, true);
   document.addEventListener("dragend", () => { suppressClick = Date.now() + 300; }, true);
   document.addEventListener("click", e => {
     const source = e.target.closest(selector);

@@ -19,7 +19,7 @@
     const b = PR.blockById[id];
     if (!b) return [];
     const keys = PR.blockKeys(b);
-    const hasEn = PR.hasZh(b) && (b.en || b.caption_en || b.image_en || (b.items || []).some((i) => i.en));  // 只读原文、没译的块正文就是英文
+    const hasEn = PR.hasZh(b) && (b.en || b.caption_en || b.image_en || b.translated_image?.src || (b.items || []).some((i) => i.en));  // 只读原文、没译的块正文就是英文
     const list = [
       { k: "note", label: PR.t("笔记"), icon: "note", fn: () => PR.startNote({ anchor: id }) },
       { k: "question", label: PR.t("提问"), icon: "question", fn: () => PR.startNote({ anchor: id, kind: "question" }) },
@@ -77,6 +77,7 @@
     const b = PR.blockById[id];
     const items = actionsFor(id).map((a) => ({ label: a.label, icon: a.icon, kbd: a.kbd, fn: a.fn }));
     if (b?.type === "figure" && PR.store.mode === "server") items.push({label: PR.t("重新截取图片"), icon: "edit", fn: () => PR.cropFigure(id)});
+    if (b?.type === "figure" && b.src && PR.store.mode === "server" && S.figure_images_enabled) items.push({label: PR.t("重新生成译图"), icon: "redo", fn: () => PR.generateFigureImages([id], true)});
     items.push("-",
       { label: PR.t("复制译文"), icon: "copy", kbd: PR.keyOf("copy"), fn: () => copyBlock(id, "zh") },
       { label: PR.t("复制英文原文"), icon: "copy", fn: () => copyBlock(id, "en") },
@@ -123,6 +124,10 @@
     const host = t.closest(".blk");
     const id = host && host.dataset.id;
     const b = PR.blockById[id];
+    if (t.dataset.t === "figure-image" && b) PR.generateFigureImages([id], true);
+    if (t.dataset.t === "figure-images") PR.generateFigureImages();
+    if (t.dataset.t === "retry-figure-images") PR.generateFigureImages(Object.keys(S.job.image_failed || {}), true);
+    if (t.dataset.t === "cancel-figure-images") PR.api("/api/p/" + PR.pid + "/cancel", {method: "POST", body: {}}).then(() => PR.poll()).catch(error => PR.toast(error.message));
     if (t.dataset.t === "page" && b) PR.openPage(b.page, id);
     if (t.dataset.t === "pin") host.classList.toggle("notes-open");
     if (t.dataset.t === "stale") PR.showStale(t.closest(".zh"));
@@ -135,6 +140,20 @@
   });
 
   /* ---------- 重译 ---------- */
+  let submittingImages = false;
+  PR.generateFigureImages = async function (ids, force = false) {
+    if (PR.store.mode !== "server" || !S.figure_images_enabled || submittingImages) return;
+    if (["queued", "running"].includes((S.job || {}).state)) return PR.toast(PR.t("这篇论文已有任务在排队或运行，请等它结束，或先取消再重试。"));
+    submittingImages = true;
+    try {
+      if (PR.flushPending && !await PR.flushPending()) throw new Error(PR.t("请先保存文字修改，再生成译图"));
+      await PR.api("/api/p/" + PR.pid + "/figure-images", {method: "POST", body: {...(ids ? {ids} : {}), force}});
+      PR.toast(PR.t("已开始生成译图，正文和笔记保持不变"));
+      await PR.poll();
+    } catch (error) { PR.toast(error.message); }
+    finally { submittingImages = false; }
+  };
+
   function retranslate(id) {
     const el = document.getElementById("b-" + id);
     PR.popover(el.querySelector(".zh") || el, '<div class="hd">' + PR.t("让模型重译这段") + '</div>' +

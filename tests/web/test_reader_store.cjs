@@ -33,6 +33,29 @@ test("progress keeps the block, the position inside it and the ratio", async () 
   assert.equal(PR.state.reader.progress.off, undefined);
 });
 
+test('image feature changes in another tab propagate without paper changes', async () => {
+  let enabled = false;
+  const events = [];
+  const PR = {t: s => s, uid: () => 'client', emit: name => events.push(name),
+    ls: {get: (_key, fallback) => fallback, set: () => true}};
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../easyread/web/js/reader/store.js'), 'utf8'), {
+    window: {PR, addEventListener() {}}, location: {pathname: '/read/paper'},
+    document: {getElementById: () => null}, setTimeout() {}, clearTimeout() {},
+    fetch: async url => ({ok: true, json: async () => url.endsWith('/state')
+      ? {paper: {meta: {}}, reader: {}, versions: {}, figure_images_enabled: enabled}
+      : {figure_images_enabled: enabled}}),
+  });
+  await PR.load();
+  assert.equal(PR.state.figure_images_enabled, false);
+  enabled = true;
+  await PR.poll();
+  assert.equal(PR.state.figure_images_enabled, true);
+  enabled = false;
+  await PR.poll();
+  assert.equal(PR.state.figure_images_enabled, false);
+  assert.equal(events.filter(name => name === 'figure-images-setting').length, 2);
+});
+
 test("exit waits for an in-flight save and drains the newer progress", async () => {
   const pending = [];
   const PR = { t: s => s, uid: () => "client", nowIso: () => "2026-10-14T00:00:00Z", emit() {},

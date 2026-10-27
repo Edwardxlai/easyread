@@ -199,9 +199,10 @@ class Handler(BaseHTTPRequestHandler):
                 # Take versions before reading content: concurrent preparation
                 # can then trigger a later poll, never tag old data as current.
                 versions = ws.versions()
+                cfg = config.load()
                 state = {**{n: ws.load(n) for n in ("paper", "discussion", "reader", "layout", "item", "job")},
                          "versions": versions, "token": app.token, "id": ws.id, "library_status": app.location.status,
-                         "engine": config.load().get("engine")}
+                         "engine": cfg.get("engine"), "figure_images_enabled": (cfg.get("figure_images") or {}).get("enabled") is True}
                 self._json(200, state)
                 # Existing layout is usable immediately. Upgrade only after the
                 # response has been sent; polling picks up the new layout/crops.
@@ -214,7 +215,8 @@ class Handler(BaseHTTPRequestHandler):
                         log.exception("启动阅读页准备失败 %s", ws.root)
                 return
             if action == "versions":
-                return self._json(200, {**ws.versions(), "library_status": app.location.status})
+                return self._json(200, {**ws.versions(), "library_status": app.location.status,
+                                        "figure_images_enabled": (config.load().get("figure_images") or {}).get("enabled") is True})
             if action == "chat":
                 return self._json(200, {"threads": chat_store.threads(ws), **chat_models.listing(config.load()), "limits": usage.latest()})
             if action == "log":

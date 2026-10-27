@@ -45,6 +45,8 @@ def post(app, ws, parts: list[str], body: dict):
         return ws.patch_item(body)
     if action == "translate":
         return translate_api.enqueue(app.jobs, ws, body)
+    if action == "figure-images":
+        return app.jobs.enqueue_figures(ws, body)
     if action == "prepare":
         app.jobs.enqueue(ws, translate_after=False)
         return {"ok": True}

@@ -21,7 +21,7 @@ from ..library.store import Workspace
 from .page_scope import references_page, scope_pages
 from .translator_checks import journal, save_checks as _save_checks
 from .repair_guard import retains_content
-from . import instructions
+from . import instructions, figure_images
 
 _merge_lock = threading.Lock()  # 并发翻译时，并入 paper.json 和重算原页定位一次只做一个
 # 用量到顶、余额不足这类错误，后面的批次也一定失败：直接停，剩下的页记为没译，等额度恢复后一键重试
@@ -78,6 +78,7 @@ def _normalize(data: dict, pages: list[int], taken: set[str]) -> dict:
         taken.add(bid)
         b["id"] = bid
         if b["type"] == "figure":
+            b.pop("translated_image", None)  # Only the image editor may publish an image result.
             b.setdefault("src", "")
             normalize_figure(b)  # 截图要等合并锁里 id 最终去重之后，见 prepare_figures
         blocks.append(b)
@@ -391,6 +392,9 @@ def translate_pages(ws: Workspace, cfg: dict, pages: list[int], cancel, report, 
         except Exception as e:  # noqa: BLE001
             journal(ws, tr("术语一致性检查没做成：{err}", err=str(e)[:300]))
             log.warning("术语一致性检查失败 %s: %s", ws.id, e)
+    if not read and state["ok"]:
+        figure_images.generate(ws, cfg, state["ok"], cancel,
+                               lambda msg: report(state["done"], len(pages), msg), meter)
     journal(ws, tr("结束，{n} 页失败：{pages}", n=len(failed), pages=sorted(failed)) if failed else tr("结束，全部成功"))
     return failed
 

@@ -31,6 +31,7 @@ DEFAULTS = {
     "translation_instructions": "",
     "translation_prompt": None,
     "translate_figure_text": True,
+    "figure_images": {"enabled": False, "provider": "codex", "base_url": "", "api_key": "", "model": "", "timeout": 600},
     "opencode": {"command": "", "model": "", "extra_args": [], "timeout": 1200},
     "check_updates": True,       # 打开文献库时问 GitHub 有没有新版本（一天一次），见 updates.py
     "batch_pages": 2,            # 每次交给模型的页数
@@ -93,10 +94,10 @@ def save(patch: dict) -> dict:
     return load()
 
 
-def with_key(o: dict) -> dict:
-    """页面提交的 openai 设置 → 要存的样子。每家服务商的 Key 分开存（keys[预设]），换来换去不用重填；
+def with_key(o: dict, section: str = "openai") -> dict:
+    """页面提交的 API 设置 → 要存的样子。按配置区和服务地址分别保存 Key，换来换去不用重填；
     页面发回来的打码 Key 或空 Key 表示不改。"""
-    cur = load()["openai"]
+    cur = load()[section]
     o = dict(o)
     key = o.pop("api_key", None)
     preset = o.get("preset", cur.get("preset")) or ""
@@ -117,11 +118,14 @@ def public(cfg: dict) -> dict:
     out = copy.deepcopy(cfg)
     out["translation_prompt_default"] = prompt_style.default(cfg.get("target"))
     out["translation_prompt_effective"] = prompt_style.effective(cfg)
-    out["openai"]["keys"] = saved_keys(cfg["openai"])
-    key = out["openai"].get("api_key") or ""
-    out["openai"]["api_key"] = ("••••" + key[-4:]) if key else ""
-    out["openai"]["has_key"] = bool(key)
-    out["openai"]["saved_keys"] = [k for k, v in (out["openai"].pop("keys", None) or {}).items() if v]
+    for section in ("openai", "figure_images"):
+        if section not in out:
+            continue
+        out[section]["keys"] = saved_keys(cfg[section])
+        key = out[section].get("api_key") or ""
+        out[section]["api_key"] = ("••••" + key[-4:]) if key else ""
+        out[section]["has_key"] = bool(key)
+        out[section]["saved_keys"] = [k for k, v in (out[section].pop("keys", None) or {}).items() if v]
     return out
 
 

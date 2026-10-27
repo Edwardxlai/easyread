@@ -18,12 +18,13 @@ function setup() {
     showModal(){this.open = true;}, close(){this.open = false; this.events.close();}};
   const document = {createElement: () => dialog, body: {appendChild(){}}, querySelectorAll: () => [source],
     addEventListener(k, fn){listeners[k] = fn;}};
-  const PR = {t: s => s, on(){}, toast(){}};
+  const failures = [];
+  const PR = {t: s => s, on(){}, toast(){}, failFigureImage: (...args) => failures.push(args)};
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../easyread/web/js/reader/figure-zoom.js'), 'utf8'), {window:{PR}, document, Date});
   const event = extra => ({preventDefault(){this.prevented = true;}, stopImmediatePropagation(){this.stopped = true;}, ...extra});
   const click = () => listeners.click(event({target:{closest: () => source}}));
   const action = key => dialog.events.click(event({target:{closest: () => ({dataset:{zoom:key}})}}));
-  return {listeners, source, image, viewport, dialog, label, event, click, action};
+  return {failures, listeners, source, image, viewport, dialog, label, event, click, action};
 }
 
 test('click opens a fitted image; controls zoom, reset, and restore focus on close', () => {
@@ -63,4 +64,10 @@ test('keyboard opens figures and viewer keys do not trigger underlying reader sh
 test('dragging a figure onto notes does not also open the viewer', () => {
   const r = setup(); r.listeners.dragend(); r.click();
   assert.equal(r.dialog.open, undefined);
+});
+
+test('a missing translated image reveals the original and text fallback', () => {
+  const r = setup();
+  r.listeners.error({target: {matches: () => true, closest: () => ({dataset: {id: 'f1'}}), getAttribute: () => 'translated.webp'}});
+  assert.deepEqual(r.failures, [['f1', 'translated.webp']]);
 });

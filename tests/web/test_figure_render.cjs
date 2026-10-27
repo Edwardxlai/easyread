@@ -8,8 +8,9 @@ function reader(block, edits = {}, meta) {
   let html = '';
   const node = { classList: { contains: () => false }, querySelector: () => null, replaceWith() {} };
   const PR = {
+    store: { mode: 'server' },
     state: { reader: { edits }, paper: { blocks: [block], meta } },
-    on() {}, emit() {}, esc: String, md: String, t: s => s, imageUrl: s => '/p/test/' + s, hashText: s => s,
+    applyMarks() {}, on() {}, emit() {}, esc: String, md: String, t: s => s, imageUrl: s => '/p/test/' + s, hashText: s => s,
   };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../../easyread/web/js/common/markup.js"), "utf8"), { window: { PR }, URL });
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../easyread/web/js/reader/render.js'), 'utf8'), {
@@ -20,7 +21,7 @@ function reader(block, edits = {}, meta) {
   });
   PR.blockById[block.id] = block;
   PR.renderBlock(block.id);
-  return { PR, html };
+  return { PR, get html() { return html; } };
 }
 
 test('read-first figure displays source labels without requiring a translation', () => {
@@ -74,4 +75,31 @@ test('figure without box or page data stays unsized', () => {
 test('malformed box is ignored', () => {
   const { html } = reader({ id: 'fig1', type: 'figure', src: 'figures/a.webp', box: [0.9, 0.5, 0.1, 0.2], caption_zh: 'c' });
   assert.match(html, /<img src="\/p\/test\/figures\/a.webp" alt="" loading="lazy">/);
+});
+
+const generated = {id: 'fig1', type: 'figure', src: 'original.webp', image_en: 'Input', image_zh: '输入',
+  translated_image: {src: 'translated.webp', source: 'original.webp', target: 'zh', image_en: 'Input', image_zh: '输入'}};
+
+test('failed generated assets restore text, stay in fallback on rerender, and recover with a new image', () => {
+  const r = reader(structuredClone(generated));
+  assert.doesNotMatch(r.html, /data-key="fig1#image"/);
+  r.PR.failFigureImage('fig1', '/p/test/translated.webp');
+  assert.doesNotMatch(r.html, /data-translated-figure/);
+  assert.match(r.html, /data-key="fig1#image">输入/);
+  assert.match(r.html, /src="\/p\/test\/original.webp"/);
+  r.PR.renderBlock('fig1');
+  assert.doesNotMatch(r.html, /data-translated-figure/);
+  r.PR.blockById.fig1.translated_image.src = 'new.webp';
+  r.PR.renderBlock('fig1');
+  assert.match(r.html, /data-translated-figure src="\/p\/test\/new.webp"/);
+  assert.doesNotMatch(r.html, /data-key="fig1#image"/);
+  r.PR.failFigureImage('fig1', '/p/test/translated.webp');
+  assert.match(r.html, /data-translated-figure/);
+});
+
+test('generated images without OCR still enable the shared language selector', () => {
+  const b = structuredClone(generated);
+  b.image_en = b.image_zh = b.translated_image.image_en = b.translated_image.image_zh = '';
+  const r = reader(b);
+  assert.equal(r.PR.hasZh(b), true);
 });

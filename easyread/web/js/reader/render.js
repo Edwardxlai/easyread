@@ -3,6 +3,20 @@
 (function (PR) {
   "use strict";
   const S = PR.state;
+  const failedFigureImages = new Set();
+  PR.failFigureImage = function (id, url) {
+    const b = PR.blockById[id];
+    if (!b?.translated_image?.src || PR.imageUrl(b.translated_image.src) !== url) return;
+    failedFigureImages.add(url);
+    PR.renderBlock(id);
+    PR.applyMarks(id);
+  };
+  PR.hasTranslatedFigure = function (b) {
+    const t = b.translated_image;
+    return !!(t?.src && t.source === b.src && t.target === (S.paper.meta?.target || 'zh') &&
+      t.image_en === (b.image_en || '') && t.image_zh === (PR.editOf(b.id + '#image')?.zh ?? b.image_zh ?? '') &&
+      !failedFigureImages.has(PR.imageUrl(t.src)));
+  };
 
   /* ---------- 译文取值：key 形如 "s1-p1"、"tab1#caption"、"s1-recs#2" ---------- */
   PR.blockById = {};
@@ -18,7 +32,7 @@
   PR.agentText = function (key) { const [zh, en] = fields(key); return zh || en; };
   /* 这处还没有译文、正文排的是英文原文（只读原文） */
   PR.isEnKey = function (key) { const [zh, en] = fields(key); return !zh && !!en && !PR.editOf(key); };
-  PR.hasZh = (b) => !!(b.zh || b.caption_zh || b.image_zh || (Array.isArray(b.items) && b.items.some((i) => i && i.zh)));
+  PR.hasZh = (b) => !!(b.zh || b.caption_zh || b.image_zh || PR.hasTranslatedFigure(b) || (Array.isArray(b.items) && b.items.some((i) => i && i.zh)));
   PR.editOf = function (key) { const e = (S.reader.edits || {})[key]; return e && e.zh != null ? e : null; };
   PR.textFor = function (key) { const e = PR.editOf(key); return e ? e.zh : PR.agentText(key); };
   PR.isStale = function (key) { const e = PR.editOf(key); return !!(e && e.base && e.base !== PR.hashText(PR.agentText(key))); };
@@ -121,7 +135,17 @@
         : '<button class="fig-missing" data-t="page">' + PR.t("图见原文第 {n} 页（点击查看）", { n: b.page }) + "</button>";
       const key = b.id + "#image";
       const imageText = b.image_zh || b.image_en ? '<div class="figure-translation"><div class="figure-translation-label">' + PR.t("图内文字") + '</div>' + zhDiv(key) + enIfZh(key, b.image_en) + '</div>' : "";
-      return '<div class="figure-media">' + img + '</div>' + imageText + captionHtml(b);
+      const translated = b.translated_image;
+      const current = PR.hasTranslatedFigure(b);
+      const failed = translated?.src && failedFigureImages.has(PR.imageUrl(translated.src));
+      const original = '<div class="figure-media">' + img + '</div>' + imageText;
+      const generate = PR.store.mode === 'server' && S.figure_images_enabled && b.src ? '<p class="figure-image-actions"><button class="btn sm line" data-t="figure-image"' + (jobRunning() ? ' disabled' : '') + '>' +
+        (translated?.src ? PR.t("重新生成译图") : PR.t("生成译图")) + '</button></p>' : '';
+      // 图片和正文共用 .zh / .en 配对，沿用阅读模式、双语顺序和单块展开。
+      // 有可用译图时不渲染图内文字；加载失败后才恢复文字兜底。
+      return (current ? '<div class="figure-generated"><div class="zh paired-translation figure-media"><img data-translated-figure src="' + PR.esc(PR.imageUrl(translated.src)) +
+        '" alt="' + PR.t("译图") + '" loading="lazy"' + style + '></div><div class="en figure-media">' + img + '</div></div>'
+        : (failed ? '<div class="figure-translation-label">' + PR.t("译图未能加载，已显示原图和文字译文") + '</div>' : '') + original) + generate + captionHtml(b);
     },
     note: (b) => '<div class="inline-note"><div class="lbl">' + PR.t("阅读批注（非原文）") + "</div>" + PR.mdBlocks(b.zh) + "</div>",
     references(b) {
@@ -178,7 +202,21 @@
     return '<header class="paper-head" id="b-head" data-id="head">' + (kicker ? '<div class="kicker">' + kicker + "</div>" : "") +
       "<h1>" + PR.titleHtml(m.title_zh || m.title_en || PR.t("（正在识别标题）")) + "</h1>" +
       (m.title_zh && m.title_en && m.title_zh !== m.title_en ? '<p class="title-en" lang="' + (m.target === "en" ? "" : "en") + '">' + PR.titleHtml(m.title_en) + "</p>" : "") +
-      (by ? '<p class="byline">' + by + "</p>" : "") + '<p class="scope">' + scope + "</p>" + creditHtml() + "</header>";
+      (by ? '<p class="byline">' + by + "</p>" : "") + '<p class="scope">' + scope + "</p>" + figureJobsHtml() + creditHtml() + "</header>";
+  }
+
+  function figureJobsHtml() {
+    if (PR.store.mode !== 'server' || !(S.paper.blocks || []).some(b => b.type === 'figure' && b.src)) return '';
+    const job = S.job || {}, running = jobRunning();
+    if (!S.figure_images_enabled && !(job.type === 'figure-images' && running)) return '';
+    const button = S.figure_images_enabled ? '<button class="btn sm line" data-t="figure-images"' + (running ? ' disabled' : '') + '>' + PR.t("为本文生成译图") + '</button>' : '';
+    const hint = S.figure_images_enabled ? '<span class="hint">' + PR.t("只补齐缺失或已过期的译图，不重译正文") + '</span>' : '';
+    if (job.type !== 'figure-images') return '<div class="figure-job">' + button + ' ' + hint + '</div>';
+    return '<div class="figure-job" role="status">' + button + ' ' + hint + '<p>' + PR.esc(job.message || '') +
+      (running ? ' ' + PR.t("（{done}/{total} 张）", {done: job.done || 0, total: job.total || 0}) +
+        ' <button class="btn sm line" data-t="cancel-figure-images">' + PR.t("取消") + '</button>' : '') + '</p>' +
+      (job.error ? '<p class="err">' + PR.esc(job.error) + '</p>' : '') +
+      (S.figure_images_enabled && !running && Object.keys(job.image_failed || {}).length ? '<button class="btn sm line" data-t="retry-figure-images">' + PR.t("重试失败的译图") + '</button>' : '') + '</div>';
   }
 
   /* 还没译的页：放原页图，边译边读 */

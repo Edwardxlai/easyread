@@ -157,7 +157,8 @@
       if (!r.ok) throw new Error(r.status === 404 ? PR.t("文献库里没有这篇论文") : PR.t("读取数据失败：{status}", { status: r.status }));
       const d = await r.json();
       PR.token = d.token;
-      Object.assign(S, { paper: d.paper, discussion: d.discussion, layout: d.layout || {}, item: d.item || {}, job: d.job || {}, versions: d.versions, engine: d.engine });
+      Object.assign(S, { paper: d.paper, discussion: d.discussion, layout: d.layout || {}, item: d.item || {}, job: d.job || {}, versions: d.versions, engine: d.engine,
+        figure_images_enabled: d.figure_images_enabled === true });
       serverReader = d.reader || {};
     }
     const ov = (S.item || {}).meta_override || {};
@@ -187,7 +188,9 @@
     }
     const changed = [];
     for (const name of ["paper", "discussion", "layout", "reader", "job"]) if (v[name] && v[name] !== S.versions[name]) changed.push(name);
-    if (!changed.length) return;
+    const imagesChanged = S.figure_images_enabled !== (v.figure_images_enabled === true);
+    S.figure_images_enabled = v.figure_images_enabled === true;
+    if (!changed.length) { if (imagesChanged) PR.emit("figure-images-setting"); return; }
     for (const name of changed) {
       if (name === "reader" && (flushing || outbox.length)) continue; // 自己正在写，等写完
       const d = await (await fetch(base() + "/part/" + name, { cache: "no-store" })).json();
@@ -196,6 +199,7 @@
     }
     if (changed.includes("paper")) { const ov = (S.item || {}).meta_override || {}; for (const [k, val] of Object.entries(ov)) if (val) S.paper.meta[k] = val; }
     PR.emit("remote", changed);
+    if (imagesChanged) PR.emit("figure-images-setting");
   }
   PR.poll = poll;
   PR.startPolling = function () {

@@ -3,6 +3,15 @@
   "use strict";
   const S = PR.state;
   const body = document.body;
+  PR.on("settings-saved", state => {
+    const enabled = state.cfg.figure_images?.enabled === true;
+    if (S.figure_images_enabled !== enabled) {
+      S.figure_images_enabled = enabled;
+      PR.hideBlockbar();
+      PR.rerenderKeepingPlace();
+    }
+  });
+  PR.on("figure-images-setting", () => { PR.hideBlockbar(); PR.rerenderKeepingPlace(); });
 
   /* 当前阅读的块：视口上部 30% 那条线穿过的块 */
   PR.readingLine = () => innerHeight * 0.3;
@@ -84,7 +93,7 @@
         PR.$(".bar-title").innerHTML = PR.titleHtml(m.short_zh || m.title_zh || m.title_en || "");
       } else if (changed.includes("job")) {
         const pend = PR.$(".pending-pages .pending, .page-cap");
-        if (pend || (S.job || {}).state === "confirm") PR.rerenderKeepingPlace();
+        if (pend || (S.job || {}).state === "confirm" || (S.job || {}).type === "figure-images" || PR.$(".figure-job")) PR.rerenderKeepingPlace();
       }
       PR.applyMarks(); PR.renderMargin();
       if (PR.notesPanelOpen()) PR.renderNotesPanel();

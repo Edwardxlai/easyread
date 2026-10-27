@@ -164,7 +164,7 @@
     PR.$$("[data-k]", root()).forEach((el) => {
       const [a, b] = el.dataset.k.split(".");
       const v = el.type === "checkbox" ? el.checked : el.value;
-      if (b) s.cfg[a][b] = v; else s.cfg[a] = ["batch_pages", "concurrency", "paper_concurrency", "page_cap"].includes(a) ? +v : v;
+      if (b) (s.cfg[a] ||= {})[b] = v; else s.cfg[a] = ["batch_pages", "concurrency", "paper_concurrency", "page_cap"].includes(a) ? +v : v;
     });
   }
 
@@ -205,7 +205,15 @@
         PR.customApis.select(s, s.form, e.target.value, "key");
         return true;
       }
-      if (e.target.dataset.k) { readTranslation(s); PR.saveModelSettings(); return false; }
+      if (e.target.dataset.k) {
+        if (e.target.dataset.k === "figure_images.base_url" && e.target.value.trim().replace(/\/$/, '') !== (s.cfg.figure_images?.base_url || '').trim().replace(/\/$/, '')) {
+          // A raw key typed earlier in this dialog belongs to the old endpoint.
+          // Blank lets the backend restore only the new endpoint's saved key.
+          const key = PR.$('[data-k="figure_images.api_key"]', root());
+          if (key) key.value = '';
+        }
+        readTranslation(s); PR.saveModelSettings(); return ["figure_images.enabled", "figure_images.provider"].includes(e.target.dataset.k);
+      }
       if (e.target.dataset.reasoning) { readForm(s); autoSaveForm(s); return true; }
       if (s.form && isApi(s.form.kind)) {
         readForm(s);

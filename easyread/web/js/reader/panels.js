@@ -138,6 +138,9 @@
   PR.renderJobState = function () {
     const j = S.job || {};
     const el = PR.$("#jobState");
+    if (j.type === "figure-images" && ["error", "partial"].includes(j.state)) {
+      el.innerHTML = '<span class="err" title="' + PR.esc(j.error || "") + '">' + PR.esc(j.message || "") + '</span>'; return;
+    }
     if (j.state === "confirm") { el.textContent = PR.t("等你确认"); return; }
     if (["queued", "running"].includes(j.state)) el.innerHTML = '<span class="spin"></span> ' + PR.esc(j.message || PR.t("翻译中")) + (j.total ? " " + j.done + "/" + j.total : "");
     else if (j.state === "error") el.innerHTML = '<span class="err" title="' + PR.esc(j.error || "") + '">' + (j.read ? PR.t("整理原文出错") : PR.t("翻译出错")) + "</span>";

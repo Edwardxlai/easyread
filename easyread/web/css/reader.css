@@ -138,6 +138,8 @@ table.tbl td .sub { color: var(--ink-3); }
 /* 图片保持原色，透明区域按 PDF 的白纸底色显示。 */
 .blk-figure img { display: block; max-width: 100%; margin: 0 auto; border-radius: 2px; background: #fff; }
 .figure-media { margin: 0 auto; }
+.figure-image-actions { text-align: center; margin: .6em 0; }
+.figure-job { margin-top: 1em; font: 13px/1.6 var(--ui); }
 .figure-translation { margin: .8em auto 0; padding: .65em .85em .7em; max-width: 42em; border-left: 2px solid var(--accent); border-radius: 4px; background: var(--accent-soft); font-size: .86em; line-height: 1.7; }
 .figure-translation-label { margin-bottom: .2em; font: 11.5px/1.4 var(--ui); letter-spacing: .06em; color: var(--accent); }
 .figure-translation .zh { text-align: left; }

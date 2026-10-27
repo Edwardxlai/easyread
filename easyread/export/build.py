@@ -50,6 +50,7 @@ def build(ws: Workspace, out: Path | None = None, assets: Path | None = None, ex
     images = {}
     done = set((paper.get("translation") or {}).get("done_pages") or []) if mobile else set()
     rels = [p["img"] for p in paper.get("meta", {}).get("pages", []) if p.get("n") not in done] + [b["src"] for b in paper.get("blocks", []) if b.get("src")]
+    rels += [b["translated_image"]["src"] for b in paper.get("blocks", []) if (b.get("translated_image") or {}).get("src")]
     for rel in rels:
         src = ws.root / rel
         if not src.exists():

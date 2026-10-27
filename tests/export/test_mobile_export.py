@@ -46,6 +46,17 @@ class MobileExportTest(unittest.TestCase):
         self.assertNotIn('document.body.classList.add("mobile-read")', html)
         self.assertNotIn("body.mobile-read", html)
 
+    def test_exports_translated_image_with_original_and_text_fallback(self):
+        (self.ws.root / "pages/translated.webp").write_bytes(b"translated-image")
+        self.ws.update("paper", lambda p: p["blocks"][1].update(image_zh="译文", translated_image={"src": "pages/translated.webp"}))
+        for mobile in (False, True):
+            for assets in (None, self.ws.root / "assets"):
+                with self.subTest(mobile=mobile, assets=assets):
+                    _, data = self.data(build(self.ws, mobile=mobile, assets=assets))
+                    self.assertIn("pages/translated.webp", data["images"])
+                    self.assertIn("pages/fig.webp", data["images"])
+                    self.assertEqual(data["paper"]["blocks"][1]["image_zh"], "译文")
+
 
 if __name__ == "__main__":
     unittest.main()
