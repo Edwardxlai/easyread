@@ -226,6 +226,39 @@ class FigureTest(unittest.TestCase):
         self.assertEqual(figures.fill(ws), 1)
         self.assertTrue((self.root / src).is_file())
 
+    def test_fill_replaces_orphaned_previous_crop(self):
+        ws, old = self.auto_figure()
+        self.assertTrue((self.root / old["src"]).is_file())
+        self.assertEqual(figures.fill(ws), 1)
+        updated = ws.load("paper")["blocks"][0]
+        self.assertNotEqual(updated["src"], old["src"])
+        self.assertFalse((self.root / old["src"]).exists())  # 定位换图后旧截图清掉
+        self.assertTrue((self.root / updated["src"]).is_file())
+
+    def test_previous_crop_kept_while_another_block_references_it(self):
+        ws = Workspace(self.root)
+        shared = figures.crop(self.root, 1, [.5, .4, .9, .7])
+        a = {"id": "fig1", "type": "figure", "page": 1, "src": shared}
+        b = {"id": "fig2", "type": "figure", "page": 1, "src": shared}
+        write_json_atomic(self.root / "paper.json", {"meta": {"page_count": 2}, "blocks": [a, b]})
+        write_json_atomic(self.root / "layout.json", {"fig1": {"page": 1, "box": [.1, .3, .9, .9], "src": "graphic"}})
+        self.assertEqual(figures.fill(ws), 1)
+        blocks = {b["id"]: b for b in ws.load("paper")["blocks"]}
+        self.assertNotEqual(blocks["fig1"]["src"], shared)
+        self.assertEqual(blocks["fig2"]["src"], shared)
+        self.assertTrue((self.root / shared).is_file())  # fig2 还在用，不清理
+
+    def test_previous_crop_kept_for_manual_crop_snapshot(self):
+        ws, old = self.auto_figure()
+        other = figures.crop(self.root, 2, [.1, .1, .5, .5])
+        ws.update("paper", lambda p: p["blocks"].append({
+            "id": "fig2", "type": "figure", "page": 2, "src": other,
+            "manual_crop": {"src": old["src"], "abox": [.5, .4, .9, .7], "box": [.5, .4, .9, .7], "page": 1},
+        }))
+        self.assertEqual(figures.fill(ws), 1)
+        self.assertTrue((self.root / old["src"]).is_file())  # 快照里留档的旧 src 仍被引用，不清理
+        self.assertTrue((self.root / other).is_file())
+
 
 if __name__ == "__main__":
     unittest.main()
