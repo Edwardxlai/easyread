@@ -6,7 +6,8 @@ const { test } = require("node:test");
 test("Codex settings render supported effort levels and save the chosen overrides", () => {
   const PR = { t: (x) => x, esc: String, settingsTabs: {},
     $: () => ({ addEventListener() {} }) };
-  const context = { window: { PR, addEventListener() {} }, document: { addEventListener() {} } };
+  const context = { window: { PR, addEventListener() {} }, document: { addEventListener() {} },
+    location: { search: "" }, URLSearchParams };
   for (const name of ["settings.js", "settings-models.js"]) {
     vm.runInNewContext(fs.readFileSync("easyread/web/js/common/" + name, "utf8"), context);
   }

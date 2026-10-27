@@ -175,6 +175,16 @@ easyread export ID                     # 导出单文件离线 HTML
 
 **能离线看、发给别人吗？** 能。文献库里右键一篇论文 → “导出离线 HTML”，得到一个单文件网页（命令行是 `easyread export ID`）。对方不用装 EasyRead，双击用浏览器打开就能读：译文、公式、原页图、你的划线和笔记都在里面，也能切对照、开原页、接着划线。原页图是打包进去的，所以文件不小（27 页的论文约 10 MB）。在离线版里新做的划线和笔记只存在打开它的那个浏览器里；想并回文献库，在左侧“说明”里点“导出我的修改”得到一个 JSON，再运行 `easyread merge ID --from 导出.json`。
 
+**排版翻译 PDF（可选）：** 先在 EasyRead 的“设置 → 模型”中将翻译引擎设为 API，并配置 OpenAI 兼容的 Chat Completions 接口、模型 ID 和 API Key。然后从文献库顶部进入“排版翻译”，选择已有论文或导入 PDF。后台用同一套模型配置调用 BabelDOC，一次翻译同时生成双语对照版和纯译文版 PDF，完成后可分别预览和下载，文件以论文标题加“对照版”或“纯译文版”命名。已完成的任务可重新生成，也可删除该文献的排版翻译结果；原 PDF 和阅读笔记不受影响。生成文件保存在对应论文的 `babeldoc/` 子目录。BabelDOC 不支持复用 Codex CLI 登录或 Responses 接口。
+
+先安装 BabelDOC 命令（与 EasyRead 的 Python 环境分开）：
+
+```sh
+uv tool install --python 3.12 --with 'bitstring<5' --with 'onnxruntime==1.23.2' BabelDOC
+```
+
+BabelDOC 0.6.4 目前若装到 `bitstring` 5.0.0，会因缺少 `BitStream` 而无法启动，因此这里限制在 4.x。本机测试使用 ONNX Runtime 1.23.2。已安装过不兼容版本时加 `--reinstall` 重装。翻译会消耗所填模型接口的额度。
+
 想放到网站上（比如 GitHub Pages），用 `easyread demo ID --out 目录`：图片另存成文件、按需加载，还会带上问 AI 的对话记录（只能看）。
 
 ## 开发

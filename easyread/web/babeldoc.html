@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>排版翻译 · EasyRead</title>
+<link rel="icon" href="/web/favicon.svg">
+<link rel="stylesheet" href="/web/css/base.css">
+<link rel="stylesheet" href="/web/css/babeldoc.css">
+<script>try{var p=JSON.parse(localStorage.getItem("easyread-prefs")||"{}");var d=p.theme==="dark"||(p.theme!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.dataset.theme=d?"dark":"light"}catch(e){}</script>
+</head>
+<body>
+<header class="topbar"><a class="brand" href="/">Easy<b>Read</b></a><span class="grow"></span><a class="btn" href="/">返回文献库</a></header>
+<main class="babel-layout">
+  <section class="babel-card">
+    <h1>排版翻译</h1>
+    <p>用 BabelDOC 同时生成双语对照版和纯译文版 PDF。翻译复用 EasyRead 的模型 API 设置。</p>
+    <form id="babelForm">
+      <label>文献库里的论文<select id="paper"><option value="">正在加载…</option></select></label>
+      <label class="upload">或导入新 PDF<input id="upload" type="file" accept="application/pdf,.pdf"></label>
+      <div class="model-config"><strong>当前翻译模型</strong><div id="modelConfig">正在读取设置…</div><a href="/?settings=chat">修改模型 API 设置</a></div>
+      <div class="job-actions"><button class="btn accent" id="start" type="submit">生成两种 PDF</button><button class="btn danger" id="delete" type="button" hidden>删除结果</button></div>
+    </form>
+    <div id="status" role="status" aria-live="polite"></div>
+    <div id="results"></div>
+  </section>
+  <section class="babel-preview"><h2>结果预览</h2><div id="previewEmpty">完成后可在这里预览双语 PDF。</div><iframe id="preview" title="双语 PDF 预览" hidden></iframe></section>
+</main>
+<script src="/web/js/common/presence.js"></script>
+<script src="/web/js/common/i18n.js"></script>
+<script src="/web/js/babeldoc.js"></script>
+</body>
+</html>
