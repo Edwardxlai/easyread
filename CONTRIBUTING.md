@@ -17,6 +17,10 @@ easyread
 
 改桌面版（Electron）还需要 Node.js 22+，见 README 的“桌面版”一节。
 
+论文笔记的 Tiptap 工具栏源码在 `easyread/web/src/note-toolbar.tsx`，编辑器与 Markmap 集成在 `easyread/web/js/reader/paper-note-editor.js`。修改 `src/` 后运行 `npm ci`（首次安装依赖）和 `npm run build:editor`，刷新阅读页查看效果。`npm run dist` 会先构建编辑器资源，再打包桌面程序。
+
+macOS 开发时可用 `node --watch-path=easyread/web/src scripts/build_note_editor.cjs` 监听源码，保存后自动编译；浏览器使用强制刷新加载新的资源。
+
 ## 跑测试
 
 ```bash

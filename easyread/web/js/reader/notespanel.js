@@ -7,7 +7,6 @@
   const itemId = (it) => it.src + ":" + it.data.id;
   let filter = "all";
   let editing = null;
-  let preview = false;
   const panel = () => PR.$("#notespanel");
 
   PR.notesPanelOpen = () => PR.side === "notes";
@@ -59,16 +58,25 @@
     const el = panel();
     if (editing && PR.noteMedia.isChoosing(editing) && editId === undefined) return;
     if ((editing || tab === "paper") && el.contains(document.activeElement) && document.activeElement.matches("textarea") && editId === undefined) return; // 正在打字，不打断；结束编辑仍需移除输入框
+    if (tab === "paper" && el.querySelector(".pn-workspace")?.contains(document.activeElement) && editId === undefined) return;
     const list = items();
     const count = PR.myNotes().length + (S.discussion.entries || []).length;
     let h = '<div class="np-head"><div class="seg"><button data-np="notes" class="' + (tab === "notes" ? "on" : "") + '">' + PR.t("批注 {n}", { n: count }) + '</button><button data-np="paper" class="' + (tab === "paper" ? "on" : "") + '">' + PR.t("论文笔记") + "</button></div>" +
       '<span class="grow"></span><button class="btn sm" data-np-act="md" title="' + PR.t("导出 Markdown") + '">' + PR.t("导出") + '</button><button class="btn icon" data-np-act="close" title="' + PR.t("关闭（M）") + '">×</button></div>';
     if (tab === "paper") {
       const body = (S.reader.paper_note || {}).body || "";
-      h += '<div class="np-paper"><div class="np-tools"><span class="hint">' + PR.t("整篇的感悟、总结、待办。自动保存。") + '</span><span class="grow"></span>' + PR.noteHelpButtons() +
-        '<button class="btn sm' + (preview ? " on" : "") + '" data-np-act="preview">' + (preview ? PR.t("编辑") : PR.t("预览")) + "</button></div>" +
-        (preview ? '<div class="np-preview">' + (body ? PR.mdBlocks(body) : '<p class="hint">' + PR.t("还没有写。") + "</p>") + "</div>"
-          : '<textarea id="paperNote" placeholder="' + PR.t("读完这篇，你怎么看？&#10;&#10;可以写：核心论点、我同意/不同意的地方、能用到哪里、还没搞懂的问题……&#10;支持 $公式$、**粗体**，空行分段。") + '">' + PR.esc(body) + "</textarea>") + PR.noteHelpBox() + "</div>";
+      const tools = '<span class="hint">' + PR.t("整篇的感悟、总结、待办。自动保存。") + '</span><span class="grow"></span>' + PR.noteHelpButtons();
+      const helper = PR.noteHelpBox();
+      if (el.querySelector(".pn-workspace") && PR.paperNoteEditor.getBody() === body) {
+        // 保存或 AI 状态刷新时保留编辑器实例、选择位置和撤销记录。
+        el.querySelector(".np-head").outerHTML = h;
+        el.querySelector(".np-tools").innerHTML = tools;
+        const old = el.querySelector(".np-ai");
+        if (old) { if (helper) old.outerHTML = helper; else old.remove(); }
+        else if (helper) el.querySelector(".np-paper").insertAdjacentHTML("beforeend", helper);
+        return;
+      }
+      h += '<div class="np-paper"><div class="np-tools">' + tools + '</div>' + PR.paperNoteEditor.html(body) + helper + '</div>';
     } else {
       const chips = [["all", PR.t("全部")], ["mine", PR.t("我的笔记")], ["hl", PR.t("划线")], ["agent", "AI"], ["open", PR.t("待回答")]]
         .map(([k, l]) => '<button data-nf="' + k + '" class="' + (filter === k ? "on" : "") + '">' + l + "</button>").join("");
@@ -82,14 +90,19 @@
       if (!list.length) h += '<p class="hint np-empty">' + (filter === "all" ? PR.t("还没有批注。选中正文文字可以划线、写笔记、提问；点一下段落也能加笔记。") : PR.t("这个分类下没有内容。")) + "</p>";
       h += "</div>";
     }
+    PR.paperNoteEditor?.destroy();
     el.innerHTML = h;
 
-    PR.$$("textarea", el).forEach(PR.autosize);
+    PR.$$(".card textarea", el).forEach(PR.autosize);
+    if (tab === "paper") PR.paperNoteEditor.mount((S.reader.paper_note || {}).body || "");
     const ta = editing && el.querySelector('.card[data-note="' + editing + '"] textarea');
     if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); ta.scrollIntoView({ block: "nearest" }); }
   };
 
-  const savePaperNote = PR.debounce(() => { const ta = PR.$("#paperNote"); if (ta) PR.commit({ op: "paper_note", body: ta.value }); }, 600);
+  const savePaperNote = PR.debounce(() => {
+    const ta = PR.$("#paperNote");
+    if (ta && ta.value !== ((S.reader.paper_note || {}).body || "")) PR.commit({ op: "paper_note", body: ta.value });
+  }, 600);
   const saveEditing = PR.debounce(() => {
     const ta = editing && panel().querySelector('.card[data-note="' + editing + '"] textarea');
     const n = editing && (S.reader.notes || {})[editing];
@@ -110,13 +123,13 @@
   };
 
   panel().addEventListener("input", (e) => {
-    PR.autosize(e.target);
     if (e.target.id === "paperNote") {
       savePaperNote();
+      PR.paperNoteEditor.update();
       const btns = PR.$("#notespanel .nh-btns");  // 笔记从空变成有内容（或反过来）：“起草稿”换成“点评 / 帮我改”
       if (btns && (btns.querySelector('[data-nh="draft"]') ? 1 : 0) !== (e.target.value.trim() ? 0 : 1)) btns.outerHTML = PR.noteHelpButtons();
     }
-    else if (e.target.matches(".card textarea")) saveEditing();
+    else if (e.target.matches(".card textarea")) { PR.autosize(e.target); saveEditing(); }
   });
   panel().addEventListener("keydown", (e) => {
     if (e.target.matches(".card") && (e.key === "Enter" || e.key === " ")) {
@@ -126,7 +139,7 @@
     if (e.target.matches(".card textarea") && (e.key === "Escape" || (e.key === "Enter" && (e.ctrlKey || e.metaKey)))) { e.preventDefault(); stopEditing(); }
   });
   panel().addEventListener("focusout", (e) => {
-    if (e.target.id === "paperNote") savePaperNote.flush();
+    if (e.target.id === "paperNote" || e.target.closest(".pn-workspace")) savePaperNote.flush();
     if (!e.target.closest(".card[data-note]")) return;
     setTimeout(() => { const card = e.target.closest(".card"); if (card && card.isConnected && !PR.noteMedia.isChoosing(card.dataset.note) && !card.contains(document.activeElement) && editing === card.dataset.note) stopEditing(); }, 150);
   });
@@ -139,8 +152,7 @@
     if (act) {
       const a = act.dataset.npAct;
       if (a === "close") PR.toggleNotesPanel(false);
-      if (a === "md") PR.openExport();
-      if (a === "preview") { savePaperNote.flush(); preview = !preview; PR.renderNotesPanel(); }
+      if (a === "md") { savePaperNote.flush(); PR.openExport(); }
       return;
     }
     const card = e.target.closest(".card");
@@ -151,6 +163,10 @@
     jump(items().find((it) => it.data.id === (card.dataset.note || card.dataset.card) && it.src === (card.dataset.note ? "mine" : "agent")));
 
   });
+
+  window.addEventListener("pagehide", () => savePaperNote.flush());
+  window.addEventListener("beforeunload", () => savePaperNote.flush());
+  document.addEventListener("visibilitychange", () => { if (document.hidden) savePaperNote.flush(); });
 
   /* 导出的 Markdown：论文笔记 + 按原文顺序的批注 */
   /* pick：{paper, note, highlight, question, ai, chat, quote}，不传就全要 */

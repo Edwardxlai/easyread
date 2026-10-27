@@ -11,7 +11,8 @@
 @media print { .reader-nav { display: none; } }
 
 body.np-open { --side-w: min(400px, 100vw); }
-body #notespanel { width: min(400px, 100vw); }
+body #notespanel { width: min(var(--side-w), 100vw); }
+@media (max-width: 1179px) { body #notespanel { width: min(400px, 100vw); } }
 @media (min-width: 760px) and (max-width: 1179px) {
   body.np-open #stage { width: calc(100vw - 424px); margin-left: 12px; margin-right: 412px; grid-template-columns: 12px minmax(0, 1fr) 12px; }
 }
