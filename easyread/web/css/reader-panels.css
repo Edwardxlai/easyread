@@ -131,6 +131,17 @@ body.pv-open .blk.pv-pair::before { background: rgba(214, 160, 40, .8); opacity:
 #popover .hd { font-size: 11.5px; letter-spacing: .08em; color: var(--ink-3); margin-bottom: 4px; }
 #popover .cap { color: var(--ink); font-family: var(--serif-zh); }
 #popover textarea { font-size: 13px; }
+.selection-translation { display: flex; flex-direction: column; max-height: calc(100dvh - 100px); }
+.st-head, .st-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.st-head { justify-content: space-between; color: var(--ink); }
+.st-quote { margin: 8px 0; padding: 8px 10px; border-left: 2px solid var(--accent); background: var(--accent-soft); max-height: 90px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.st-result { white-space: pre-wrap; overflow-wrap: anywhere; overflow-y: auto; color: var(--ink); height: clamp(120px, 28vh, 260px); min-height: 70px; }
+.st-actions { margin-top: 12px; }
+.st-speech { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 8px; flex-shrink: 0; }
+.st-speech .hint { font-size: 11px; }
+.st-accent, .st-voice { padding: 4px 6px; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); color: var(--ink); font: inherit; }
+.st-voice { min-width: 0; max-width: min(220px, 100%); }
+#selbar { max-width: calc(100vw - 16px); flex-wrap: wrap; }
 .pv-page.loading { min-height: 60vh; background: linear-gradient(100deg, var(--surface) 30%, var(--surface-2) 50%, var(--surface) 70%) 0 0 / 300% 100%; animation: pv-shimmer 1.2s linear infinite; }
 @keyframes pv-shimmer { to { background-position: -300% 0; } }
 

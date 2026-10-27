@@ -252,9 +252,15 @@
   };
 
   /* ---------- 悬浮卡 ---------- */
-  let popHideT = null, popSticky = false;
+  let popHideT = null, popSticky = false, popCleanup = null;
+  function releasePopover() {
+    const cleanup = popCleanup; popCleanup = null;
+    if (cleanup) cleanup();
+  }
   PR.popover = function (anchor, html, opts) {
     if (!html) return;
+    releasePopover();
+    popCleanup = opts && opts.onClose;
     clearTimeout(popHideT);
     const pop = PR.$("#popover");
     pop.onclick = null;
@@ -269,6 +275,7 @@
     pop.style.left = x + "px"; pop.style.top = Math.max(58, y) + "px";
   };
   PR.hidePopover = () => {
+    releasePopover();
     clearTimeout(popHideT);
     const pop = PR.$("#popover"); pop.classList.remove("open");
     if (pop.querySelector(".media-hover")) pop.replaceChildren();

@@ -182,13 +182,15 @@
       '<button data-s="highlight" data-color="' + c + '" class="dot-' + c + '" title="' + (pen === "underline" ? PR.t("{color}色下划线", { color: name }) : PR.t("{color}色荧光笔", { color: name })) + (PR.keysOn ? PR.t("（{k}）", { k: i + 1 }) : "") + '"></button>').join("") + "</span>" +
       '<button data-s="note" title="' + PR.t("写笔记（N）") + '">' + PR.icon("note", "sm") + PR.t("笔记") + "</button>" +
       '<button data-s="question" title="' + PR.t("提问（Q）") + '">' + PR.icon("question", "sm") + PR.t("提问") + "</button>" +
+      (PR.store.mode === "server" ? '<button data-s="translate" title="' + PR.t("翻译选中文字，学习词义和用法") + '">' + PR.icon("en", "sm") + PR.t("翻译") + "</button>" : "") +
       (PR.canChat && PR.canChat() && PR.feature("chat") ? '<button data-s="chat" title="' + PR.t("把这句引用到问 AI（可以引用多段）") + '">' + PR.icon("sparkle", "sm") + (PR.chatOpen && PR.chatOpen() ? PR.t("引用到对话") : PR.t("问 AI")) + "</button>" : "") +
       (pendingSel.side || pendingSel.parts || pendingSel.math ? "" : '<button data-s="en" title="' + PR.t("看这段英文") + '">' + PR.icon("en", "sm") + PR.t("原文") + "</button>") +
       '<button data-s="copy" title="' + PR.t("复制") + '">' + PR.icon("copy", "sm") + "</button>";
     bar.classList.add("open");
     const r = pendingSel.rect, w = bar.offsetWidth;
     const x = Math.min(innerWidth - w - 8, Math.max(8, r.left + r.width / 2 - w / 2));
-    const y = r.top - 48 < 58 ? r.bottom + 8 : r.top - 48;
+    const above = r.top - bar.offsetHeight - 8;
+    const y = above < 58 ? r.bottom + 8 : above;
     bar.style.left = x + "px"; bar.style.top = y + "px";
   }
   document.addEventListener("mouseup", (e) => { if (!(e.target.closest && e.target.closest("#selbar, #blockbar"))) setTimeout(showSelbar, 10); });
@@ -197,10 +199,11 @@
 
   PR.selectionAction = function (kind, color) {
     if (!pendingSel) return;
-    const { anchor, key, quote, prefix, suffix, side, parts } = pendingSel;
+    const { anchor, key, quote, prefix, suffix, side, parts, rect } = pendingSel;
     selbar().classList.remove("open");
     getSelection().removeAllRanges();
     pendingSel = null;
+    if (kind === "translate") { PR.translateSelection({ anchor, quote, rect }); return; }
     if (kind === "en") { PR.toggleEn(anchor, true); return; }
     if (kind === "copy") { navigator.clipboard.writeText(quote).then(() => PR.toast(PR.t("已复制"))); return; }
     if (kind === "chat") { PR.chatAsk({ anchor, quote }); return; }
