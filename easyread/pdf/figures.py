@@ -19,7 +19,7 @@ import threading
 
 from . import pdfwork
 from ..app.log import log
-from ..library.store import Workspace
+from ..library.store import Workspace, dir_lock
 
 _running: set[str] = set()
 
@@ -159,10 +159,12 @@ def _figure_srcs(paper) -> set[str]:
     """paper.json 里指向截图的所有引用：块 src，加上手动裁剪快照里留档的旧 src（reset 要恢复它）。"""
     out = set()
     for b in paper.get("blocks", []):
-        out.add(b.get("src", ""))
+        if isinstance(b.get("src"), str):
+            out.add(b["src"])
         snapshot = b.get("manual_crop")
         if isinstance(snapshot, dict):
-            out.add(snapshot.get("src", ""))
+            if isinstance(snapshot.get("src"), str):
+                out.add(snapshot["src"])
     return out
 
 
@@ -171,21 +173,29 @@ def _drop_orphans(ws, stale: set[str]) -> None:
     引用以清理那一刻的 paper.json 为准，只删自动裁剪命名的文件；删不掉就留着，无害。"""
     if not stale:
         return
+    # Hold the paper write lock through the final reference check and unlink.
+    # A concurrent crop/reset must not restore a file between these operations.
     try:
-        referenced = _figure_srcs(ws.load("paper"))
-    except Exception:  # noqa: BLE001
-        return
-    for src in stale:
-        if src in referenced or not src.startswith("figures/"):
-            continue
-        if not _CROP_NAME.fullmatch(src.rsplit("/", 1)[-1]):
-            continue
-        try:
-            (ws.root / src).unlink()
-        except FileNotFoundError:
-            pass
-        except OSError:
-            log.exception("清理旧截图失败 %s", src)
+        with dir_lock(ws.root):
+            referenced = _figure_srcs(ws.load("paper"))
+            directory = ws.root.resolve() / "figures"
+            if directory.resolve() != directory:
+                return  # Do not follow a relocated figures directory/junction.
+            for src in stale:
+                if not isinstance(src, str) or src in referenced:
+                    continue
+                name = src.removeprefix("figures/")
+                if src != "figures/" + name or not _CROP_NAME.fullmatch(name):
+                    continue
+                target = directory / name
+                if target.is_symlink() or target.resolve().parent != directory:
+                    continue
+                try:
+                    target.unlink(missing_ok=True)
+                except OSError:
+                    log.exception("Unable to remove replaced crop %s", src)
+    except Exception:  # Cleanup is optional; keep files if state/locking fails.
+        log.exception("Unable to check replaced crops in %s", ws.root)
 
 
 def fill_later(ws, gate=None) -> None:

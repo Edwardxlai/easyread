@@ -1516,5 +1516,7 @@
   "蓝色高亮": "Blue highlight",
   "红色高亮": "Red highlight",
   "紫色高亮": "Purple highlight",
-  "黄色高亮": "Yellow highlight"
+  "黄色高亮": "Yellow highlight",
+  "固定目录到左侧": "Pin contents to the left",
+  "取消固定目录": "Unpin contents"
 }

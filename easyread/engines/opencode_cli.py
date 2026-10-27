@@ -34,9 +34,32 @@ def environment():
                OPENCODE_PERMISSION=json.dumps({"*": "deny"}))
     env["OPENCODE_CONFIG_CONTENT"] = json.dumps({
         "autoupdate": False, "share": "disabled", "permission": {"*": "deny"},
-        "agent": {"easyread-reader": {"mode": "primary", "permission": {"*": "deny"},
+        "agent": {"easyread-reader": {"description": "Translate papers and answer reading questions without tools",
+                    "mode": "primary", "disable": False, "permission": {"*": "deny"},
                     "prompt": "Answer the supplied question or translation task directly. Do not use tools."}},
     })
+    return env
+
+
+def prepare_runtime(work):
+    """Expose the agent to both embedded CLI and persistent-server discovery.
+
+    A reused OpenCode server does not inherit a new client's inline config.
+    Keep the normal user provider/login configuration, and add only the private
+    reading agent and tool restrictions inside this disposable project.
+    """
+    env = environment()
+    root = Path(work).resolve()
+    (root / "opencode.json").write_text(env["OPENCODE_CONFIG_CONTENT"], encoding="utf-8")
+    agents = root / ".opencode" / "agents"
+    agents.mkdir(parents=True)
+    (agents / "easyread-reader.md").write_text(
+        "---\ndescription: Translate papers and answer reading questions without tools\n"
+        "mode: primary\npermission:\n  '*': deny\n---\n"
+        "Answer the supplied question or translation task directly. Do not use tools.\n",
+        encoding="utf-8",
+    )
+    env["PWD"] = str(root)  # New clients prefer PWD to process.cwd().
     return env
 
 
@@ -71,7 +94,7 @@ def run(c, prompt, cwd, images, cancel=None, meter=None):
         raise engines.EngineError(tr("找不到 OpenCode 命令，请先安装并配置模型"))
     # Do not inherit project agents, instructions or worktree access.
     with tempfile.TemporaryDirectory(prefix="easyread-opencode-") as work:
-        proc = subprocess.Popen(build_args(exe, c, images), cwd=work, env=environment(),
+        proc = subprocess.Popen(build_args(exe, c, images), cwd=work, env=prepare_runtime(work),
                                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                 text=True, encoding="utf-8", errors="replace", creationflags=engines._NO_WINDOW)
         out = engines._communicate(proc, prompt, int(c.get("timeout") or 1200), cancel)

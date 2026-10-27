@@ -226,6 +226,42 @@ class FigureTest(unittest.TestCase):
         self.assertEqual(figures.fill(ws), 1)
         self.assertTrue((self.root / src).is_file())
 
+    def test_cleanup_does_not_follow_parent_segments_or_symlinks(self):
+        ws = Workspace(self.root)
+        write_json_atomic(self.root / "paper.json", {"blocks": []})
+        (self.root / "figures/crop-dir").mkdir(parents=True)
+        name = "crop-1-" + "a" * 20 + ".webp"
+        outside = self.root / name
+        outside.write_bytes(b"keep")
+        figures._drop_orphans(ws, {"figures/crop-dir/../../" + name})
+        self.assertTrue(outside.exists())
+        linked = self.root / "figures" / name
+        try:
+            linked.symlink_to(outside)
+        except OSError:
+            return  # Windows without the symlink privilege still checks traversal.
+        figures._drop_orphans(ws, {"figures/" + name})
+        self.assertTrue(linked.is_symlink())
+        self.assertTrue(outside.exists())
+
+    def test_cleanup_holds_the_write_lock_while_checking_references(self):
+        ws = Workspace(self.root)
+        name = "figures/crop-1-" + "b" * 20 + ".webp"
+        (self.root / "figures").mkdir()
+        (self.root / name).write_bytes(b"keep")
+
+        observed = []
+
+        def load(part):
+            observed.append((self.root / ".write.lock").exists())
+            return {"blocks": [{"src": name}]}
+
+        with mock.patch.object(ws, "load", side_effect=load):
+            figures._drop_orphans(ws, {name})
+        self.assertEqual(observed, [True])
+        self.assertTrue((self.root / name).exists())
+        self.assertFalse((self.root / ".write.lock").exists())
+
     def test_fill_replaces_orphaned_previous_crop(self):
         ws, old = self.auto_figure()
         self.assertTrue((self.root / old["src"]).is_file())
