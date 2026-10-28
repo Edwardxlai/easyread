@@ -3,14 +3,13 @@
 (function (PR) {
   "use strict";
   const body = document.body;
+  const root = document.documentElement;
   const KEY = "easyread-panel-w";
   const MIN = 320, TEXT_MIN = 420;  // 面板至少 320px，正文至少留 420px
-  const clamp = (w) => Math.round(Math.max(MIN, Math.min(window.innerWidth - TEXT_MIN -
-    (body.classList.contains("contents-pinned") ? 260 : 0), w)));
-  const setW = (w) => w ? body.style.setProperty("--side-w", clamp(w) + "px") : body.style.removeProperty("--side-w");
+  const clamp = (w) => Math.round(Math.max(MIN, Math.min(window.innerWidth - TEXT_MIN, w)));
+  const setW = (w) => w ? root.style.setProperty("--side-w", clamp(w) + "px") : root.style.removeProperty("--side-w");
   let saved = PR.ls.get(KEY, 0);
   setW(saved);
-  PR.on("contents-pin", () => { if (saved) setW(saved); });
 
   /* 宽度变了：正文重排并停在刚才读的段，原页按新宽度换合适清晰度的图 */
   function relayout() {
