@@ -1516,5 +1516,9 @@
   "译图完成：生成 {n} 张，沿用 {skip} 张，失败 {failed} 张": "Figure translation finished: {n} generated, {skip} reused, {failed} failed",
   "译图排队中": "Figure translation queued",
   "译图任务因服务重启而中断，已保存的图片保留；可手动补齐": "Figure translation interrupted by a server restart. Saved images are kept; you can generate the remaining images manually.",
-  "请先在设置中开启生成译图": "Enable translated image generation in Settings first"
+  "请先在设置中开启生成译图": "Enable translated image generation in Settings first",
+ "上传笔记图片": "Upload note images",
+ "插入图片": "Insert image",
+ "笔记缩放": "Note zoom",
+ "返回更多工具": "Back to more tools"
 }
