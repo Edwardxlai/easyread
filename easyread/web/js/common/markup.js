@@ -79,13 +79,43 @@
     return { footnotePage: b.page };
   };
 
+  // Author/year references are linked only when the first author and year
+  // identify exactly one bibliography entry. Ambiguous citations stay plain.
+  PR.buildCitationIndex = function (refs) {
+    const index = new Map();
+    for (const ref of refs || []) {
+      const text = String(ref.text || ""), first = text.split(",")[0].split(/\s+and\s+/i)[0].split(/(?<=[\p{L}]{2})\.\s/u)[0];
+      const author = (first.match(/[\p{L}][\p{L}'’-]*/gu) || []).pop();
+      const years = [...text.matchAll(/\b(?:19|20)\d{2}[a-z]?\b/gi)].map(m => m[0].toLowerCase());
+      const bases = new Set(years.map(y => y.slice(0, 4)));
+      const suffixed = new Set(years.filter(y => y.length === 5));
+      // A publication year cannot be inferred safely when the entry mentions
+      // different years (for example, an access date or an earlier edition).
+      if (!author || bases.size !== 1 || suffixed.size > 1) continue;
+      const year = suffixed.size ? [...suffixed][0] : [...bases][0];
+      const key = author.toLowerCase() + ":" + year;
+      if (index.has(key)) index.set(key, null); else index.set(key, String(ref.id));
+    }
+    PR.citationIndex = index;
+  };
+  function citeAnchor(id, label) {
+    return '<a class="cite" href="#ref-' + PR.esc(id) + '" data-ref="' + PR.esc(id) + '">' + label + '</a>';
+  }
   function citeLinks(s) {
-    return s.replace(/\[(\d+(?:\s*[,，–-]\s*\d+)*)\]/g, (m, inner) => {
-      const parts = inner.split(/(\s*[,，–-]\s*)/);
-      const linked = parts.map((p) => (/^\d+$/.test(p) && PR.refById && PR.refById[p])
-        ? '<a class="cite" data-ref="' + p + '">' + p + "</a>" : p).join("");
-      return "[" + linked + "]";
+    // Exact reference IDs support numeric and alphanumeric labels, including +.
+    s = s.replace(/\[([^\]\n]{1,160})\]/g, (raw, inner) => {
+      const parts = inner.split(/(\s*[,，;；–-]\s*)/);
+      const ids = parts.filter((_, i) => i % 2 === 0);
+      if (!ids.some(p => PR.refById && Object.hasOwn(PR.refById, p)) ||
+          !ids.every(p => /^\d+$/.test(p) || (PR.refById && Object.hasOwn(PR.refById, p)))) return raw;
+      return "[" + parts.map(p => PR.refById && Object.hasOwn(PR.refById, p) ? citeAnchor(p, p) : p).join("") + "]";
     });
+    // Parenthetical and narrative citations: Smith et al., 2020 or Smith (2020).
+    return s.replace(/(?<![\p{L}\d])([\p{Lu}][\p{L}'’-]+)(?:\s+(?:et al\.|(?:and|&amp;)\s+[\p{Lu}][\p{L}'’-]+))?\s*(?:,\s*|\(\s*)((?:19|20)\d{2}[a-z]?)(\)?)/gu,
+      (raw, author, year) => {
+        const id = PR.citationIndex && PR.citationIndex.get(author.toLowerCase() + ":" + year.toLowerCase());
+        return id ? citeAnchor(id, raw) : raw;
+      });
   }
 
   function xref(kind, key, label) {

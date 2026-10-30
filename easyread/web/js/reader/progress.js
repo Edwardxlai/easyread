@@ -78,6 +78,15 @@
     return PR.t("已回到上次读到的地方");
   }
 
+  // A citation return uses the exact spot captured by that particular visit,
+  // even if this paper's ordinary reading progress changed in another tab.
+  PR.restoreCitationProgress = function (p) {
+    const at = target(p);
+    if (at == null) return false;
+    anchor(p, at);
+    return true;
+  };
+
   PR.restoreProgress = function () {
     const p = S.reader.progress || {};
     if (scrollY > 50) return false;  // 浏览器恢复过滚动位置，或者用户已经动了

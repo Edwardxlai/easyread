@@ -29,6 +29,7 @@
 
 <header class="topbar" id="bar">
   <a class="btn brand-back" id="backBtn" href="/" title="回文献库"></a>
+  <a class="btn citation-return" id="citationBack" hidden></a>
   <button class="btn icon" data-act="drawer" title="目录（T）"></button>
   <div class="bar-titles">
     <span class="bar-title"></span>
@@ -53,6 +54,7 @@
   <div class="drawer-tabs" role="tablist">
     <button data-tab="toc" class="on">目录</button>
     <button data-tab="terms">术语</button>
+    <button data-tab="citations" class="server-only">引用</button>
     <button data-tab="about">说明</button>
     <button data-tab="recent" class="server-only">最近</button>
   </div>
@@ -124,6 +126,8 @@
 <script src="/web/js/reader/figure-crop.js"></script>
 <script src="/web/js/reader/editor.js"></script>
 <script src="/web/js/reader/panels.js"></script>
+<script src="/web/js/reader/citations.js"></script>
+<script src="/web/js/reader/citation-import.js"></script>
 <script src="/web/js/reader/selection-speech.js"></script>
 <script src="/web/js/reader/selection-translate.js"></script>
 <script src="/web/js/reader/reading-language.js"></script>
@@ -144,6 +148,7 @@
 <script src="/web/js/reader/jumpback.js"></script>
 <script src="/web/js/reader/find.js"></script>
 <script src="/web/js/reader/progress.js"></script>
+<script src="/web/js/reader/citation-nav.js"></script>
 <script src="/web/js/reader/keys.js"></script>
 <script src="/web/js/reader/export.js"></script>
 <script src="/web/js/common/settings-models.js"></script>

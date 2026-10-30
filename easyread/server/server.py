@@ -18,7 +18,7 @@ from ..pdf import figures, pdfwork
 from ..app import cli_models, config, i18n, open_link, prefs, updates
 from ..engines import detect, engines, usage
 from ..translate import langs
-from ..library import trash
+from ..library import citations, trash
 from . import settings_api, library_api, jobs_api, paper_api, wsock
 from ..app.log import log, tail
 from ..bulk import api as bulk_api
@@ -107,7 +107,7 @@ class Handler(BaseHTTPRequestHandler):
             raise ValueError(tr("文件太大"))
         return self.rfile.read(n) if n else b""
 
-    def _import_result(self, ws, fresh, translate_after, scope, read=False, model="", target="", translation_extra=""):
+    def _import_result(self, ws, fresh, translate_after, scope, read=False, model="", target="", translation_extra="", citation=None):
         # A failed first preparation still leaves a library entry. Re-importing
         # that PDF must retry preparation instead of silently skipping it.
         paper = ws.load("paper") or {}
@@ -117,7 +117,13 @@ class Handler(BaseHTTPRequestHandler):
             if translate_after and not read:
                 langs.remember(ws, target)  # 导入框里选的译文语言
             self.app.jobs.enqueue(ws, translate_after=translate_after, scope=scope, read=read, model=model, translation_extra=translation_extra)
-        return self._json(200, {"id": ws.id, "new": fresh, "queued": queued})
+        result = {"id": ws.id, "new": fresh, "queued": queued}
+        if citation:
+            try:
+                citations.link_reference(self.app.lib, citation[0], citation[1], citation[2], ws.id)
+            except (ValueError, OSError) as e:
+                result["citation_error"] = str(e)
+        return self._json(200, result)
 
     # ---------- GET ----------
     def do_HEAD(self):
@@ -190,6 +196,8 @@ class Handler(BaseHTTPRequestHandler):
             if not ws:
                 return self._json(404, {"error": tr("没有这篇论文")})
             action = parts[4]
+            if action == "citations":
+                return self._json(200, citations.graph_for(lib, ws.id))
             if action == "state":
                 opened = {"last_opened": now_iso()}
                 if (ws.load("item") or {}).get("status", "unread") == "unread":  # 打开过就算在读
@@ -330,6 +338,16 @@ class Handler(BaseHTTPRequestHandler):
             ws = lib.ws(parts[3]) if len(parts) > 4 else None
             if not ws:
                 return self._json(404, {"error": tr("没有这篇论文")})
+            if parts[4] in ("citation-import", "citation-import-pdf"):
+                if parts[4] == "citation-import":
+                    body = json.loads(self._body() or b"{}")
+                    data, name, meta = lib.fetch(body.get("ref", ""))
+                    ref_id, fingerprint = str(body.get("ref_id", "")), str(body.get("fingerprint", ""))
+                else:
+                    data, name, meta = self._body(), q.get("name", "paper.pdf"), None
+                    ref_id, fingerprint = q.get("ref_id", ""), q.get("fingerprint", "")
+                imported, fresh = lib.create_from_pdf(data, name, meta)
+                return self._import_result(imported, fresh, False, None, citation=(ws, ref_id, fingerprint))
             body = json.loads(self._body() or b"{}")
             if parts[4] == "chat" and len(parts) == 5:
                 return self._chat(ws, body)

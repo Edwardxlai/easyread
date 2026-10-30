@@ -43,6 +43,7 @@ function render(blocks, options = {}) {
     // These tests inspect generated markup; DOM reuse is a separate layer.
     updatePaperHtml: (element, html) => { element.innerHTML = html; },
   };
+  if (options.references) PR.state.paper.references = options.references;
   if (options.pages) PR.state.paper.meta.pages = options.pages;
   if (options.job) PR.state.job = options.job;
   if (options.mode) PR.store.mode = options.mode;
@@ -159,3 +160,12 @@ test("offline unprepared documents do not offer an unavailable retry API", () =>
   assert.doesNotMatch(html, /retry-prepare|class="spin"/);
 });
 
+
+
+test("references without a heading still get a jump destination", () => {
+  const html = render([{id:'p1', type:'para', page:1, zh:'Text'}], {
+    references:[{id:'7', text:'An extracted reference'}],
+  });
+  assert.match(html, /id="b-__references"/);
+  assert.match(html, /id="ref-7"/);
+});

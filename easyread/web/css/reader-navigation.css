@@ -16,3 +16,5 @@ body #notespanel { width: min(var(--side-w), 100vw); }
 @media (min-width: 760px) and (max-width: 1179px) {
   body.np-open #stage { width: calc(100vw - 424px); margin-left: 12px; margin-right: 412px; grid-template-columns: 12px minmax(0, 1fr) 12px; }
 }
+.citation-return { white-space: nowrap; color: var(--accent); font-size: 12px; }
+.citation-return[hidden] { display: none; }
