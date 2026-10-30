@@ -169,3 +169,21 @@ body.pv-open .blk.pv-pair::before { background: rgba(214, 160, 40, .8); opacity:
 .jump-back-close:hover { background: rgba(255,255,255,.2); }
 :root[data-theme="dark"] .jump-back { color: #10201f; }
 @media (max-width: 760px) { .jump-back { left: 12px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); } }
+
+/* Citation tree: matched library papers expand in both directions. */
+.drawer-tabs { overflow-x: auto; flex-shrink: 0; }
+.drawer-tabs button { white-space: nowrap; }
+.cite-tree-group { margin: 14px 0; }
+.cite-tree-group > summary { font-weight: 600; cursor: pointer; color: var(--ink); }
+.cite-tree-node, .cite-tree-entry, .cite-tree-leaf { margin: 8px 0; line-height: 1.5; overflow-wrap: anywhere; }
+.cite-tree-entry .cite-tree-node { display: inline-block; vertical-align: top; max-width: calc(100% - 3em); }
+.cite-tree-node summary { cursor: pointer; }
+.cite-tree-node a, .cite-tree-leaf a, .cite-unmatched a { color: var(--accent); text-decoration: none; }
+.cite-tree-node a:hover, .cite-tree-leaf a:hover, .cite-unmatched a:hover { text-decoration: underline; }
+.cite-tree-children { margin-left: 12px; padding-left: 10px; border-left: 1px solid var(--rule); }
+.cite-unmatched { color: var(--ink-2); }
+.cite-unmatched > div { font: 12px var(--ui); margin-top: 3px; }
+.cite-unmatched .linkish { font-size: inherit; }
+.citation-import-ref { max-height: 9em; overflow: auto; line-height: 1.6; color: var(--ink-2); overflow-wrap: anywhere; }
+.citation-import .field { display: grid; gap: 6px; }
+.citation-import-status { margin: 12px 0 0; }

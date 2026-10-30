@@ -152,6 +152,8 @@
   let tab = "toc";
   PR.toggleDrawer = function (force, which) {
     if (which) tab = which;
+    PR.$('[data-tab="citations"]').hidden = PR.store.mode !== "server";
+    PR.$('[data-tab="recent"]').hidden = PR.store.mode !== "server";
     const open = force != null ? force : !body.classList.contains("drawer-open");
     body.classList.toggle("drawer-open", open);
     if (open) PR.renderDrawer();
@@ -163,7 +165,8 @@
   PR.renderDrawer = function () {
     PR.$$(".drawer-tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab));
     const box = PR.$(".drawer-body");
-    box.innerHTML = ({ toc: tocHtml, terms: termsHtml, about: aboutHtml, recent: recentHtml })[tab]();
+    if (tab === "citations") { box.innerHTML = ""; PR.citationsDrawer(box); }
+    else box.innerHTML = ({ toc: tocHtml, terms: termsHtml, about: aboutHtml, recent: recentHtml })[tab]();
     box.className = "drawer-body " + tab;
   };
   /* 最近读过的论文：不用回文献库就能换一篇 */

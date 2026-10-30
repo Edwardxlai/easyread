@@ -300,3 +300,7 @@ textarea.editor { display: block; width: 100%; resize: none; overflow: hidden; b
 .blk.footnote { font-size: .88em; color: var(--ink-2); padding-left: 1.6em; border-left: 2px solid var(--ink-3); }
 .footnote-label { position: absolute; left: .3em; }
 .footnote-ref { text-decoration: none; cursor: pointer; }
+.ref-tools { display: flex; flex-wrap: wrap; gap: .3em 1em; margin-top: .3em; font: 12px/1.5 var(--ui); }
+.ref-tools a, .ref-tools summary { color: var(--accent); cursor: pointer; text-decoration: none; }
+.ref-tools a:hover { text-decoration: underline; }
+.ref-tools details a { display: block; margin: .3em 0; color: var(--ink-2); }
