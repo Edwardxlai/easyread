@@ -36,6 +36,14 @@
   });
   const btn = PR.$("#settingsBtn");
   if (btn) btn.onclick = () => PR.openSettings();
+  if (new URLSearchParams(location.search).get("settings") === "chat") {
+    window.addEventListener("load", () => {
+      const url = new URL(location.href);
+      url.searchParams.delete("settings");
+      history.replaceState(null, "", url.pathname + url.search + url.hash);
+      PR.openSettings("chat");
+    }, { once: true });
+  }
 
   function sync() { const t = PR.settingsTabs[st.tab]; if (t && t.sync) t.sync(st, dlg()); }
   PR.settingsRender = render;

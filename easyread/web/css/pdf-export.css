@@ -1,0 +1,17 @@
+.imp-pdf-export { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--rule); }
+.imp-pdf-export label.check { margin: 0; min-height: 32px; cursor: pointer; }
+.imp-pdf-export .hint { margin: 4px 0 0 23px; line-height: 1.6; }
+.pdf-output-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 12px 0 0 23px; font-size: 13px; }
+.pdf-output-row label { flex-basis: 100%; color: var(--ink-3); }
+.pdf-output-row input { flex: 1; min-width: 100px; width: 0; text-overflow: ellipsis; font-size: 12px; }
+.pdf-output-row .btn { flex-shrink: 0; }
+.imp-pdf-export .pdf-only { margin: 8px 0 0 23px; font-size: 12px; }
+.pdf-export-path { overflow-wrap: anywhere; white-space: pre-wrap; }
+.pdf-export-result { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--rule); font-size: 13px; }
+.pdf-export-title { display: flex; align-items: center; gap: 6px; color: var(--ink-2); }
+.pdf-export-files, .pdf-export-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
+.pdf-export-files .linkish { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; text-align: left; max-width: 100%; }
+.pdf-export-name { flex-basis: 100%; color: var(--ink-3); font-size: 12px; overflow-wrap: anywhere; }
+.pdf-export-error { overflow-wrap: anywhere; white-space: pre-wrap; }
+.pdf-export-result details { color: var(--ink-3); font-size: 12px; }
+.pdf-export-result summary { cursor: pointer; }

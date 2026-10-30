@@ -65,7 +65,8 @@ class LibraryLocation:
     def _busy(self):
         # Jobs.bulk.get() 与登记 cancels 之间有短暂空档；持久 job 状态也必须核对。
         mig = getattr(self.app, "bulk", None)  # 正在从 Zotero 迁移或导入文件夹
-        return self.app.jobs.busy() or bool(mig and mig.busy()) or any((ws.load("job") or {}).get("state") in ("queued", "running")
+        babeldoc = getattr(self.app, "babeldoc", None)
+        return self.app.jobs.busy() or bool(babeldoc and babeldoc.running) or bool(mig and mig.busy()) or any((ws.load("job") or {}).get("state") in ("queued", "running")
                                            for ws in self.app.lib.all())
 
     def move(self, body: dict) -> dict:

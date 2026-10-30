@@ -42,6 +42,7 @@
       '<option value="">' + PR.esc(L.engineLabel || PR.t("未设置")) + "</option></select>" +
       '<button class="linkish" id="impEngine" title="' + PR.t("增删模型在设置 → 模型") + '">' + PR.t("管理模型") + "</button></div>" +
       '<div id="impExtra"' + (after === 'translate' ? '' : ' hidden') + '>' + PR.translationExtraHtml() + '</div>' +
+      PR.pdfExport.optionHtml() +
       '<div class="actions"><button class="btn" id="impClose">' + PR.t("关闭") + "</button></div>";
     dlg.classList.add("open");
     setTimeout(() => { const i = PR.$("#arxivRef"); if (ref) i.value = ref; i.focus(); }, 50);
@@ -62,20 +63,23 @@
     sel.value = ok ? want : "";
   }
   const close = () => dlg.classList.remove("open");
-  function opts() {
+  function opts(pdfOnly = false) {
     const p = pref();
-    const after = L.engine === "none" ? "none" : p.after;
+    const after = pdfOnly || L.engine === "none" ? "none" : p.after;
     const from = Math.max(1, +p.from || 1), to = Math.max(1, +p.to || from);
     const scope = p.scope === "range" ? "range:" + Math.min(from, to) + "-" + Math.max(from, to) : p.scope;
     const sel = PR.$("#impModel"), tgt = PR.$("#impTarget");  // 拖进来导入时对话框没开，用设置里的译文语言
-    return { translate: after !== "none", read: after === "read", scope, model: after === "none" ? "" : sel ? sel.value : "",
+    const pdfExport = pdfOnly || (dlg.classList.contains('open') && !!PR.$('#impPdfExport')?.checked);
+    return { translate: after !== "none", read: after === "read", scope, model: after === "none" && !pdfExport ? "" : sel ? sel.value : "",
       target: after === "translate" ? (tgt ? tgt.value : PR.target) : "",
+      pdf_export: pdfExport,
+      pdf_output_dir: pdfExport ? PR.$('#impPdfDirectory').value : '',
       translation_extra: after === "translate" && dlg.classList.contains('open') ? (dlg.querySelector('[data-translation-extra]')?.value.trim() || '') : '' };
   }
 
   dlg.addEventListener("click", (e) => {
     if (e.target === dlg || e.target.closest("#impClose")) close();
-    if (e.target.closest("#pick")) PR.$("#fileInput").click();
+    if (e.target.closest("#pick")) { delete PR.$("#fileInput").dataset.pdfOnly; PR.$("#fileInput").click(); }
     if (e.target.closest("#arxivGo")) importRef(PR.$("#arxivRef").value);
     if (e.target.closest("#impEngine")) { close(); PR.openSettings(); }
     if (e.target.closest("#zoteroGo")) { close(); PR.openZotero(); }
@@ -86,7 +90,7 @@
       PR.$('#impExtra').hidden = a.dataset.after !== 'translate';
       PR.$$("[data-after]", dlg).forEach((b) => b.classList.toggle("on", b === a));
       PR.$("#scopeRow").classList.toggle("dim", a.dataset.after === "none");
-      PR.$("#modelRow").classList.toggle("dim", a.dataset.after === "none");
+      PR.$("#modelRow").classList.toggle("dim", a.dataset.after === "none" && !PR.$('#impPdfExport').checked);
       PR.$("#impTarget").hidden = a.dataset.after !== "translate";
       PR.$("#originalModelHint").hidden = a.dataset.after !== "read";
       enHint();
@@ -107,23 +111,45 @@
   });
   dlg.addEventListener("keydown", (e) => { if (e.target.id === "arxivRef" && e.key === "Enter") importRef(e.target.value); if (e.key === "Escape") close(); });
   PR.$("#importBtn").onclick = () => PR.openImport();
-  PR.$("#fileInput").addEventListener("change", (e) => { importFiles(Array.from(e.target.files)); e.target.value = ""; });
+  PR.$("#fileInput").addEventListener("change", (e) => {
+    const pdfOnly = e.target.dataset.pdfOnly === "1";
+    delete e.target.dataset.pdfOnly;
+    importFiles(Array.from(e.target.files), pdfOnly);
+    e.target.value = "";
+  });
+  PR.$("#fileInput").addEventListener("cancel", (e) => { delete e.target.dataset.pdfOnly; });
+  PR.importPdfOnly = async function () {
+    const ref = PR.$("#arxivRef").value.trim();
+    if (ref) {
+      const button = PR.$("#impPdfOnly");
+      if (button.disabled) return;
+      button.disabled = true;
+      try { await importRef(ref, true); }
+      finally { button.disabled = false; }
+    } else {
+      // Open synchronously from the click so browsers preserve user activation.
+      const input = PR.$("#fileInput");
+      input.dataset.pdfOnly = "1";
+      input.click();
+    }
+  };
 
-  async function importFiles(files) {
+  async function importFiles(files, pdfOnly = false) {
     const pdfs = files.filter((f) => /\.pdf$/i.test(f.name) || f.type === "application/pdf");
     if (!pdfs.length) return PR.toast(PR.t("只支持 PDF 文件"));
-    let o = opts();
+    if (!(await PR.pdfExport.prepare(pdfOnly))) return;
+    let o = opts(pdfOnly);
     const wasOpen = dlg.classList.contains('open');
     close();
     // 一次拖进来很多篇：默认先只导入，免得按上次的设置把额度一下子用光
-    if (pdfs.length > BULK && o.translate) {
+    if (pdfs.length > BULK && (o.translate || o.pdf_export)) {
       const pick = await PR.confirm({
         title: PR.t("一次导入 {n} 篇，先不翻译？", { n: pdfs.length }),
         body: (o.read ? PR.t("按上次的设置，导入后会用模型整理全部 {n} 篇的原文，比较费额度。", { n: pdfs.length }) : PR.t("按上次的设置，导入后会翻译全部 {n} 篇，比较费额度。", { n: pdfs.length })) +
           PR.t("先只导入的话，之后在想读的论文上点翻译，或勾选几篇一起翻译。"),
         ok: PR.t("只导入"), alt: o.read ? PR.t("照样整理全部") : PR.t("照样翻译全部"), center: true });
       if (!pick) return;
-      if (pick === true) o = Object.assign(o, { translate: false, read: false, model: "", target: "" });
+      if (pick === true) o = Object.assign(o, { translate: false, read: false, model: "", target: "", pdf_export: false });
     }
     if (!wasOpen && o.translate && !o.read) {
       const extra = await PR.translationDialog();
@@ -136,6 +162,7 @@
       try {
         const r = await PR.api("/api/import?translate=" + (o.translate ? 1 : 0) + "&read=" + (o.read ? 1 : 0) + "&model=" + encodeURIComponent(o.model) + "&target=" + encodeURIComponent(o.target) + "&scope=" + encodeURIComponent(o.scope) + "&translation_extra=" + encodeURIComponent(o.translation_extra) + "&name=" + encodeURIComponent(f.name), { method: "POST", body: f });
         last = r.id;
+        if (o.pdf_export) await PR.pdfExport.start(r.id, o.model, o.pdf_output_dir);
         if (!r.new) PR.toast(r.queued ? PR.t("《{name}》已重新加入准备队列", { name: PR.esc(f.name) }) : PR.t("《{name}》已经在库里了", { name: PR.esc(f.name) }));
       } catch (e) { PR.toast(PR.t("导入失败：{msg}", { msg: PR.esc(e.message) })); }
     }
@@ -143,15 +170,17 @@
     if (last) { L.select(last); PR.toast((o.read ? PR.t("已导入 {n} 篇，后台开始整理原文", { n: pdfs.length }) : o.translate ? PR.t("已导入 {n} 篇，后台开始翻译", { n: pdfs.length }) : PR.t("已导入 {n} 篇", { n: pdfs.length })), { label: PR.t("打开"), fn: () => L.openReader(last) }, 6000); }
   }
 
-  async function importRef(ref) {
+  async function importRef(ref, pdfOnly = false) {
     ref = (ref || "").trim();
     if (!ref) return;
+    if (!(await PR.pdfExport.prepare(pdfOnly))) return;
     const btn = PR.$("#arxivGo");
     if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin"></span> ' + PR.t("查找中"); }
     else PR.toast('<span class="spin"></span> ' + PR.t("正在查找并下载 {ref}", { ref: PR.esc(ref) }), null, 60000);
-    const o = opts();
+    const o = opts(pdfOnly);
     try {
       const r = await PR.api("/api/import-url", { method: "POST", body: { ref, ...o } });
+      if (o.pdf_export) await PR.pdfExport.start(r.id, o.model, o.pdf_output_dir);
       close();
       await L.load();
       L.select(r.id);
