@@ -25,7 +25,7 @@ function exporter(chat, mode, failure) {
     saveExport: async blob => { result.text = await blob.text(); return 'download'; },
     toast: text => result.notices.push(text),
   };
-  const context = { window: { PR }, document: { addEventListener() {} }, Blob };
+  const context = { window: { PR, addEventListener() {} }, document: { addEventListener() {} }, Blob };
   for (const file of ['reader/notespanel.js', 'common/export-dialog.js', 'reader/export.js']) {
     vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../easyread/web/js', file), 'utf8'), context);
   }

@@ -10,6 +10,7 @@
 .pn-bar .seg button { min-height: 28px; color: var(--ink-2); }
 .pn-bar .seg button.on { color: var(--accent); }
 .pn-bar .btn { min-height: 28px; color: var(--ink-2); }
+.pn-bar [data-note-map-toggle].on { color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
 .pn-bar .grow { flex: 1; }
 .pn-sync { color: var(--ink-2); font-size: 12px; }
 .pn-format { flex: none; min-height: 44px; border-bottom: 1px solid var(--rule); background: var(--surface); }
@@ -19,7 +20,7 @@
 .pn-content { flex: 1; min-height: 0; overflow: hidden; }
 .pn-rich-pane, .pn-source, .pn-rich { height: 100%; }
 .pn-rich-pane { overflow: auto; }
-.pn-prose { min-height: 100%; padding: 14px 16px 36px; outline: none; font: 15px/1.9 var(--serif-zh); overflow-wrap: anywhere; }
+.pn-prose { min-height: 100%; padding: 14px 16px 36px; outline: none; zoom: var(--note-zoom, 1); font: 15px/1.9 var(--serif-zh); overflow-wrap: anywhere; }
 .pn-prose p { margin: 0 0 .8em; }
 .pn-prose:has(> p:only-child > br.ProseMirror-trailingBreak:only-child)::before { content: attr(data-placeholder); color: var(--ink-2); font: 13px/1.8 var(--ui); float: left; height: 0; pointer-events: none; }
 .pn-prose h1, .pn-prose h2, .pn-prose h3, .pn-prose h4, .pn-prose h5, .pn-prose h6 { font-family: var(--ui); line-height: 1.5; margin: 1em 0 .5em; }
@@ -44,7 +45,7 @@
 .pn-prose li[data-checked] { display: flex; gap: 8px; align-items: baseline; }
 .pn-prose li[data-checked] > label { flex: none; }
 .pn-prose li[data-checked] > div { flex: 1; min-width: 0; }
-.pn-workspace #paperNote { display: block; height: 100%; min-height: 0; border-radius: 0; box-shadow: none; padding: 12px; font: 13px/1.85 var(--mono), var(--sans-zh); overflow: auto; }
+.pn-workspace #paperNote { display: block; height: 100%; min-height: 0; border-radius: 0; box-shadow: none; padding: 12px; zoom: var(--note-zoom, 1); font: 13px/1.85 var(--mono), var(--sans-zh); overflow: auto; }
 .pn-workspace #paperNote:focus { box-shadow: none; outline: none; }
 .pn-map-svg .markmap-node foreignObject { cursor: pointer; }
 .pn-formula { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; border-bottom: 1px solid var(--rule); padding: 7px; font-size: 12px; }
@@ -61,3 +62,9 @@
 .pn-map-empty { position: absolute; inset: 0; padding: 18px; margin: 0; background: var(--bg); color: var(--ink-2); font: 13px/1.8 var(--ui); pointer-events: none; }
 .pn-workspace button:focus-visible, .pn-workspace select:focus-visible, .pn-divider:focus-visible, .pn-map-svg:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 @media (max-width: 759px) { .pn-sync { display: none; } }
+
+
+.pn-menu-value { font-size: 12px; opacity: .65; margin-left: 12px; font-variant-numeric: tabular-nums; }
+.pn-submenu-arrow { transform: rotate(-90deg); }
+
+.pn-map-svg .pn-map-image { display: block; width: 160px; height: 110px; object-fit: contain; }

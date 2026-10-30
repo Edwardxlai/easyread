@@ -1,4 +1,5 @@
-import { Editor } from '@tiptap/core';
+import { Editor, Extension } from '@tiptap/core';
+import { Plugin } from '@tiptap/pm/state';
 import StarterKit from '@tiptap/starter-kit';
 import { Markdown } from '@tiptap/markdown';
 import { TableKit } from '@tiptap/extension-table';
@@ -40,27 +41,79 @@ const NoteHighlight = Highlight.extend({
   },
 });
 
+const NoteComposition = Extension.create({
+  name: 'noteComposition',
+  addProseMirrorPlugins() {
+    return [new Plugin({
+      // 组合输入中的退格会产生空事务；避免它重写 DOM 选区并中断输入法。
+      filterTransaction: tr => !(
+        this.editor.view.composing && !tr.docChanged && !tr.selectionSet && !tr.storedMarksSet && Object.keys(tr.meta).length === 0
+      ),
+    })];
+  },
+});
+
+async function insertNoteImages(editor, files, position = editor.state.selection.from) {
+  const images = [];
+  for (const file of files) {
+    if (!file.type.startsWith('image/')) continue;
+    const src = await new Promise((resolve, reject) => {
+      const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = () => reject(reader.error); reader.readAsDataURL(file);
+    });
+    images.push({ type: 'image', attrs: { src, alt: file.name || PR.t('图片') } });
+  }
+  if (!editor.isDestroyed && images.length) editor.chain().focus().insertContentAt(position, images).run();
+}
+
 function createEditor({ element, content, onChange, onSelection, onMathClick }) {
-  return new Editor({
+  let composing = false, compositionTimer, instance;
+  const publish = editor => { if (!composing && !editor.view.composing) onChange(editor.getMarkdown()); };
+  instance = new Editor({
     element,
     extensions: [
+      NoteComposition,
       StarterKit.configure({ link: { openOnClick: false } }),
       Markdown.configure({ markedOptions: { gfm: true, breaks: true }, indentation: { style: 'space', size: 2 } }),
-      TableKit, TaskList, TaskItem.configure({ nested: true }), Image, NoteHighlight.configure({ multicolor: true }),
+      TableKit, TaskList, TaskItem.configure({ nested: true }), Image.configure({ allowBase64: true }), NoteHighlight.configure({ multicolor: true }),
       NoteInlineMath.configure({ katexOptions: { throwOnError: false, trust: false }, onClick: (node, pos) => onMathClick(node, pos, false) }),
       NoteBlockMath.configure({ katexOptions: { throwOnError: false, trust: false }, onClick: (node, pos) => onMathClick(node, pos, true) }),
     ],
     content, contentType: 'markdown',
-    editorProps: { attributes: { class: 'pn-prose', role: 'textbox', 'aria-multiline': 'true', 'aria-label': PR.t('论文笔记富文本'), 'data-placeholder': PR.t('记录核心论点、方法和你的思考。') } },
-    onUpdate: ({ editor }) => onChange(editor.getMarkdown()),
-    onSelectionUpdate: ({ editor }) => onSelection(editor),
+    editorProps: {
+      handleDOMEvents: {
+        compositionstart() { composing = true; clearTimeout(compositionTimer); return false; },
+        compositionend(view) {
+          clearTimeout(compositionTimer);
+          compositionTimer = setTimeout(() => { composing = false; if (!view.isDestroyed) publish(instance); }, 0);
+          return false;
+        },
+      },
+      handlePaste(view, event) {
+        const files = [...(event.clipboardData?.files || [])].filter(file => file.type.startsWith('image/'));
+        if (!files.length) return false;
+        event.preventDefault(); insertNoteImages(instance, files); return true;
+      },
+      handleDrop(view, event, _slice, moved) {
+        const files = [...(event.dataTransfer?.files || [])].filter(file => file.type.startsWith('image/'));
+        if (moved || !files.length) return false;
+        event.preventDefault(); const position = view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos;
+        insertNoteImages(instance, files, position); return true;
+      },
+      attributes: { class: 'pn-prose', role: 'textbox', 'aria-multiline': 'true', 'aria-label': PR.t('论文笔记富文本'), 'data-placeholder': PR.t('记录核心论点、方法和你的思考。') } },
+    onDestroy: () => { clearTimeout(compositionTimer); },
+    onUpdate: ({ editor }) => publish(editor),
+    onSelectionUpdate: ({ editor }) => { if (!composing && !editor.view.composing) onSelection(editor); },
   });
+  return instance;
 }
 
 function inline(node) {
   if (node.type === 'inlineMath') return PR.tex(node.attrs.latex, false);
   if (node.type === 'hardBreak') return '<br>';
-  if (node.type === 'image') return PR.esc(node.attrs.alt || PR.t('图片'));
+  if (node.type === 'image') {
+    const { src, alt } = node.attrs, label = PR.esc(alt || PR.t('图片'));
+    return src ? `<img class="pn-map-image" draggable="false" src="${PR.esc(src)}" alt="${label}" width="160" height="110">` : label;
+  }
   let html = node.type === 'text' ? PR.esc(node.text) : (node.content || []).map(inline).join('');
   for (const mark of node.marks || []) {
     const tag = { bold: 'strong', italic: 'em', underline: 'u', strike: 's', code: 'code' }[mark.type];
@@ -140,4 +193,4 @@ function findMapNode(root, position) {
   return match;
 }
 
-PR.noteLibraries = { createEditor, Markmap, toMindMap, findMapNode, mountNoteToolbar };
+PR.noteLibraries = { createEditor, Markmap, toMindMap, findMapNode, mountNoteToolbar, insertNoteImages };
