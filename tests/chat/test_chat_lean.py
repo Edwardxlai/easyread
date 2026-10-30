@@ -1,4 +1,4 @@
-"""问 AI、回答笔记、重译一段也只带用得到的东西：Claude 只给 Read 工具，Codex 关掉用户的 MCP；不认新参数时退回原样。
+"""问答允许只读研究工具，翻译继续精简；保持模型配置与旧版兼容。
 python -m unittest tests.chat.test_chat_lean"""
 import io
 import json
@@ -43,11 +43,13 @@ class ChatClaudeLeanTest(unittest.TestCase):
             out = "".join(chat._stream_claude(c or {"model": "opus", "reasoning_effort": "high"}, "q", Path("."), threading.Event()))
         return out, calls
 
-    def test_tools_read_and_user_choices_kept(self):
+    def test_read_search_web_tools_and_user_choices_kept(self):
         out, calls = self.stream([FakeProc(result_lines("答"))])
         self.assertEqual(out, "答")
         a = calls[0]
-        self.assertEqual(a[a.index("--tools") + 1], "Read")
+        self.assertEqual(set(a[a.index("--tools") + 1].split(",")), {"Read", "Glob", "Grep", "WebSearch", "WebFetch"})
+        self.assertEqual(a[a.index("--allowedTools") + 1], a[a.index("--tools") + 1])
+        self.assertIn("Bash", a[a.index("--disallowedTools") + 1])
         self.assertIn("--strict-mcp-config", a)
         self.assertEqual(a[a.index("--model") + 1], "opus")
         self.assertEqual(a[a.index("--effort") + 1], "high")
@@ -57,6 +59,7 @@ class ChatClaudeLeanTest(unittest.TestCase):
         self.assertEqual(out, "答")
         self.assertIn("--tools", calls[0])
         self.assertNotIn("--tools", calls[1])
+        self.assertIn("--disallowedTools", calls[1])
 
     def test_other_errors_are_not_retried(self):
         with self.assertRaises(engines.EngineError):
@@ -83,6 +86,8 @@ class OtherPathsLeanTest(unittest.TestCase):
             list(chat.stream(cfg, "q", Path("."), threading.Event()))
         self.assertTrue(seen[-1]["codex"]["lean"])
         self.assertEqual(seen[-1]["codex"]["model"], "m")
+        self.assertTrue(seen[-1]["codex"]["_chat"])
+        self.assertNotIn("_chat", cfg["codex"])
         self.assertNotIn("lean", cfg["codex"])
 
         ws = mock.MagicMock()
@@ -91,6 +96,7 @@ class OtherPathsLeanTest(unittest.TestCase):
                 mock.patch.object(translate, "add_discussion", lambda *a: None):
             translate.answer(ws, cfg, "n1", None)
         self.assertTrue(seen[-1]["codex"]["lean"])
+        self.assertNotIn("_chat", seen[-1]["codex"])
         with mock.patch.object(engines, "run", run), mock.patch.object(translate.prompts, "retranslate", lambda ws, k, h: ("p", None)), \
                 mock.patch.object(translate, "set_block_text", lambda *a: None):
             translate.retranslate(ws, cfg, "p1", "", None)

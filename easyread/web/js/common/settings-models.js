@@ -5,6 +5,9 @@
   "use strict";
   /* efforts：能传的推理强度（和后端 agent_cli.SPECS 一致），空的就不显示推理强度 */
   PR.agentClis = {
+    qoder: { name: "Qoder CN CLI", url: "https://docs.qoder.cn/cli/installation", efforts: [],
+      hint: PR.t("使用本机已登录的 Qoder CN；模型留空跟随 CLI 默认，看图能力取决于所选模型"),
+      setup: PR.t("安装并登录 Qoder CN CLI") },
     opencode: { name: "OpenCode CLI", url: "https://opencode.ai/docs/", efforts: [],
       hint: PR.t("模型名填写 provider/model，可在终端运行 opencode models 查看；留空使用 OpenCode 默认模型"),
       setup: PR.t("安装 OpenCode 并配置模型") },

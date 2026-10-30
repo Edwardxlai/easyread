@@ -1,7 +1,7 @@
 """OpenCode noninteractive adapter: stdin prompt, JSON events, attached images.
 
 Reference: https://opencode.ai/docs/cli/ and /docs/permissions/.
-Each call starts a fresh session with all agent tools denied.
+Each call starts a fresh session. Chat enables reading and web research only.
 """
 import json
 import os
@@ -12,6 +12,7 @@ from pathlib import Path
 
 from ..app.i18n import tr
 from . import netcheck
+from .chat_tools import opencode_permissions
 
 
 def path(c):
@@ -27,13 +28,16 @@ def build_args(exe, c, images):
     return args
 
 
-def environment():
+def environment(chat=False):
     env = dict(netcheck.proxy_env() or os.environ)
+    permissions = opencode_permissions(chat)
+    if chat:
+        env["OPENCODE_ENABLE_EXA"] = "true"
     env.update(OPENCODE_DISABLE_AUTOUPDATE="true", OPENCODE_DISABLE_CLAUDE_CODE="true",
                OPENCODE_DISABLE_AUTOCOMPACT="true", OPENCODE_DISABLE_DEFAULT_PLUGINS="true",
-               OPENCODE_PERMISSION=json.dumps({"*": "deny"}))
+               OPENCODE_PERMISSION=json.dumps(permissions))
     env["OPENCODE_CONFIG_CONTENT"] = json.dumps({
-        "autoupdate": False, "share": "disabled", "permission": {"*": "deny"},
+        "autoupdate": False, "share": "disabled", "permission": permissions,
     })
     return env
 
@@ -69,7 +73,11 @@ def run(c, prompt, cwd, images, cancel=None, meter=None):
         raise engines.EngineError(tr("找不到 OpenCode 命令，请先安装并配置模型"))
     # Do not inherit project agents, instructions or worktree access.
     with tempfile.TemporaryDirectory(prefix="easyread-opencode-") as work:
-        env = environment()
+        env = environment(bool(c.get("_chat")))
+        if c.get("_chat"):
+            for name in ("paper.json", "reader.json"):
+                if (cwd / name).is_file():
+                    shutil.copyfile(cwd / name, Path(work) / name)
         env["PWD"] = str(Path(work).resolve())
         proc = subprocess.Popen(build_args(exe, c, images), cwd=work, env=env,
                                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,

@@ -18,7 +18,7 @@ import threading
 from pathlib import Path
 
 from ..app.i18n import tr
-from . import agent_cli, codebuddy_cli, codex_lean, netcheck, usage, opencode_cli, zcode_cli
+from . import agent_cli, codebuddy_cli, codex_lean, netcheck, usage, opencode_cli, zcode_cli, qoder_cli
 from ..app.log import log
 
 
@@ -34,7 +34,8 @@ class Cancelled(RuntimeError):
 
 ENGINE_NAMES = {"claude": "Claude Code", "codex": "Codex CLI", "codebuddy": "CodeBuddy CLI", "opencode": "OpenCode CLI", "zcode": "ZCode CLI", **{k: v["name"] for k, v in agent_cli.SPECS.items()},
                 "openai": "API", "none": "不翻译"}  # i18n-ok 显示时用 engine_name()
-CLI_ENGINES = ("claude", "codex", "codebuddy", "opencode", "zcode", *agent_cli.ENGINES)  # 本机 CLI：起子进程、用已登录的订阅
+ENGINE_NAMES["qoder"] = "Qoder CN CLI"
+CLI_ENGINES = ("claude", "codex", "codebuddy", "opencode", "zcode", "qoder", *agent_cli.ENGINES)  # 本机 CLI：起子进程、用已登录的订阅
 
 
 def engine_name(engine: str | None) -> str:
@@ -55,6 +56,8 @@ def run(cfg: dict, prompt: str, cwd: Path, images: list[Path] | None = None, can
 
 def _run(cfg: dict, prompt: str, cwd: Path, images: list[Path] | None, cancel: threading.Event | None, meter) -> str:
     engine = cfg.get("engine")
+    if engine == "qoder":
+        return qoder_cli.run(cfg["qoder"], prompt, cwd, images or [], cancel, meter)
     if engine == "opencode":
         return opencode_cli.run(cfg["opencode"], prompt, cwd, images or [], cancel, meter)
     if engine == "claude":
@@ -77,7 +80,7 @@ def image_mode(cfg: dict) -> str:
     engine = cfg.get("engine")
     if engine == "claude" or engine in agent_cli.ENGINES:
         return "claude"
-    if engine in ("codex", "codebuddy", "opencode", "zcode") or (engine == "openai" and cfg["openai"].get("vision")):
+    if engine in ("codex", "codebuddy", "opencode", "zcode", "qoder") or (engine == "openai" and cfg["openai"].get("vision")):
         return "attached"
     return "text"
 
@@ -116,6 +119,8 @@ def cli_path(engine: str, c: dict) -> str | None:
         return opencode_cli.path(c)
     if engine == "zcode":
         return zcode_cli.path(c)
+    if engine == "qoder":
+        return qoder_cli.path(c)
     return agent_cli.path(engine, c)
 
 
@@ -197,7 +202,7 @@ def option_unknown(err) -> bool:
 
 
 def for_translation(cfg: dict) -> dict:
-    """本机 CLI 只带用得到的东西（见 run_claude、run_codex）：整篇翻译、问 AI、回答笔记、重译一段都走这里。"""
+    """翻译精简配置；问答在 chat_tools.for_chat 中附加只读研究工具。"""
     out = dict(cfg)
     for e in ("claude", "codex"):
         if isinstance(cfg.get(e), dict):
@@ -217,7 +222,10 @@ def _codex_once(exe: str, c: dict, prompt: str, cwd: Path, images: list[Path], c
     for field, key in (("reasoning_effort", "model_reasoning_effort"), ("service_tier", "service_tier")):
         if c.get(field):
             args += ["-c", key + "=" + json.dumps(c[field])]
-    args += extra + ["-"]
+    args += extra
+    if c.get("_chat"):
+        args += ["-c", 'web_search="live"']
+    args += ["-"]
     try:
         out = _communicate(_popen(args, cwd), prompt, int(c.get("timeout") or 1200), cancel)
         text = Path(last).read_text(encoding="utf-8", errors="replace").strip()

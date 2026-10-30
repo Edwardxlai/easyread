@@ -16,6 +16,7 @@ from pathlib import Path
 
 from ..app.i18n import tr
 from . import netcheck
+from .chat_tools import RESEARCH_PROMPT
 
 
 _RUNTIME_CONFIG = {
@@ -44,8 +45,13 @@ def build_args(c: dict, workdir: Path, images: list[Path]) -> list[str]:
         raise EngineError(tr("ZCode 跟随自身的模型设置，请在 ZCode 中切换模型和推理选项"))
     if c.get("extra_args"):
         raise EngineError(tr("ZCode 暂不支持额外参数，请清空 zcode.extra_args"))
-    args = ["--prompt", _PROMPT, "--cwd", str(workdir), "--mode", "plan",
-            "--disallowed-tools", _DISALLOWED, "--workflow-mode", "disabled",
+    prompt = _PROMPT
+    disallowed = _DISALLOWED
+    if c.get("_chat"):
+        prompt = _PROMPT.replace("run commands, search the web, or read unrelated files.", "run commands or read unrelated files.") + RESEARCH_PROMPT
+        disallowed = " ".join(tool for tool in _DISALLOWED.split() if tool not in ("WebSearch", "WebFetch"))
+    args = ["--prompt", prompt, "--cwd", str(workdir), "--mode", "plan",
+            "--disallowed-tools", disallowed, "--workflow-mode", "disabled",
             "--output-format", "json", "--no-color", "--attach", str(workdir / "easyread-task.txt")]
     for img in images:
         args += ["--attach", str(img)]
@@ -78,6 +84,10 @@ def run(c: dict, prompt: str, cwd: Path, images: list[Path], cancel=None, meter=
     try:
         with tempfile.TemporaryDirectory(prefix="easyread-zcode-") as folder:
             workdir = Path(folder)
+            if c.get("_chat"):
+                for name in ("paper.json", "reader.json"):
+                    if (cwd / name).is_file():
+                        shutil.copyfile(cwd / name, workdir / name)
             args = [exe, *build_args(c, workdir, images)]
             (workdir / "easyread-task.txt").write_text(prompt, encoding="utf-8")
             (workdir / "zcode.json").write_text(json.dumps(_RUNTIME_CONFIG), encoding="utf-8")

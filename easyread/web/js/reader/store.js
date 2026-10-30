@@ -134,7 +134,9 @@
       }).then(r => r.ok).catch(() => false);
     }
     if (flushPromise && !await flushPromise) return false;
-    while (outbox.length) if (!await flush({ keepalive: true })) return false;
+    // Desktop close waits for this promise; large image notes must use a normal
+    // request. Keepalive has a small body quota and is only needed on page leave.
+    while (outbox.length) if (!await flush({ keepalive: !!opts.leaving })) return false;
     return true;
   };
 

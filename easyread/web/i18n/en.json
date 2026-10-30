@@ -1516,5 +1516,11 @@
   "蓝色高亮": "Blue highlight",
   "红色高亮": "Red highlight",
   "紫色高亮": "Purple highlight",
-  "黄色高亮": "Yellow highlight"
+  "黄色高亮": "Yellow highlight",
+  "使用本机已登录的 Qoder CN；模型留空跟随 CLI 默认，看图能力取决于所选模型": "Use your local Qoder CN sign-in. Leave the model blank to use the CLI default; image support depends on the model.",
+  "安装并登录 Qoder CN CLI": "Install and sign in to Qoder CN CLI",
+  "Qoder CN 暂不支持额外参数，请清空 qoder.extra_args": "Qoder CN does not support extra arguments yet. Clear qoder.extra_args.",
+  "简明回答：短句、一句只讲一件事、步骤分条列出，数字和前提条件一个不丢。": "Concise answers: short sentences, one point per sentence, steps in lists, with all numbers and conditions preserved.",
+  "精读：解释设计动机、推导公式、核对实验依据；没有报告的内容明确说明。": "Close reading: explain design choices, derive equations and check experimental evidence; identify anything the paper does not report.",
+  "会参考已整理正文；过长时提供节选。": " Uses the processed paper text, with excerpts for long papers."
 }

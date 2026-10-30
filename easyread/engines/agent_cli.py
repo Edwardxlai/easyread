@@ -23,6 +23,7 @@ import tempfile
 from pathlib import Path
 
 from ..app.i18n import tr
+from .chat_tools import RESEARCH_PROMPT
 
 SPECS = {
     "grok": {"name": "Grok Build", "commands": ("grok",), "efforts": ["low", "medium", "high"]},
@@ -57,7 +58,7 @@ def run(engine: str, c: dict, prompt: str, cwd: Path, cancel=None, meter=None) -
         raise engines.EngineError(tr("找不到 {name} 命令：{cmd}（先装好并登录）", name=name, cmd=c.get("command") or SPECS[engine]["commands"][0]))
     timeout = int(c.get("timeout") or 1200)
     args = [exe] + build_args(engine, c)
-    prompt += ONLY_READ
+    prompt += RESEARCH_PROMPT if c.get("_chat") else ONLY_READ
     if engine == "grok":
         fd, file = tempfile.mkstemp(suffix=".md", prefix="easyread-grok-")
         with os.fdopen(fd, "w", encoding="utf-8") as f:
@@ -84,8 +85,11 @@ def build_args(engine: str, c: dict) -> list[str]:
     model = c.get("model") or ""
     effort = c.get("reasoning_effort") or ""
     if engine == "grok":
-        args = ["--output-format", "json", "--no-auto-update", "--tools", "read_file", "--disallowed-tools", "search_tool,use_tool",
-                "--disable-web-search", "--reasoning-effort", effort if effort in SPECS["grok"]["efforts"] else "low"]
+        args = ["--output-format", "json", "--no-auto-update", "--tools", "read_file,search_tool" if c.get("_chat") else "read_file",
+                "--disallowed-tools", "use_tool" if c.get("_chat") else "search_tool,use_tool"]
+        if not c.get("_chat"):
+            args += ["--disable-web-search"]
+        args += ["--reasoning-effort", effort if effort in SPECS["grok"]["efforts"] else "low"]
         args += ["--model", model] if model else []
     elif engine == "agy":
         args = ["--input-format", "stream-json", "--output-format", "stream-json"] + (["--model", model] if model else [])

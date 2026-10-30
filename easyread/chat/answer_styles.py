@@ -7,8 +7,8 @@ STE100 = "ste100"
 XRAY = "xray"
 VALUES = (DEFAULT, STE100, XRAY)
 
-# 这两种模式都要先把整篇正文交给模型作依据，再回答。
-WHOLE_PAPER = (STE100, XRAY)
+# 回答方式只控制表达风格，不改变论文上下文的范围。
+WHOLE_PAPER = VALUES
 
 
 def parse(value=None) -> str:

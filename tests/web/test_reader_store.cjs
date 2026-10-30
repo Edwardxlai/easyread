@@ -56,6 +56,30 @@ test('image feature changes in another tab propagate without paper changes', asy
   assert.equal(events.filter(name => name === 'figure-images-setting').length, 2);
 });
 
+test("awaited exit saves image notes larger than the keepalive body quota", async () => {
+  const requests = [];
+  const PR = { t: s => s, uid: () => "client", nowIso: () => "2026-10-30T00:00:00Z", emit() {},
+    ls: { get: (_key, fallback) => fallback, set: () => true } };
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../../easyread/web/js/reader/store.js"), "utf8"), {
+    window: { PR, addEventListener() {} }, location: { pathname: "/read/paper" },
+    document: { getElementById: () => null }, setTimeout() {}, clearTimeout() {},
+    fetch: async (url, options) => {
+      if (url.endsWith("/state")) return { ok: true, json: async () => ({ paper: { meta: {} }, reader: {}, token: "token" }) };
+      requests.push(options);
+      if (options.keepalive && Buffer.byteLength(options.body) > 65536) throw new TypeError("keepalive quota exceeded");
+      return { ok: true, json: async () => ({ rev: 1 }) };
+    },
+  });
+  await PR.load();
+  const body = "![figure](data:image/png;base64," + "A".repeat(80000) + ")";
+  PR.commit({ op: "paper_note", body });
+  assert.equal(await PR.flushPending(), true);
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].keepalive, false);
+  assert.equal(JSON.parse(requests[0].body).ops[0].body, body);
+  assert.equal(PR.store.pending, 0);
+});
+
 test("exit waits for an in-flight save and drains the newer progress", async () => {
   const pending = [];
   const PR = { t: s => s, uid: () => "client", nowIso: () => "2026-10-14T00:00:00Z", emit() {},
