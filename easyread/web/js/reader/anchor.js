@@ -110,6 +110,7 @@
     }
     seen.forEach((id) => (miss.has(id) ? lost.add(id) : lost.delete(id)));
     PR.applyMirrors && PR.applyMirrors(scope);
+    PR.renderMathMarks && PR.renderMathMarks(scope);
   };
 
   /* ---------- 选中文字 -> 浮动条 ---------- */

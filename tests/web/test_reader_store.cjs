@@ -123,3 +123,38 @@ test("offline deletes survive delayed note creation and export/import", async ()
     assert.ok(!PR.state.reader.notes.n1.deleted);
   }
 });
+
+test("storage quota failures retain the export warning and block unsafe exit", async () => {
+  for (const staticMode of [true, false]) {
+    const events = {}, statuses = [];
+    let storageWorks = false, connected = false;
+    const data = { paper: { meta: { source_sha256: "paper" } }, reader: {} };
+    const PR = { t: s => s, uid: () => "client", nowIso: () => "2026-10-30T00:00:00Z",
+      emit: (name, value) => { if (name === "status") statuses.push(value); },
+      ls: { get: (_key, fallback) => fallback, set: () => storageWorks } };
+    vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../../easyread/web/js/reader/store.js"), "utf8"), {
+      window: { PR, addEventListener: (name, fn) => { events[name] = fn; } },
+      location: { pathname: "/read/paper" }, setTimeout() {}, clearTimeout() {},
+      document: { getElementById: () => staticMode ? { textContent: JSON.stringify(data) } : null },
+      fetch: async url => {
+        if (!url.endsWith("/state") && !connected) throw new Error("offline");
+        return { ok: true, json: async () => url.endsWith("/state") ? data : { rev: 1 } };
+      },
+    });
+    await PR.load();
+    PR.commit({ op: "paper_note", body: "unsaved image note" });
+    assert.equal(PR.store.status, "error");
+    assert.equal(await PR.flushPending(), false);
+    assert.equal(PR.store.status, "error");
+    let blocked = false;
+    events.beforeunload({ preventDefault: () => { blocked = true; } });
+    assert.equal(blocked, true);
+    assert.match(statuses.at(-1).text, /内存/);
+    assert.equal(PR.exportOps().ops.find(op => op.op === "paper_note").body, "unsaved image note");
+    storageWorks = true; connected = true;
+    if (staticMode) PR.commit({ op: "paper_note", body: "saved image note" });
+    else { await PR.flush(); await PR.flushPending(); }
+    assert.equal(PR.store.status, staticMode ? "local" : "saved");
+    assert.equal(await PR.flushPending(), true);
+  }
+});

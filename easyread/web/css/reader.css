@@ -185,6 +185,9 @@ mark.hl.q { box-shadow: inset 0 -.14em 0 color-mix(in srgb, var(--mine) 65%, tra
 mark.hl.agent { background: transparent; box-shadow: inset 0 -.12em 0 color-mix(in srgb, var(--accent) 45%, transparent); cursor: default; }
 mark.hl.active { outline: 2px solid color-mix(in srgb, var(--mine) 40%, transparent); outline-offset: 1px; }
 mark.hl.agent.active { background: var(--hl-q); outline: 0; }
+.katex-html > .base { position: relative; isolation: isolate; }
+.katex mark.hl.math-fragment { background: transparent; box-shadow: none; outline: none; }
+.katex mark.hl.math-band { position: absolute; z-index: -1; padding: 0; pointer-events: none; }
 code { font: .86em var(--mono); background: var(--accent-soft); padding: .1em .3em; border-radius: 3px; }
 .blk pre { max-width: 100%; overflow-x: auto; padding: .8em 1em; background: var(--accent-soft); border-radius: 4px; text-align: left; }
 .blk pre code { display: block; padding: 0; background: none; white-space: pre; }
