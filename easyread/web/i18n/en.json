@@ -1520,5 +1520,8 @@
   "上传笔记图片": "Upload note images",
   "插入图片": "Insert image",
   "笔记缩放": "Note zoom",
-  "返回更多工具": "Back to more tools"
+  "返回更多工具": "Back to more tools",
+  "笔记图片每张不能超过 2 MiB，请压缩后重试": "Each note image must be at most 2 MiB. Compress it and try again.",
+  "插入图片后笔记不能超过 4 MiB，请减少图片或压缩后重试": "The note must stay under 4 MiB after adding images. Remove or compress images and try again.",
+  "读取笔记图片失败，请重新选择图片": "Could not read the note image. Please select it again."
 }

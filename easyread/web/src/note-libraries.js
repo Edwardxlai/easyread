@@ -9,6 +9,7 @@ import Highlight from '@tiptap/extension-highlight';
 import { InlineMath, BlockMath } from '@tiptap/extension-mathematics';
 import { Markmap } from 'markmap-view';
 import { mountNoteToolbar } from './note-toolbar';
+import { insertNoteImages } from './note-images';
 
 const PR = window.PR;
 const NoteInlineMath = InlineMath.extend({
@@ -52,18 +53,6 @@ const NoteComposition = Extension.create({
     })];
   },
 });
-
-async function insertNoteImages(editor, files, position = editor.state.selection.from) {
-  const images = [];
-  for (const file of files) {
-    if (!file.type.startsWith('image/')) continue;
-    const src = await new Promise((resolve, reject) => {
-      const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = () => reject(reader.error); reader.readAsDataURL(file);
-    });
-    images.push({ type: 'image', attrs: { src, alt: file.name || PR.t('图片') } });
-  }
-  if (!editor.isDestroyed && images.length) editor.chain().focus().insertContentAt(position, images).run();
-}
 
 function createEditor({ element, content, onChange, onSelection, onMathClick }) {
   let composing = false, compositionTimer, instance;
