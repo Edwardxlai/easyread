@@ -3,25 +3,39 @@
   "use strict";
 
   PR.translateSelection = function (selection) {
-    let speech;
+    let speech, sizeObserver;
     const at = { getBoundingClientRect: () => selection.rect };
     PR.popover(at, '<section class="selection-translation" role="dialog" aria-label="' + PR.t("划词翻译") + '">' +
-      '<div class="st-head"><strong>' + PR.t("划词翻译") + '</strong><button class="btn sm" data-st-close aria-label="' + PR.t("关闭") + '">×</button></div>' +
+      '<div class="st-head"><strong>' + PR.t("划词翻译") + '</strong><button class="btn sm" data-st-close aria-label="' + PR.t("关闭") + '">' +
+      '<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button></div>' +
       '<div class="st-quote" dir="auto">' + PR.esc(selection.quote) + '</div>' +
       '<div class="st-speech"><select class="st-accent" data-st-accent aria-label="' + PR.t("朗读口音") + '">' +
       '<option value="en-US">' + PR.t("美音") + '</option><option value="en-GB">' + PR.t("英音") + '</option></select>' +
-      '<select class="st-voice" data-st-voice aria-label="' + PR.t("朗读音色") + '" disabled><option>' + PR.t("加载音色…") + '</option></select>' +
       '<button class="btn sm line" data-st-speak disabled>' + PR.t("朗读原文") + '</button>' +
       '<button class="btn sm line" data-st-slow disabled>' + PR.t("慢速朗读") + '</button>' +
       '<button class="btn sm line" data-st-stop hidden>' + PR.t("停止朗读") + '</button>' +
-      '<span class="hint" data-st-speech-status role="status"></span></div>' +
+      '<details class="st-voice-options"><summary>' + PR.t("朗读音色") + '</summary>' +
+      '<select class="st-voice" data-st-voice aria-label="' + PR.t("朗读音色") + '" disabled><option>' + PR.t("加载音色…") + '</option></select></details>' +
+      '<span class="hint st-speech-status" data-st-speech-status role="status"></span></div>' +
       '<div class="st-result" dir="auto" role="status" aria-live="polite"></div>' +
       '<div class="st-actions"><button class="btn sm line" data-st-retry hidden>' + PR.t("重试") + '</button>' +
       '<button class="btn sm line" data-st-copy disabled>' + PR.t("复制译文") + '</button></div></section>', {
-        sticky: true, wide: true, onClose: () => speech && speech.dispose(),
+        sticky: true, wide: true, onClose: () => {
+          if (speech) speech.dispose();
+          if (sizeObserver) sizeObserver.disconnect();
+        },
       });
     // Each request owns its own DOM nodes. A late answer cannot replace a newer popup.
     const root = PR.$("#popover .selection-translation");
+    if (window.ResizeObserver) {
+      sizeObserver = new window.ResizeObserver(() => {
+        const pop = root.parentElement, r = selection.rect;
+        let top = r.bottom + 8;
+        if (top + pop.offsetHeight > window.innerHeight - 10) top = r.top - pop.offsetHeight - 8;
+        pop.style.top = Math.max(58, top) + "px";
+      });
+      sizeObserver.observe(root);
+    }
     speech = PR.selectionSpeech(root, selection.quote);
     const result = root.querySelector(".st-result"), retry = root.querySelector("[data-st-retry]"), copy = root.querySelector("[data-st-copy]");
     let translation = "";

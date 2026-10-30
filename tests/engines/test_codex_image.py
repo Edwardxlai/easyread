@@ -1,6 +1,8 @@
 import io
 import json
 import threading
+import tempfile
+import time
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -63,6 +65,53 @@ class CodexImageTest(unittest.TestCase):
                 codex_image.edit({}, png(), "translate", self.cancel)
         call.assert_called_once()
         self.assertFalse(self.root.exists())
+
+    def test_generated_artifact_link_is_imported_without_a_copy(self):
+        with tempfile.TemporaryDirectory() as folder, patch.dict(codex_image.os.environ, {"CODEX_HOME": folder}):
+            artifact = Path(folder) / "generated_images" / "turn" / "result.png"
+            artifact.parent.mkdir(parents=True)
+            def communicate(*args):
+                artifact.write_bytes(png())
+                return json.dumps({"type": "item.completed", "item": {
+                    "type": "agent_message", "text": f"![Translated image]({artifact.as_posix()})"}})
+            with patch.object(engines, "_communicate", side_effect=communicate):
+                result = codex_image.edit({}, png(), "translate", self.cancel)
+            with Image.open(io.BytesIO(result)) as image:
+                self.assertEqual(image.format, "WEBP")
+
+    def test_artifact_links_cannot_import_old_or_unrelated_files(self):
+        with tempfile.TemporaryDirectory() as folder, patch.dict(codex_image.os.environ, {"CODEX_HOME": folder}):
+            for relative, age in (("outside.png", 0), ("generated_images/old.png", 60)):
+                artifact = Path(folder) / relative
+                artifact.parent.mkdir(parents=True, exist_ok=True)
+                artifact.write_bytes(png())
+                modified = time.time() - age
+                codex_image.os.utime(artifact, (modified, modified))
+                events = [{"item": {"type": "agent_message", "text": f"![Image]({artifact.as_posix()})"}}]
+                self.assertIsNone(codex_image._generated_image(events, time.time()))
+
+    def test_generated_images_allow_system_directory_aliases_but_not_escaped_paths(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            home = root / "real-home"
+            images = home / "generated_images"
+            images.mkdir(parents=True)
+            alias = root / "home-alias"
+            outside = root / "outside"
+            outside.mkdir()
+            try:
+                alias.symlink_to(home, target_is_directory=True)
+                (images / "escape").symlink_to(outside, target_is_directory=True)
+            except OSError:
+                self.skipTest("Directory symlinks are unavailable")
+            (images / "result.png").write_bytes(png())
+            (outside / "secret.png").write_bytes(png())
+            with patch.dict(codex_image.os.environ, {"CODEX_HOME": str(alias)}):
+                for relative, accepted in (("result.png", True), ("escape/secret.png", False)):
+                    path = alias / "generated_images" / relative
+                    events = [{"item": {"type": "agent_message", "text": f"![Image]({path.as_posix()})"}}]
+                    result = codex_image._generated_image(events, time.time())
+                    self.assertEqual(result is not None, accepted)
 
     def test_no_proxy_override_still_removes_paid_credentials(self):
         # Exercise language detection without relying on the host's preferences/cache.

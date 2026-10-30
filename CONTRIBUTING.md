@@ -28,6 +28,8 @@ python -m unittest discover tests -v
 node --test tests/web/test_*.cjs tests/desktop/test_*.cjs
 ```
 
+论文笔记的浏览器回归脚本在 `tests/browser/paper-note-workspace.cjs`。用 Playwright CLI 打开临时文献库中的中文阅读页后，执行 `run-code --filename=tests/browser/paper-note-workspace.cjs`，可验证中文输入法退格、图片上传／粘贴／拖入、缩放设置和导图缩略图；脚本会恢复测试笔记、缩放比例和导图开关。
+
 提 PR 后 GitHub Actions 会在 Windows、macOS、Linux 上自动跑一遍。第一次贡献的 PR 需要维护者点一下批准才会开始跑，稍等就好。
 
 ## 提 PR

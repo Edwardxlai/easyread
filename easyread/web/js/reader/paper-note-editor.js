@@ -39,6 +39,8 @@
     el.querySelector(".pn-divider").hidden = !visible;
     el.querySelector(".pn-mindmap").hidden = !visible;
     button.setAttribute("aria-expanded", String(visible));
+    button.setAttribute("aria-pressed", String(visible));
+    button.classList.toggle("on", visible);
     const action = visible ? PR.t("隐藏思维导图") : PR.t("显示思维导图");
     button.title = action;
     button.setAttribute("aria-label", action);
@@ -46,7 +48,7 @@
   }
 
   async function revealSelection() {
-    if (!mapVisible || !map || !rich || !rich.isFocused || mode !== "rich" || selectingFromMap || PR.$("#paperNote").value !== mapBody) return;
+    if (!mapVisible || !map || !rich || rich.view.composing || !rich.isFocused || mode !== "rich" || selectingFromMap || PR.$("#paperNote").value !== mapBody) return;
     const current = map, match = libraries.findMapNode(current.state.data, rich.state.selection.from);
     if (!match) return;
     for (const ancestor of match.ancestors) if (ancestor.payload?.fold) await current.toggleNode(ancestor);
@@ -56,7 +58,7 @@
   }
 
   async function updateMap() {
-    if (!mapVisible || !rich || !map) return;
+    if (!mapVisible || !rich || !map || rich.view.composing) return;
     const body = PR.$("#paperNote").value, current = map;
     const doc = body === richSource ? rich.getJSON() : rich.markdown.parse(body);
     const meta = PR.state.paper.meta || {};
@@ -77,7 +79,7 @@
     await updateMap();
     await document.fonts.ready;
     const svg = map.svg.node(), copy = svg.cloneNode(true), fonts = new Set();
-    const properties = "color display font-family font-size font-style font-weight line-height letter-spacing text-align text-decoration white-space vertical-align position top right bottom left width height min-width max-width box-sizing margin-top margin-right margin-bottom margin-left padding-top padding-right padding-bottom padding-left border-top border-right border-bottom border-left border-radius background-color fill fill-opacity stroke stroke-width stroke-opacity stroke-dasharray stroke-linecap stroke-linejoin opacity overflow".split(" ");
+    const properties = "color display font-family font-size font-style font-weight line-height letter-spacing text-align text-decoration white-space vertical-align position top right bottom left width height min-width max-width box-sizing margin-top margin-right margin-bottom margin-left padding-top padding-right padding-bottom padding-left border-top border-right border-bottom border-left border-radius background-color fill fill-opacity stroke stroke-width stroke-opacity stroke-dasharray stroke-linecap stroke-linejoin opacity overflow object-fit object-position".split(" ");
     const originals = [svg, ...svg.querySelectorAll("*")], copies = [copy, ...copy.querySelectorAll("*")];
     originals.forEach((node, i) => {
       const style = getComputedStyle(node), target = copies[i];
@@ -147,7 +149,7 @@
 
   PR.paperNoteEditor = {
     html(body) {
-      const modes = [["rich", PR.t("富文本")], ["source", "Markdown"]];
+      const modes = [["rich", PR.t("预览")], ["source", "Markdown"]];
       return '<div class="pn-workspace"><section class="pn-writing" aria-label="' + label(PR.t("论文笔记编辑器")) + '">' +
         '<div class="pn-bar"><div class="seg" role="group" aria-label="' + label(PR.t("笔记显示方式")) + '">' + modes.map(([key, text]) => '<button data-note-mode="' + key + '">' + text + '</button>').join("") + '</div><span class="grow"></span><button class="btn sm" data-note-map-toggle aria-controls="pnMindmap">Markmap</button></div>' +
         '<div class="pn-format"></div>' +
@@ -159,6 +161,7 @@
     },
     mount(body) {
       richSource = body; firstMap = true; mapBody = null;
+      workspace().style.setProperty("--note-zoom", PR.ls.get("easyread-note-zoom", 100) / 100);
       rich = libraries.createEditor({
         element: workspace().querySelector(".pn-rich"), content: body,
         onChange(text) {
