@@ -138,6 +138,7 @@
     PR.ls.get("pr-seen-" + PR.paperKey, (S.discussion.entries || []).map((e) => e.id)).forEach((id) => seen.add(id));
     PR.ls.set("pr-seen-" + PR.paperKey, Array.from(seen));
     PR.renderPaper();
+    PR.citationNav.setup();
     PR.setupDemo();  // 署名要放在论文标题下面，得等正文渲染出来
     PR.applyMarks();
     PR.renderMargin();
@@ -155,9 +156,14 @@
     }, 80)).observe(PR.$("#paper"));
     PR.startPolling();
 
-    if (location.hash && document.getElementById(location.hash.slice(1))) {
+    let hashId = location.hash.slice(1);
+    try { hashId = decodeURIComponent(hashId); } catch (_) { /* Keep literal malformed hashes. */ }
+    const returned = PR.citationNav.restore();
+    if (returned) {
+      // The per-visit citation position takes precedence over ordinary progress.
+    } else if (hashId && document.getElementById(hashId)) {
       // 打开带 #段落 的链接：先跳过去，等字体、公式排好后再对一次中，免得排版变动把它挤偏
-      const id = location.hash.slice(1);
+      const id = hashId;
       setTimeout(() => PR.jumpTo(id, { noBack: true, instant: true }), 200);
       Promise.all([document.fonts ? document.fonts.ready : null, new Promise((r) => setTimeout(r, 900))])
         .then(() => PR.jumpTo(id, { noBack: true, instant: true, noFlash: true }));

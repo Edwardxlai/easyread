@@ -174,3 +174,26 @@ test("blank lines between numbered steps do not reset each displayed number to o
   assert.ok(html.includes('<ol start="2"><li>输入 <math>x</math>。</li></ol>'));
   assert.ok(html.includes('<ol start="3"><li>读取结果。</li></ol>'));
 });
+
+test("links exact alphanumeric labels and unique author-year citations, leaving ambiguity alone", () => {
+  const PR = markup();
+  const refs = [
+    {id: "VSP+17", text: "Ashish Vaswani, Noam Shazeer, et al. Attention is All You Need. 2017."},
+    {id: "2", text: "Jane Smith and John Doe. A study. 2020."},
+    {id: "3", text: "J. Smith, P. Doe. Another study. 2021."},
+    {id: "4", text: "John Smith, R. Roe. A further study. 2021."},
+    {id: "5", text: "Jane Jones, An older study. 2019. Accessed 2021."},
+  ];
+  PR.refById = Object.fromEntries(refs.map(r => [r.id, r]));
+  PR.buildCitationIndex(refs);
+  let html = PR.md("[VSP+17, 2], Vaswani et al., 2017 and Smith (2020); Smith et al., 2021.");
+  assert.equal((html.match(/data-ref="VSP\+17"/g) || []).length, 2);
+  assert.equal((html.match(/data-ref="2"/g) || []).length, 2);
+  assert.ok(html.includes('href="#ref-VSP+17"'));
+  assert.ok(html.includes('Smith et al., 2021'));
+  assert.ok(!html.includes('data-ref="3"'));
+  assert.ok(!html.includes('data-ref="4"'));
+  assert.ok(!PR.md('Jones, 2021').includes('class="cite"'));
+  assert.ok(!PR.md('`Vaswani et al., 2017`').includes('class="cite"'));
+  assert.ok(!PR.md('[feature-2]').includes('class="cite"'));
+});

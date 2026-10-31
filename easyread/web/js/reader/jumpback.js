@@ -26,6 +26,17 @@
     show();
   };
 
+  // Keep same-paper return steps when a citation opens another paper.
+  PR.snapshotJumpBack = () => stack.map(s => ({...s}));
+  PR.restoreJumpBack = function (saved) {
+    if (!Array.isArray(saved)) return;
+    stack.length = 0;
+    saved.slice(-30).forEach(s => {
+      if (s && typeof s.id === "string" && Number.isFinite(s.off) && Number.isFinite(s.y)) stack.push(s);
+    });
+    if (stack.length) { dismissed = false; show(); }
+  };
+
   function label() {
     const s = stack[stack.length - 1];
     const sec = s && PR.blockById[s.id] && PR.sectionOf ? PR.sectionOf(s.id) : "";

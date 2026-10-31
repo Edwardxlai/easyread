@@ -44,6 +44,7 @@
     return [b.id];
   };
 
+  let missingReferences = null;
   function buildIndex() {
     PR.buildFootnoteIndex(S.paper.blocks);
     PR.blockById = {};
@@ -52,6 +53,7 @@
     PR.refById = {};
     PR.order = {};
     (S.paper.references || []).forEach((r) => (PR.refById[String(r.id)] = r));
+    PR.buildCitationIndex(S.paper.references);
     (S.paper.blocks || []).forEach((b, i) => {
       if (!b || typeof b !== "object") return;
       PR.blockById[b.id] = b;
@@ -61,6 +63,14 @@
       if (b.type === "figure" && b.num) PR.xindex.fig[b.num] = b.id;
       if (b.type === "heading" || b.type === "references") { if (b.num) PR.xindex.sec[b.num] = b.id; PR.headings.push(b); }
     });
+    missingReferences = null;
+    if ((S.paper.references || []).length && !(S.paper.blocks || []).some(b => b && b.type === "references")) {
+      let id = "__references";
+      while (PR.blockById[id]) id += "_";
+      missingReferences = { id, type: "references", level: 1, zh: PR.t("参考文献"), en: "References" };
+      PR.blockById[id] = missingReferences;
+      PR.headings.push(missingReferences);
+    }
   }
 
   function staleTag(key) { return PR.isStale(key) ? '<button class="stale-tag" data-t="stale" title="' + PR.t("你改过这段之后，译者稿又更新了") + '">' + PR.t("译者稿有更新") + "</button>" : ""; }
@@ -289,6 +299,7 @@
         html += blockErrorHtml(b, error);
       }
     }
+    if (missingReferences) html += sectionHtml(missingReferences, "", false);
     PR.updatePaperHtml(PR.$("#paper"), html + pendingHtml(lastPage));
     // 一段译文都没有（只读原文）：顶栏的“译文 / 对照”没意义，藏起来
     document.body.classList.toggle("en-only", (S.paper.blocks || []).length > 0 && !(S.paper.blocks || []).some((b) => b && PR.hasZh(b)));
