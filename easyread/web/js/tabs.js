@@ -102,6 +102,7 @@
       if (!link || link.matches("[data-cite-paper], [data-cite-passage]")) return;
       const url = new URL(link.href);
       if (url.origin !== location.origin) return;
+      if (url.hash && url.pathname === win.location.pathname && url.search === win.location.search) return;
       if (url.pathname.startsWith("/read/")) {
         e.preventDefault(); e.stopImmediatePropagation(); open(url.href);
       } else if (url.pathname === "/" || url.pathname === "/index.html") {
