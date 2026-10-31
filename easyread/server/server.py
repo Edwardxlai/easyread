@@ -20,10 +20,11 @@ from ..engines import detect, engines, usage
 from ..translate import langs
 from ..library import trash
 from . import settings_api, library_api, jobs_api, paper_api, wsock
+from .babeldoc_api import BabelDocJobs
 from ..app.log import log, tail
 from ..bulk import api as bulk_api
 from .jobs import Jobs
-from ..library.library import Library
+from ..library.library import Library, sha256_bytes
 from ..app.i18n import tr
 from ..library.store import now_iso
 from ..library.reader_files import prepare_later as _prepare_later
@@ -44,6 +45,7 @@ class App:
     def __init__(self, cfg: dict):
         self.lib = Library(config.library_dir(cfg))
         self.jobs = Jobs(self.lib)
+        self.babeldoc = BabelDocJobs()
         self.token = os.urandom(12).hex()
         self.location = library_api.LibraryLocation(self)
         self.presence = None  # presence.Presence，serve() 里设
@@ -143,6 +145,8 @@ class Handler(BaseHTTPRequestHandler):
         app, lib = self.app, self.app.lib
         if path in ("/", "/index.html"):
             return self._page(WEB / "library.html")
+        if path in ("/babeldoc", "/web/babeldoc.html"):
+            return self._redirect("/")
         if path == "/web/tabs.html":
             return self._page(WEB / "tabs.html")
         if path.startswith("/read/"):
@@ -190,6 +194,11 @@ class Handler(BaseHTTPRequestHandler):
             if not ws:
                 return self._json(404, {"error": tr("没有这篇论文")})
             action = parts[4]
+            if action == "babeldoc":
+                if len(parts) == 5:
+                    return self._json(200, app.babeldoc.status(ws))
+                if len(parts) == 7:
+                    return self._file(app.babeldoc.file(ws, parts[5], parts[6]), ctype="application/pdf")
             if action == "state":
                 opened = {"last_opened": now_iso()}
                 if (ws.load("item") or {}).get("status", "unread") == "unread":  # 打开过就算在读
@@ -303,6 +312,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, {"ok": True})
         if path == "/api/import":  # 请求体就是 PDF 文件
             data = self._body()
+            if q.get("babeldoc") == "1" and sha256_bytes(data)[:12] in app.babeldoc.running:
+                raise ValueError("这篇文献正在生成 PDF，不能重复上传")
             ws, fresh = lib.create_from_pdf(data, q.get("name", "paper.pdf"))
             return self._import_result(ws, fresh, q.get("translate", "1") == "1", q.get("scope"),
                                        read=q.get("read") == "1", model=q.get("model", ""), target=q.get("target", ""), translation_extra=q.get("translation_extra", ""))
@@ -331,6 +342,11 @@ class Handler(BaseHTTPRequestHandler):
             if not ws:
                 return self._json(404, {"error": tr("没有这篇论文")})
             body = json.loads(self._body() or b"{}")
+            if parts[4] == "babeldoc" and len(parts) == 5:
+                return self._json(200, app.babeldoc.start(ws, model=str(body.get("model") or ""),
+                                  output_dir=str(body.get("output_dir") or ""), regenerate=bool(body.get("regenerate"))))
+            if parts[4] == "babeldoc" and len(parts) == 6 and parts[5] == "delete":
+                return self._json(200, app.babeldoc.delete(ws))
             if parts[4] == "chat" and len(parts) == 5:
                 return self._chat(ws, body)
             if parts[4] == "notehelp":

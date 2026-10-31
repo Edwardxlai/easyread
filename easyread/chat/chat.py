@@ -5,7 +5,7 @@
 - 上下文：论文标题、摘要、读者指着的段落和前后几段、读者引用的几处原文、术语表。
   读者的标记（按颜色分好的划线、笔记、问题）只在问题提到“标红的”“划线”“笔记”时才带上，
   提到具体颜色就只带那种颜色，所以可以问“我标红的那些公式之间有什么联系”。
-  Claude Code 还能自己 Read paper.json、reader.json 看全文和全部标记。
+  所有回答方式都附带已整理正文（超长论文按段节选）；Claude Code / Codex 还可读取本地文件。
 """
 from __future__ import annotations
 
@@ -20,6 +20,7 @@ from uuid import uuid4
 
 from . import answer_styles
 from ..engines import engines, netcheck, openai_api, usage
+from ..engines import chat_tools
 from ..translate import langs
 from ..app.i18n import tr
 from ..app.log import log
@@ -29,7 +30,7 @@ from ..library.store import Workspace
 HISTORY = 12  # 带上最近几轮对话
 COLOR_NAMES = {"yellow": "黄", "green": "绿", "blue": "蓝", "pink": "红"}  # i18n-ok
 MARKS_BUDGET = 9000  # 标记部分最多带多少字
-PAPER_BUDGET = 30000  # STE 问答带上正文，长论文各段取节选，保留后面的结果和结论
+PAPER_BUDGET = 30000  # 各种问答方式都带上正文，长论文各段取节选，保留后面的结果和结论
 
 
 # ---------- 提示词 ----------
@@ -174,6 +175,8 @@ def prompt(ws: Workspace, messages: list[dict], anchor: str | None, quote: str, 
     ask = history[-1]["content"] if history else ""
     tool = ("需要看全文时，用 Read 工具读当前目录的 paper.json（blocks 里是译文和原文）；读者的全部标记在 reader.json 的 notes 里。\n"  # i18n-ok
             if engine == "claude" else "")
+    if engine in engines.CLI_ENGINES and engine != "claude":
+        tool = "需要看全文或节选中省略的内容时，可以只读当前目录的 paper.json（blocks 里是译文和原文）；读者的全部标记在 reader.json 的 notes 里。\n"  # i18n-ok
     want, colors = wants_marks(ask)
     marks = _marks(ws, colors) if want else _marks_summary(ws)
     style = {answer_styles.STE100: answer_styles.STE100_INSTRUCTIONS,
@@ -182,6 +185,7 @@ def prompt(ws: Workspace, messages: list[dict], anchor: str | None, quote: str, 
     whole = _paper_context(ws) if answer_style in answer_styles.WHOLE_PAPER else ""
     return ("你在陪读者读一篇学术论文，回答他边读边冒出来的问题。\n" + style  # i18n-ok
             + "区分“论文里写了什么”和“你的补充解释”，论文里没有的内容不要说成是论文说的。"  # i18n-ok
+            "当前段落和选中文字只是提问的重点，不限制可参考的论文范围；跨章节问题应结合已提供的正文，依据不足时明确说明。"  # i18n-ok
             "行内公式只用 $TeX$，行间公式只用 $$TeX$$。"  # i18n-ok
             r"不要用 \(\) 或 \[\]，不要把公式放进反引号或代码块。"  # i18n-ok
             "行间公式的 $$ 单独占一行。公式内部可以换行，但不要在公式中插入空行；多行推导使用 aligned 环境。"  # i18n-ok
@@ -265,31 +269,33 @@ def stream(ecfg: dict, text: str, cwd: Path, cancel: threading.Event, on_model=N
     if images and engines.image_mode(ecfg) == "claude":
         text += "\n\n读者附上的图片，请用读图工具查看这些本地文件：\n" + "\n".join(str(path) for path in images)  # i18n-ok
     try:
+        if e in engines.CLI_ENGINES:
+            text += chat_tools.RESEARCH_PROMPT
         if e == "claude":
             yield from _stream_claude(ecfg["claude"], text, cwd, cancel, on_model, meter)
         elif e == "openai":
             yield from openai_api.stream(ecfg["openai"], text, cancel, meter, images=images)
         else:  # codex 没有逐字输出，整段给；不拉起用户的 MCP 和用不到的功能（见 codex_lean）
-            yield engines.run(engines.for_translation(ecfg), text, cwd, images, cancel, meter)
+            yield engines.run(chat_tools.for_chat(ecfg), text, cwd, images, cancel, meter)
     except engines.EngineError as err:
         raise engines.EngineError(netcheck.explain(ecfg, str(err))) from None
 
 
 def _stream_claude(c: dict, text: str, cwd: Path, cancel, on_model=None, meter=None) -> Iterator[str]:
-    """只给 Read 一个工具（--tools Read）：其余内置工具的定义每问一次都要发，约 2.7 万 token。
-    这版 Claude Code 不认 --tools、还没输出任何字时，去掉它再问一次。"""
+    """问答可读取、搜索论文和网页；保持无写入、无命令执行的工具范围。"""
     exe = engines.claude_path(c)
     if not exe:
         raise engines.EngineError(tr("找不到 Claude Code 命令（先装好并登录 Claude Code）"))
     args = [exe, "-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
-            "--allowedTools", "Read", "--strict-mcp-config", "--disable-slash-commands", "--no-session-persistence"]
+            "--allowedTools", chat_tools.READ_TOOLS, "--disallowedTools", chat_tools.DENIED_TOOLS,
+            "--strict-mcp-config", "--disable-slash-commands", "--no-session-persistence"]
     if c.get("model"):
         args += ["--model", c["model"]]
     if c.get("reasoning_effort"):
         args += ["--effort", c["reasoning_effort"]]
     said = []
     try:
-        for piece in _stream_once(args + engines.CLAUDE_LEAN, text, cwd, cancel, on_model, meter):
+        for piece in _stream_once(args + ["--tools", chat_tools.READ_TOOLS], text, cwd, cancel, on_model, meter):
             said.append(piece)
             yield piece
     except engines.EngineError as e:

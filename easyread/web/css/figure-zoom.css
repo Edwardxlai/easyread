@@ -2,6 +2,7 @@
 .figure-viewer::backdrop { background: rgb(0 0 0 / .65); }
 .figure-viewer[open] { display: flex; flex-direction: column; }
 .figure-viewer-tools { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--rule); font: 13px var(--ui); }
+.figure-viewer-tools .grow { flex: 1; min-width: 0; }
 .figure-viewer-scale { min-width: 44px; text-align: center; font-variant-numeric: tabular-nums; }
 .figure-viewer-scroll { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; cursor: grab; touch-action: none; }
 .figure-viewer-scroll.panning { cursor: grabbing; }

@@ -56,6 +56,30 @@ test('image feature changes in another tab propagate without paper changes', asy
   assert.equal(events.filter(name => name === 'figure-images-setting').length, 2);
 });
 
+test("awaited exit saves image notes larger than the keepalive body quota", async () => {
+  const requests = [];
+  const PR = { t: s => s, uid: () => "client", nowIso: () => "2026-10-30T00:00:00Z", emit() {},
+    ls: { get: (_key, fallback) => fallback, set: () => true } };
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../../easyread/web/js/reader/store.js"), "utf8"), {
+    window: { PR, addEventListener() {} }, location: { pathname: "/read/paper" },
+    document: { getElementById: () => null }, setTimeout() {}, clearTimeout() {},
+    fetch: async (url, options) => {
+      if (url.endsWith("/state")) return { ok: true, json: async () => ({ paper: { meta: {} }, reader: {}, token: "token" }) };
+      requests.push(options);
+      if (options.keepalive && Buffer.byteLength(options.body) > 65536) throw new TypeError("keepalive quota exceeded");
+      return { ok: true, json: async () => ({ rev: 1 }) };
+    },
+  });
+  await PR.load();
+  const body = "![figure](data:image/png;base64," + "A".repeat(80000) + ")";
+  PR.commit({ op: "paper_note", body });
+  assert.equal(await PR.flushPending(), true);
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].keepalive, false);
+  assert.equal(JSON.parse(requests[0].body).ops[0].body, body);
+  assert.equal(PR.store.pending, 0);
+});
+
 test("exit waits for an in-flight save and drains the newer progress", async () => {
   const pending = [];
   const PR = { t: s => s, uid: () => "client", nowIso: () => "2026-10-14T00:00:00Z", emit() {},
@@ -97,5 +121,40 @@ test("offline deletes survive delayed note creation and export/import", async ()
     assert.equal(PR.exportOps().ops.find(op => op.op === "note").note.deleted, true);
     PR.commit({ ...note, note: { ...note.note, updated: "2026-10-01T00:03:00Z" } });
     assert.ok(!PR.state.reader.notes.n1.deleted);
+  }
+});
+
+test("storage quota failures retain the export warning and block unsafe exit", async () => {
+  for (const staticMode of [true, false]) {
+    const events = {}, statuses = [];
+    let storageWorks = false, connected = false;
+    const data = { paper: { meta: { source_sha256: "paper" } }, reader: {} };
+    const PR = { t: s => s, uid: () => "client", nowIso: () => "2026-10-30T00:00:00Z",
+      emit: (name, value) => { if (name === "status") statuses.push(value); },
+      ls: { get: (_key, fallback) => fallback, set: () => storageWorks } };
+    vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../../easyread/web/js/reader/store.js"), "utf8"), {
+      window: { PR, addEventListener: (name, fn) => { events[name] = fn; } },
+      location: { pathname: "/read/paper" }, setTimeout() {}, clearTimeout() {},
+      document: { getElementById: () => staticMode ? { textContent: JSON.stringify(data) } : null },
+      fetch: async url => {
+        if (!url.endsWith("/state") && !connected) throw new Error("offline");
+        return { ok: true, json: async () => url.endsWith("/state") ? data : { rev: 1 } };
+      },
+    });
+    await PR.load();
+    PR.commit({ op: "paper_note", body: "unsaved image note" });
+    assert.equal(PR.store.status, "error");
+    assert.equal(await PR.flushPending(), false);
+    assert.equal(PR.store.status, "error");
+    let blocked = false;
+    events.beforeunload({ preventDefault: () => { blocked = true; } });
+    assert.equal(blocked, true);
+    assert.match(statuses.at(-1).text, /内存/);
+    assert.equal(PR.exportOps().ops.find(op => op.op === "paper_note").body, "unsaved image note");
+    storageWorks = true; connected = true;
+    if (staticMode) PR.commit({ op: "paper_note", body: "saved image note" });
+    else { await PR.flush(); await PR.flushPending(); }
+    assert.equal(PR.store.status, staticMode ? "local" : "saved");
+    assert.equal(await PR.flushPending(), true);
   }
 });

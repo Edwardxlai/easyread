@@ -43,6 +43,7 @@ DEFAULTS = {
     "codex": {"command": "codex", "model": "", "reasoning_effort": "", "service_tier": "", "extra_args": [], "timeout": 1200},
     "codebuddy": {"command": "codebuddy", "model": "", "extra_args": [], "timeout": 1200},
     "zcode": {"command": "zcode", "model": "", "extra_args": [], "timeout": 1200},
+    "qoder": {"command": "", "model": "", "extra_args": [], "timeout": 1200},
     # 另外三个本机 CLI（见 agent_cli.py）；command 空着按默认名找，model 空着用 CLI 自己的默认
     "grok": {"command": "", "model": "", "reasoning_effort": "", "extra_args": [], "timeout": 1200},
     "agy": {"command": "", "model": "", "reasoning_effort": "", "extra_args": [], "timeout": 1200},

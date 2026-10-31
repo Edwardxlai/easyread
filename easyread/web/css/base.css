@@ -1,6 +1,7 @@
 /* EasyRead · 共用的设计变量与基础组件（文献库页和阅读页都用） */
 [hidden] { display: none !important; }  /* 元素设了 hidden 就一定藏起来，别被自己的 display 盖掉 */
 :root {
+  color-scheme: light;
   --bg: #f6f3ec;
   --surface: #fbfaf6;
   --surface-2: #efebe2;
@@ -47,6 +48,7 @@ html[data-target="ja"] { --serif-zh: "Noto Serif JP", "Source Han Serif JP", "Hi
 html[data-target="ko"] { --serif-zh: "Noto Serif KR", "Source Han Serif KR", AppleMyungjo, Batang, serif; --sans-zh: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
 html[data-target="en"], html[data-target="es"], html[data-target="fr"], html[data-target="de"], html[data-target="it"] { --serif-zh: "Source Serif 4", "Source Serif Pro", Charter, "Iowan Old Style", Georgia, serif; --sans-zh: "Source Sans 3", "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
 :root[data-theme="dark"] {
+  color-scheme: dark;
   --bg: #1a1917;
   --surface: #22211e;
   --surface-2: #2a2825;

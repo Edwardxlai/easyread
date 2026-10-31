@@ -40,8 +40,8 @@ class AnswerStyleTest(unittest.TestCase):
                 ste = chat.prompt(self.ws, messages, "b", "引用", engine, answer_style="ste100")
                 self.assertIn("用中文，直接", normal)
                 self.assertNotIn("本次使用 ASD-STE100", normal)
-                self.assertNotIn("当前已导入的正文", normal)
-                self.assertNotIn("A final limitation.", normal)
+                self.assertIn("当前已导入的正文", normal)
+                self.assertIn("A final limitation.", normal)
                 self.assertNotIn("用中文，直接", ste)
                 self.assertIn("只输出中文回答，不附英文答案", ste)
                 self.assertNotIn("## English (ASD-STE100)", ste)
@@ -50,6 +50,17 @@ class AnswerStyleTest(unittest.TestCase):
                 self.assertIn("每句表达一个主要意思", ste)
                 self.assertIn("不要把英文的词数限制机械地套到中文", ste)
                 self.assertIn("不要声称", ste)
+
+    def test_standard_question_keeps_later_sections_with_or_without_selection(self):
+        for engine in ("openai", "claude", "codex", "opencode", "zcode"):
+            for anchor, quote in ((None, ""), ("b", "A source fact")):
+                with self.subTest(engine=engine, anchor=anchor):
+                    text = chat.prompt(self.ws, [{"role": "user", "content": "Which metrics were used?"}], anchor, quote, engine)
+                    for fact in ("A test condition.", "Test results", "2%", "A final limitation."):
+                        self.assertIn(fact, text)
+                    self.assertIn("不限制可参考的论文范围", text)
+                    if engine in ("claude", "codex"):
+                        self.assertIn("paper.json", text)
 
     def test_xray_mode_reconstructs_and_checks_instead_of_summarizing(self):
         messages = [{"role": "assistant", "content": "Previous answer in English."}, {"role": "user", "content": "这个设计为什么长这样"}]

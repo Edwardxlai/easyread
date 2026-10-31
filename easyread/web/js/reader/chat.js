@@ -14,9 +14,9 @@
   const styleOf = (value) => STYLES.indexOf(value) >= 0 ? value : "standard";   // 只认这三档，其余（旧数据、脏值）一律回到 standard
   const styleOfThread = (t) => styleOf(t && t.answer_style);
   const styleLabel = (s) => s === "ste100" ? PR.t("简明回答") : s === "xray" ? PR.t("精读") : PR.t("标准回答");
-  const styleHint = (s) => s === "ste100" ? PR.t("简明回答：短句、一句只讲一件事、步骤分条列出，数字和前提条件一个不丢。会把全文一起发给模型作依据，用量更多。")
-    : s === "xray" ? PR.t("精读：还原作者的出发点，分清承重和装饰，把关键公式落到能手算的例子，核对数字和对照条件；论文没有报告的就写没有报告。会把全文一起发给模型作依据，用量更多。")
-    : PR.t("标准回答：直接、具体，能举例就举例。");
+  const styleHint = (s) => (s === "ste100" ? PR.t("简明回答：短句、一句只讲一件事、步骤分条列出，数字和前提条件一个不丢。")
+    : s === "xray" ? PR.t("精读：解释设计动机、推导公式、核对实验依据；没有报告的内容明确说明。")
+    : PR.t("标准回答：直接、具体，能举例就举例。")) + PR.t("会参考已整理正文；过长时提供节选。");
   Object.assign(st, { chatOptions: {}, effortOpen: false, catalog: null });
   const imageDraft = PR.createChatImages(st, panel, render, () => focusInput());
   const imagesHtml = imageDraft.html;

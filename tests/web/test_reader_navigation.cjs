@@ -64,6 +64,17 @@ test("manual input cancels corrections and restores normal deferred rendering", 
   assert.equal(r.timers.size, 0);
 });
 
+test("a click after a find jump keeps the target laid out throughout pointerdown", () => {
+  const r = reader(), target = r.block(12000, 120);
+  r.PR.centerOn(target, true);
+  r.fire("pointerdown");
+  assert.equal(target.style.contentVisibility, "visible");
+  const deferredStop = [...r.timers.values()].at(-1);
+  deferredStop();
+  assert.equal(target.style.contentVisibility, "auto");
+  assert.equal(r.observers[0].disconnected, true);
+});
+
 test("a second jump cancels the first destination and clips tall targets to the document", () => {
   const r = reader(), first = r.block(12000, 120), second = r.block(19900, 1200);
   r.PR.centerOn(first);

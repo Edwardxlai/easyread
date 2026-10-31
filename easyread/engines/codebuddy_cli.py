@@ -17,6 +17,7 @@ from pathlib import Path
 
 from ..app.i18n import tr
 from . import netcheck
+from .chat_tools import READ_TOOLS, DENIED_TOOLS
 
 
 def path(c: dict) -> str | None:
@@ -35,8 +36,10 @@ def build_args(c: dict) -> list[str]:
             raise EngineError(tr("CodeBuddy 的额外参数不能覆盖安全或输入输出设置：{arg}", arg=arg))
     if c.get("model"):
         args += ["--model", c["model"]]
+    if c.get("_chat"):
+        args += ["--allowedTools", READ_TOOLS, "--disallowedTools", DENIED_TOOLS]
     return args + ["-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
-                   "--tools", "", "--strict-mcp-config", "--permission-mode", "default",
+                   "--tools", READ_TOOLS if c.get("_chat") else "", "--strict-mcp-config", "--permission-mode", "default",
                    "--setting-sources", "user", "--settings", '{"disableAllHooks":true}',
                    "--no-session-persistence"]
 

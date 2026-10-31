@@ -64,7 +64,8 @@ test('ordered lists, tasks, tables and images keep their note content', () => {
   assert.equal(map.children[0].content, '3. 步骤');
   assert.equal(map.children[1].content, '☑ 已完成');
   assert.ok(map.children[2].content.includes('<td>方法</td><td>DPO</td>'));
-  assert.equal(map.children[3].content, '实验图');
+  assert.ok(map.children[3].content.includes('src="/image.png"'));
+  assert.ok(map.children[3].content.includes('alt="实验图"'));
 });
 
 test('source ranges distinguish repeated text and follow nested list positions', () => {

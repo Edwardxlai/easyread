@@ -94,9 +94,11 @@
       '<span>DOI</span><span contenteditable="plaintext-only" data-meta="doi" aria-label="DOI" title="' + PR.t("可粘贴 DOI 编号或 doi.org 链接") + '">' + PR.esc(i.doi) + "</span>" +
       "<span>" + PR.t("添加于") + "</span><span>" + PR.esc(PR.relTime(i.added)) + (i.last_opened ? PR.t("　·　上次打开 {t}", { t: PR.esc(PR.relTime(i.last_opened)) }) : "") + "</span></div>" +
       "<h4>" + PR.t("翻译") + "</h4>" + jobHtml(i) +
+      '<div id="pdfExportResult" data-paper="' + PR.esc(i.id) + '"></div>' +
       (i.notes + i.highlights + i.open_questions ? '<p class="mine-line">' + [i.notes && PR.t("{n} 条笔记", { n: i.notes }), i.highlights && PR.t("{n} 处划线", { n: i.highlights }), i.open_questions && PR.t("{n} 个问题待回答", { n: i.open_questions })].filter(Boolean).join(" · ") + "</p>" : "") +
       (i.abstract ? "<h4>" + PR.t("摘要") + '</h4><div class="abstract" id="abs">' + PR.esc(i.abstract.replace(/\$([^$]+)\$/g, "$1")) + '</div><button class="linkish" data-d="abs">' + PR.t("展开全文") + "</button>" : "") +
       "</div>";
+    if (PR.pdfExport) PR.pdfExport.show(i.id);
   };
 
   async function saveMeta(el) {

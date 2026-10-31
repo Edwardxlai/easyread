@@ -21,7 +21,7 @@ def apply(ecfg: dict, options: dict | None) -> dict:
                 allowed = ["", *match["reasoning_levels"]]
         elif engine in agent_cli.ENGINES:
             allowed = ["", *agent_cli.SPECS[engine]["efforts"]]
-        elif engine in ("codebuddy", "zcode"):
+        elif engine in ("codebuddy", "zcode", "qoder"):
             allowed = [""]
         if effort not in allowed:
             raise ValueError("Unsupported reasoning effort")
