@@ -30,7 +30,8 @@ test("Codex settings render supported effort levels and save the chosen override
 
 test("image generation settings render and persist separately from the text model", () => {
   const PR = {t: x => x, esc: String, settingsTabs: {}, $: () => ({addEventListener() {}}), agentClis: {}};
-  const context = {window: {PR, addEventListener() {}}, document: {addEventListener() {}}};
+  const context = {window: {PR, addEventListener() {}}, document: {addEventListener() {}},
+    location: {search: ""}, URLSearchParams};
   for (const name of ['settings.js', 'settings-translation.js']) {
     vm.runInNewContext(fs.readFileSync('easyread/web/js/common/' + name, 'utf8'), context);
   }

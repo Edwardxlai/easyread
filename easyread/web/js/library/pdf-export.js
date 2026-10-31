@@ -48,11 +48,11 @@
         const dual = name.endsWith(".dual.pdf") || name.endsWith(" - 对照版.pdf"); // i18n-ok: legacy file suffix
         return '<a class="linkish" href="' + endpoint(id) + '/' + encodeURIComponent(job.job_id) + '/' + encodeURIComponent(name) +
           '" download="' + PR.esc(name) + '">' + PR.icon("download", "sm") +
-          PR.t(dual ? "下载对照" : "下载译文") + '<span class="pdf-export-name">' + PR.esc(name) + '</span></a>';
+          (dual ? PR.t("下载对照") : PR.t("下载译文")) + '<span class="pdf-export-name">' + PR.esc(name) + '</span></a>';
       }).join("") + '</div>';
     } else {
       html += '<p class="hint">' + PR.t("PDF 未生成，论文已正常导入") + '</p><details><summary>' + PR.t("查看原因") +
-        '</summary><p class="hint pdf-export-error">' + PR.esc(PR.t(job.message || "请求失败")) + '</p></details>' +
+        '</summary><p class="hint pdf-export-error">' + PR.esc(job.message ? PR.t(job.message) : PR.t("请求失败")) + '</p></details>' +
         '<div class="pdf-export-actions"><button class="linkish" data-pdf-retry="' + PR.esc(id) + '">' + PR.t("重试生成") +
         '</button><button class="linkish" data-pdf-settings>' + PR.t("模型设置") + '</button></div>';
     }

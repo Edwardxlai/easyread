@@ -1527,6 +1527,7 @@
   "API 地址、模型或 API Key 尚未配置完整。": "API URL, model, or API key is incomplete.",
   "下载对照": "Download bilingual PDF",
   "下载译文": "Download translation",
+  "请求失败": "Request failed",
   "修改模型 API 设置": "Change model API settings",
   "删除结果": "Delete results",
   "删除这篇文献的所有排版翻译结果？原 PDF 和阅读笔记不会删除。": "Delete all BabelDOC results for this paper? The original PDF and reading notes will be kept.",
