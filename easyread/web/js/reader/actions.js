@@ -225,7 +225,7 @@
     const host = el.closest("#paper .blk") || el;
     const visibility = host.style.contentVisibility;
     host.style.contentVisibility = "visible";
-    let settled = !!instant, stopped = false, idleTimer;
+    let settled = !!instant, stopped = false, idleTimer, inputTimer;
     const destination = () => {
       const r = el.getBoundingClientRect(), bar = (PR.$("#bar") || {}).offsetHeight || 0;
       const room = innerHeight - bar;
@@ -244,13 +244,19 @@
       idleTimer = setTimeout(settle, 120); // Fallback for webviews without scrollend.
     }
     const observer = new ResizeObserver(() => { if (settled) align(); });
+    // Let Chromium finish native hit testing before changing the clicked block's layout.
+    function stopAfterPointer() {
+      clearTimeout(inputTimer);
+      inputTimer = setTimeout(stop, 0);
+    }
     function stop() {
       stopped = true;
-      clearTimeout(idleTimer); clearTimeout(fallback); clearTimeout(deadline);
+      clearTimeout(idleTimer); clearTimeout(inputTimer); clearTimeout(fallback); clearTimeout(deadline);
       observer.disconnect();
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("scrollend", settle);
-      ["wheel", "touchstart", "pointerdown", "keydown"].forEach(type => window.removeEventListener(type, stop, true));
+      ["wheel", "keydown"].forEach(type => window.removeEventListener(type, stop, true));
+      ["pointerdown", "touchstart"].forEach(type => window.removeEventListener(type, stopAfterPointer, true));
       host.style.contentVisibility = visibility;
       cancelCentering = null;
     }
@@ -261,7 +267,8 @@
     if (paper && paper !== el) observer.observe(paper);
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("scrollend", settle, { passive: true });
-    ["wheel", "touchstart", "pointerdown", "keydown"].forEach(type => window.addEventListener(type, stop, { passive: true, capture: true }));
+    ["wheel", "keydown"].forEach(type => window.addEventListener(type, stop, { passive: true, capture: true }));
+    ["pointerdown", "touchstart"].forEach(type => window.addEventListener(type, stopAfterPointer, { passive: true, capture: true }));
     cancelCentering = stop;
     window.scrollTo({ top: destination(), behavior: instant ? "instant" : "smooth" });
   };
