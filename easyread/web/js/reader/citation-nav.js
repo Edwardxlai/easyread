@@ -32,15 +32,20 @@
         title: (PR.state.paper.meta || {}).short_zh || (PR.state.paper.meta || {}).title_zh || (PR.state.paper.meta || {}).title_en || PR.t('论文')});
       PR.captureProgress();
       if (token) {
-        try { history.replaceState({...history.state, citationVisit:token}, '', location.href); } catch (_) { /* The explicit return link still works. */ }
+        if (!PR.openPaperTab) {
+          try { history.replaceState({...history.state, citationVisit:token}, '', location.href); } catch (_) { /* The explicit return link still works. */ }
+        }
         destination.searchParams.set(FROM, token);
       }
-      location.assign(destination.pathname + destination.search + destination.hash);
+      if (PR.openPaperTab) PR.openPaperTab(destination.href);
+      else location.assign(destination.pathname + destination.search + destination.hash);
     },
     setup() {
       const token = new URLSearchParams(location.search).get(FROM), r = record(token);
       const link = PR.$('#citationBack');
-      if (!link || !r) return;
+      if (!link) return;
+      link.hidden = !r;
+      if (!r) return;
       const url = new URL(r.url, location.origin);
       url.searchParams.set(RETURN, token);
       link.href = url.pathname + url.search;

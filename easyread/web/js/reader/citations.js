@@ -3,7 +3,7 @@
 (function (PR) {
   "use strict";
   const cache = new Map();
-  let generation = 0;
+  let generation = 0, bibliographyObserver;
   function invalidate() { cache.clear(); generation++; }
   const E = PR.esc;
   function graph(id) {
@@ -50,8 +50,10 @@
       container.textContent = PR.t("加载引用关系失败，收起后重新展开可重试。");
     }
   }
-  PR.citationsDrawer = function (box) {
-    invalidate(); // New imports, metadata edits and deletions change the graph.
+  PR.citationsDrawer = function (box, reopened) {
+    if (reopened) invalidate(); // Account for edits or imports made in another tab.
+    if (box.citationGeneration === generation && box.querySelector('.cite-tree-root')) return;
+    box.citationGeneration = generation;
     box.innerHTML = '<p class="hint">' + PR.t("仅显示本地文献库中已整理的引用；未匹配条目可搜索。展开论文继续查看双向引用。") + '</p>' +
       '<div class="cite-tree-root"><p class="hint">' + PR.t("加载中…") + '</p></div>';
     if (!box.citationToggleBound) {
@@ -98,9 +100,21 @@
     }
   }
   function refresh() {
+    bibliographyObserver?.disconnect();
+    if (!PR.state.paper.references?.length) return;
     decorate(null);
+    if (PR.store.mode !== 'server') return;
     const version = generation;
-    if (PR.store.mode === 'server') graph(PR.pid).then(data => { if (version === generation) decorate(data); }).catch(() => {});
+    const load = () => graph(PR.pid).then(data => { if (version === generation) decorate(data); }).catch(() => {});
+    if (cache.has(PR.pid) || !window.IntersectionObserver) { load(); return; }
+    const refs = document.querySelector('#paper .blk-references');
+    if (!refs) return;
+    bibliographyObserver = new IntersectionObserver((entries, observer) => {
+      if (!entries.some(entry => entry.isIntersecting)) return;
+      observer.disconnect();
+      if (version === generation) load();
+    });
+    bibliographyObserver.observe(refs);
   }
   PR.refreshCitations = function () { invalidate(); refresh(); if (document.body.classList.contains('drawer-open')) PR.renderDrawer(); };
   PR.on('rendered', refresh);

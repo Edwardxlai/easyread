@@ -13,12 +13,18 @@ from urllib.parse import quote
 
 from .store import DataReadError
 
-_DOI = re.compile(r"\b10\.\d{4,9}/[^\s\"<>\[\]()]+", re.I)
+_DOI = re.compile(r"\b10\.\d{4,9}/[^\s\"<>\[\]]+", re.I)
 _ARXIV = re.compile(r"(?:arxiv\s*:\s*|arxiv\.org/(?:abs|pdf)/)(\d{4}\.\d{4,5}(?:v\d+)?)", re.I)
 
 
 def _doi(text):
-    return {m.group().rstrip(".,;:").lower() for m in _DOI.finditer(str(text or ""))}
+    identifiers = set()
+    for match in _DOI.finditer(str(text or "")):
+        doi = match.group().lower().rstrip(".,;:")
+        while doi.endswith(")") and doi.count(")") > doi.count("("):
+            doi = doi[:-1].rstrip(".,;:")
+        identifiers.add(doi)
+    return identifiers
 
 
 def _arxiv(text):
@@ -61,26 +67,28 @@ def graph_for(lib, pid):
 
     def resolve(ref, source):
         text = str(ref.get("text") or "")
+        ref_dois, ref_arxivs = _doi(text), _arxiv(text)
+        def compatible(ident):
+            other_dois, other_arxivs = _doi(papers[ident]["doi"]), _arxiv(papers[ident]["arxiv"])
+            return not ((ref_dois and other_dois and ref_dois.isdisjoint(other_dois)) or
+                        (ref_arxivs and other_arxivs and ref_arxivs.isdisjoint(other_arxivs)))
         ids = set()
-        for d in _doi(text): ids.update(doi_index[d])
-        for a in _arxiv(text): ids.update(arxiv_index[a])
+        for d in ref_dois: ids.update(doi_index[d])
+        for a in ref_arxivs: ids.update(arxiv_index[a])
         ids.discard(source)
         # Never guess if an identifier matches multiple library entries.
         if len(ids) == 1:
-            return next(iter(ids))
+            ident = next(iter(ids))
+            return ident if compatible(ident) else None
         if ids:
             return None
         normalized = " " + _words(text) + " "
-        ref_dois, ref_arxivs = _doi(text), _arxiv(text)
         ids = set()
         for ident, title in titles.items():
             if ident == source or title not in normalized:
                 continue
-            other_dois, other_arxivs = _doi(papers[ident]["doi"]), _arxiv(papers[ident]["arxiv"])
-            if (ref_dois and other_dois and ref_dois.isdisjoint(other_dois)) or (
-                    ref_arxivs and other_arxivs and ref_arxivs.isdisjoint(other_arxivs)):
-                continue
-            ids.add(ident)
+            if compatible(ident):
+                ids.add(ident)
         return next(iter(ids)) if len(ids) == 1 else None
 
     outward = {}

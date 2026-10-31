@@ -59,6 +59,18 @@ class CitationGraphTest(unittest.TestCase):
         (folder / "paper.json").write_text("{broken")
         self.assertTrue(graph_for(self.lib, "paperA")["incomplete"])
 
+    def test_parentheses_and_conflicting_identifiers_do_not_link_different_papers(self):
+        doi = "10.1016/S0140-6736(20)30183-5"
+        self.paper("paperB", "The Candidate Paper", doi=doi, arxiv="arXiv:2301.12345")
+        self.paper("paperA", "The Citing Paper", [
+            {"id": "1", "text": f"Article (doi:{doi})."},
+            {"id": "2", "text": "doi:10.1016/S0140-6736(20)99999-1."},
+            {"id": "3", "text": "arXiv:2301.12345. doi:10.1016/different."},
+        ])
+        entries = graph_for(self.lib, "paperA")["references"]
+        self.assertEqual([r["target"] for r in entries], ["paperB", None, None])
+        self.assertEqual(entries[0]["source_url"], "https://doi.org/10.1016/s0140-6736%2820%2930183-5")
+
 
 if __name__ == "__main__":
     unittest.main()

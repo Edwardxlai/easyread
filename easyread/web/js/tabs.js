@@ -78,15 +78,28 @@
     if (url.origin !== location.origin || !match) return;
     const id = match[1];
     if (!tabs.has(id)) create(id, url.href, t("正在打开…"));
+    else if (url.searchParams.has("cite_from") || url.searchParams.has("cite_return")) {
+      const frame = tabs.get(id).frame, win = frame.contentWindow;
+      if (!win.PR?.state?.paper) { frame.src = url.href; }
+      else {
+        select(id);
+        win.history.replaceState(win.history.state, "", url.href);
+        win.PR.citationNav.setup();
+        if (url.searchParams.has("cite_return")) win.PR.citationNav.restore();
+        else if (url.hash) win.PR.jumpTo(decodeURIComponent(url.hash.slice(1)), { noBack: true, instant: true });
+        return;
+      }
+    }
     else if (url.hash) tabs.get(id).frame.contentWindow.location.hash = url.hash;
     select(id);
   }
   function bind(tab) {
     const win = tab.frame.contentWindow, doc = win.document;
     if (win.PR?.lib) win.PR.lib.openReader = id => open("/read/" + encodeURIComponent(id));
+    if (win.PR?.citationNav) win.PR.openPaperTab = open;
     doc.addEventListener("click", e => {
       const link = e.target.closest("a[href]");
-      if (!link) return;
+      if (!link || link.matches("[data-cite-paper], [data-cite-passage]")) return;
       const url = new URL(link.href);
       if (url.origin !== location.origin) return;
       if (url.pathname.startsWith("/read/")) {

@@ -2,7 +2,7 @@
    reader's explicit association with the unchanged bibliography entry. */
 (function (PR) {
   'use strict';
-  let dialog, current = null, importing = false;
+  let dialog, current = null, importing = false, latestRequest = 0;
   const E = PR.esc;
   const $ = sel => dialog.querySelector(sel);
   function create() {
@@ -22,8 +22,12 @@
   PR.importCitation = async function (paper, ref) {
     if (importing) { PR.toast(PR.t('一篇论文正在导入，请稍候。')); return; }
     if (!dialog) create();
+    const request = ++latestRequest;
+    current = null;
+    dialog.classList.remove('open');
     try {
       const data = await PR.api('/api/p/' + encodeURIComponent(paper) + '/citations');
+      if (request !== latestRequest) return;
       const entry = data.references.find(r => r.id === ref);
       if (!entry) throw new Error(PR.t('参考文献已变化，请重新选择条目'));
       current = {paper, entry};
@@ -36,7 +40,7 @@
         '<div class="actions"><button class="btn" data-ci-close>' + PR.t('关闭') + '</button><button class="btn line" data-ci-file>' + PR.t('选择 PDF') + '</button><button class="btn accent" data-ci-add>' + PR.t('查找并加入') + '</button></div></div>';
       dialog.classList.add('open');
       $('[data-ci-ref]').focus();
-    } catch (e) { PR.toast(PR.t('无法读取引用：{msg}', {msg:E(e.message)})); }
+    } catch (e) { if (request === latestRequest) PR.toast(PR.t('无法读取引用：{msg}', {msg:E(e.message)})); }
   };
   async function start(file) {
     if (importing || !current) return;

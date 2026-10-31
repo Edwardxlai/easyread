@@ -47,3 +47,17 @@ test('an import failure leaves the reference available for a PDF retry', async (
   assert.equal(ui.nodes['[data-ci-file]'].disabled,false);
   assert.equal(ui.nodes['[data-ci-add]'].disabled,false);
 });
+
+test('a slow first selection cannot replace the newer reference', async () => {
+  const ui = setup({});
+  const pending = [];
+  ui.PR.api = () => new Promise(resolve => pending.push(resolve));
+  const first = ui.PR.importCitation('paperA', '1');
+  const second = ui.PR.importCitation('paperA', '2');
+  pending[1]({references:[{id:'2', text:'second choice'}]});
+  await second;
+  pending[0]({references:[{id:'1', text:'stale choice'}]});
+  await first;
+  assert.match(ui.dialog.innerHTML, /second choice/);
+  assert.doesNotMatch(ui.dialog.innerHTML, /stale choice/);
+});
