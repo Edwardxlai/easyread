@@ -238,7 +238,7 @@
       }
       if (!content.length) return;
       content.push({ type: "paragraph" });
-      rich.chain().focus().insertContentAt(rich.state.doc.content.size, content).scrollIntoView().run();
+      rich.chain().focus().insertContentAt(rich.state.selection.from, content).scrollIntoView().run();
       PR.finishPanelNote();
     },
     revealSource(anchor, index = 0) {
