@@ -41,3 +41,25 @@ class FsRetryTest(unittest.TestCase):
                         self.fail('entered without lock owner written')
             close.assert_called_once()
             self.assertFalse((root / '.write.lock').exists())
+
+    def test_read_waits_out_a_concurrent_replace(self):
+        # Windows denies opening a file while another thread's write_json_atomic replaces it.
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / 'paper.json'
+            store.write_json_atomic(path, {'blocks': [1]})
+            real, calls = open, []
+
+            def replacing(*args, **kwargs):
+                calls.append(args[0])
+                if len(calls) < 3:
+                    raise PermissionError(errno.EACCES, 'Permission denied')
+                return real(*args, **kwargs)
+            with patch.object(store, 'open', replacing, create=True), patch.object(store.time, 'sleep'):
+                self.assertEqual(store.read_json(path), {'blocks': [1]})
+            self.assertEqual(len(calls), 3)
+
+    def test_unreadable_file_is_still_reported(self):
+        with patch.object(store, 'open', Mock(side_effect=PermissionError(errno.EACCES, 'denied')), create=True), \
+                patch.object(store.time, 'sleep'):
+            with self.assertRaises(PermissionError):
+                store.read_json(Path('paper.json'))
