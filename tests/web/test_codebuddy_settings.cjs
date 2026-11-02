@@ -15,7 +15,8 @@ function settings() {
   }
   const state = { cfg: { engine: "claude", claude: {}, codex: {}, openai: {},
     codebuddy: { command: "codebuddy", model: "", extra_args: [], timeout: 1200 },
-    zcode: { command: "zcode", model: "", extra_args: [], timeout: 1200 } },
+    zcode: { command: "zcode", model: "", extra_args: [], timeout: 1200 },
+    omp: { command: "", model: "", reasoning_effort: "", extra_args: [], timeout: 1200 } },
     chat: { models: [], default: "" }, presets: [], pinned: true, transChecked: true };
   PR.settingsRender = () => {};
   PR.saveModelSettings = () => { state.saved = PR.settingsTabs.engine.collect(state); };
@@ -75,6 +76,36 @@ test("ZCode follows its own model and can be selected for translation and chat",
   assert.equal(state.saved.engine, "zcode");
   assert.equal(state.saved.zcode.command, "zcode");
   assert.equal(state.saved.zcode.model, "");
+  state.menu[1].fn();
+  assert.equal(state.chat.default, card.id);
+});
+
+test("omp takes an optional model and reasoning effort for translation and chat", async () => {
+  const { PR, state, input, click } = settings();
+  await click("[data-cm]", { cm: "add" });
+  await click("[data-cmk]", { cmk: "omp" });
+  const html = PR.settingsTabs.chat.render(state);
+  assert.match(html, /data-cmk="omp"/);
+  assert.match(html, /https:\/\/omp\.sh\//);
+  assert.match(html, /omp models/);
+  assert.match(html, /id="cmModel"/);
+  const fields = PR.modelReasoningFields(state, state.form);
+  for (const level of ["minimal", "low", "medium", "high", "xhigh", "max"]) assert.match(fields, new RegExp('value="' + level + '"'));
+  const plain = PR.$;
+  PR.$ = (selector, ...rest) => selector === '[data-reasoning="reasoning_effort"]' ? { value: "low" } : plain(selector, ...rest);
+  input.value = "opus";
+  await click("[data-cm]", { cm: "ok" });
+  PR.$ = plain;
+  const card = state.chat.models[0];
+  assert.equal(card.engine, "omp");
+  assert.equal(card.model, "opus");
+  assert.equal(card.source, "omp");
+  assert.equal(card.reasoning_effort, "low");
+  await click("[data-cm]", { cm: "more", i: "0" });
+  state.menu[0].fn();
+  assert.equal(state.saved.engine, "omp");
+  assert.equal(state.saved.omp.model, "opus");
+  assert.equal(state.saved.omp.reasoning_effort, "low");
   state.menu[1].fn();
   assert.equal(state.chat.default, card.id);
 });

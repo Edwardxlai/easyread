@@ -51,6 +51,7 @@
 | **Codex CLI** | 装好并登录 [Codex](https://github.com/openai/codex) | 不用 Key，用 ChatGPT 账号 |
 | **CodeBuddy CLI** | 按[官方 CLI 文档](https://www.codebuddy.cn/docs/cli/headless)安装并登录，账号需有 CLI 使用权益 | 不用 Key；模型名自己填，留空用 CLI 默认模型。[当前免费体验版不含 CLI](https://www.codebuddy.cn/docs/workbuddy/Pricing)，与 WorkBuddy 同账号共享积分 |
 | **ZCode CLI（实验性）** | 按[官方 CLI 指南](https://github.com/zai-org/ZCode/tree/main/apps/zcode-cli/docs/usage)安装并登录，使 `zcode` 在 PATH 中可用 | 复用本机登录态；模型和推理选项在 ZCode 中选择。支持翻译、问 AI 和图片附件（需模型支持）；真实账号调用尚待验证 |
+| **omp** | 按[官方说明](https://omp.sh/)安装 [oh-my-pi](https://github.com/can1357/oh-my-pi) 并登录模型服务，使 `omp` 在 PATH 中可用 | 复用 omp 已配置的模型和登录；模型名可选（`omp models` 查看），留空用 omp 默认模型；可选推理强度，支持翻译、问 AI 和图片附件（需模型支持） |
 | **Grok Build / Antigravity CLI / Cursor CLI** | 装好并登录 [Grok Build](https://x.ai/cli)、[Antigravity CLI](https://antigravity.google/docs/cli) 或 [Cursor CLI](https://cursor.com/docs/cli/installation) | 不用 Key，用各自的订阅；模型名自己填，留空用它的默认 |
 | **API 接口 · 国内直连**：DeepSeek / 智谱 / 阿里云百炼 / Kimi / 硅基流动 / 魔搭 | API Key | 智谱 GLM-4.7-Flash、硅基流动小模型免费；DeepSeek 一篇 20 页论文几毛钱 |
 | **API 接口 · 海外（要梯子）**：OpenAI / Anthropic / Gemini / OpenRouter / Groq / Cerebras | API Key | Gemini、OpenRouter、Groq、Cerebras 有免费额度 |

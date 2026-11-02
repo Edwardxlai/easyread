@@ -19,7 +19,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from . import answer_styles
-from ..engines import engines, netcheck, openai_api, usage
+from ..engines import engines, netcheck, omp_cli, openai_api, usage
 from ..engines import chat_tools
 from ..translate import langs
 from ..app.i18n import tr
@@ -275,7 +275,9 @@ def stream(ecfg: dict, text: str, cwd: Path, cancel: threading.Event, on_model=N
             yield from _stream_claude(ecfg["claude"], text, cwd, cancel, on_model, meter)
         elif e == "openai":
             yield from openai_api.stream(ecfg["openai"], text, cancel, meter, images=images)
-        else:  # codex 没有逐字输出，整段给；不拉起用户的 MCP 和用不到的功能（见 codex_lean）
+        elif e == "omp":
+            yield from omp_cli.stream(ecfg["omp"], text, cwd, images, cancel, meter)
+        else:  # 其余本机 CLI 没有逐字输出，整段给；不拉起用户的 MCP 和用不到的功能（见 codex_lean）
             yield engines.run(chat_tools.for_chat(ecfg), text, cwd, images, cancel, meter)
     except engines.EngineError as err:
         raise engines.EngineError(netcheck.explain(ecfg, str(err))) from None

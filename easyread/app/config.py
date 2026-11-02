@@ -25,7 +25,7 @@ SERVER_INFO = HOME / ".server.json"
 DEFAULTS = {
     "library_dir": str(HOME / "library"),
     "port": 8765,
-    "engine": "claude",          # claude | codex | codebuddy | grok | agy | cursor（本机 CLI 无头）| openai（任意 OpenAI 兼容接口）| none
+    "engine": "claude",          # claude | codex | codebuddy | opencode | zcode | omp | grok | agy | cursor（本机 CLI 无头）| openai（任意 OpenAI 兼容接口）| none
     "auto_translate": True,      # 导入后自动开始翻译
     "target": "zh",              # 译文语言，见 langs.py
     "translation_instructions": "",
@@ -44,6 +44,7 @@ DEFAULTS = {
     "codebuddy": {"command": "codebuddy", "model": "", "extra_args": [], "timeout": 1200},
     "zcode": {"command": "zcode", "model": "", "extra_args": [], "timeout": 1200},
     "qoder": {"command": "", "model": "", "extra_args": [], "timeout": 1200},
+    "omp": {"command": "", "model": "", "reasoning_effort": "", "extra_args": [], "timeout": 1200},
     # 另外三个本机 CLI（见 agent_cli.py）；command 空着按默认名找，model 空着用 CLI 自己的默认
     "grok": {"command": "", "model": "", "reasoning_effort": "", "extra_args": [], "timeout": 1200},
     "agy": {"command": "", "model": "", "reasoning_effort": "", "extra_args": [], "timeout": 1200},

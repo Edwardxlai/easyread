@@ -1,6 +1,6 @@
 """Conversation-local overrides, independent of translation/model-card defaults."""
 from ..app import cli_models
-from ..engines import agent_cli
+from ..engines import agent_cli, omp_cli
 
 
 def apply(ecfg: dict, options: dict | None) -> dict:
@@ -21,6 +21,8 @@ def apply(ecfg: dict, options: dict | None) -> dict:
                 allowed = ["", *match["reasoning_levels"]]
         elif engine in agent_cli.ENGINES:
             allowed = ["", *agent_cli.SPECS[engine]["efforts"]]
+        elif engine == "omp":
+            allowed = ["", *omp_cli.EFFORTS]
         elif engine in ("codebuddy", "zcode", "qoder"):
             allowed = [""]
         if effort not in allowed:

@@ -1,6 +1,6 @@
 """“问 AI”用哪些模型：设置里一张短名单（默认 Claude Opus 5.5、Claude Sonnet 5.5、GPT），可以增删改。
 
-每一项：{"id", "name", "engine": "claude" | "codex" | "codebuddy" | "grok" | "agy" | "cursor" | "openai", "model", "preset"（API 服务商）, "base_url"（自定义地址时）,
+每一项：{"id", "name", "engine": "claude" | "codex" | "codebuddy" | "opencode" | "zcode" | "omp" | "grok" | "agy" | "cursor" | "openai", "model", "preset"（API 服务商）, "base_url"（自定义地址时）,
          "api"（chat | responses，不填跟服务商默认）}
 API 的 Key 用翻译引擎那边按服务商存的同一份（openai.keys），不用填两次。
 """
