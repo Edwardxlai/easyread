@@ -48,6 +48,28 @@ test("footnotes and same-number references have separate destinations", () => {
   assert.equal(PR.md("[^13]", PR.footnoteOptions("p2")), "<sup>13</sup>");
 });
 
+test("author-year citations link by the key of their printed label, whatever the style lists before et al.", () => {
+  const PR = markup();
+  const refs = ["Jimenez-2024", "Chen-Jiang-2025", "Chen-2026a", "Chen-2026b", "DaSilva-2025", "JYW+24", "13", "Smith-2020", "Smith-Lee-2020"].map(id => ({ id }));
+  PR.refById = Object.fromEntries(refs.map(r => [r.id, r]));
+  PR.buildCiteIndex(refs);
+  const cites = (html) => [...html.matchAll(/<a class="cite" data-ref="([^"]+)">([^<]+)<\/a>/g)].map(m => m[1] + ":" + m[2]);
+  // Several citations in one bracket each link; the brackets stay text.
+  const group = PR.md("[[Jimenez et al., 2024](#cite:Jimenez-2024), [Chen 和 Jiang，2025](#cite:chen-jiang-2025)]");
+  assert.deepEqual(cites(group), ["Jimenez-2024:Jimenez et al., 2024", "Chen-Jiang-2025:Chen 和 Jiang，2025"]);
+  assert.ok(group.startsWith("[<a") && group.endsWith("</a>]"));
+  // Year suffixes tell same-author entries apart; case, punctuation and accents do not matter.
+  assert.deepEqual(cites(PR.md("[Chen 等人（2026b）](#cite:Chen-2026b) [Da Silva 等（2025）](#cite:DáSilva-2025)")), ["Chen-2026b:Chen 等人（2026b）", "DaSilva-2025:Da Silva 等（2025）"]);
+  // A style that names three authors still finds the entry by first author and year, but only when one entry fits.
+  assert.deepEqual(cites(PR.md("[Jimenez, Yang, and Wettig 2024](#cite:Jimenez-Yang-Wettig-2024)")), ["Jimenez-2024:Jimenez, Yang, and Wettig 2024"]);
+  assert.equal(PR.md("[Smith, Jones, and Lee 2020](#cite:Smith-Jones-Lee-2020)"), "Smith, Jones, and Lee 2020");
+  assert.deepEqual(cites(PR.md("[JYW+24](#cite:JYW+24)")), ["JYW+24:JYW+24"]);
+  assert.equal(PR.md("[Nobody, 2019](#cite:Nobody-2019)"), "Nobody, 2019");  // not in the list (yet): words only
+  assert.equal(PR.md("[Jimenez et al., 2024](#cite:Jimenez-2024)", { cite: false }), "Jimenez et al., 2024");
+  // Only numbered and alphabetic lists print a label in front of entries.
+  assert.deepEqual(["13", "JYW+24", "Jimenez-2024", "r0a1b2c3d"].map(PR.refLabel), ["[13]", "[JYW+24]", "", ""]);
+});
+
 test("inline external links preserve labels and URLs without linking code or unsafe schemes", () => {
   const PR = markup();
   const html = PR.md("Read [here](https://example.com/docs?q=1&lang=en), [此处](https://example.com/other), and `[here](https://example.com/code)`.");

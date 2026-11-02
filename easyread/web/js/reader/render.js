@@ -53,6 +53,7 @@
     PR.refById = {};
     PR.order = {};
     (S.paper.references || []).forEach((r) => (PR.refById[String(r.id)] = r));
+    PR.buildCiteIndex(S.paper.references);
     (S.paper.blocks || []).forEach((b, i) => {
       if (!b || typeof b !== "object") return;
       PR.blockById[b.id] = b;
@@ -151,7 +152,10 @@
     },
     note: (b) => '<div class="inline-note"><div class="lbl">' + PR.t("阅读批注（非原文）") + "</div>" + PR.mdBlocks(b.zh) + "</div>",
     references(b) {
-      const refs = (S.paper.references || []).map((r) => '<li id="ref-' + PR.esc(r.id) + '"><span class="n">[' + PR.esc(r.id) + "]</span><span>" + linkify(r.text) + "</span></li>").join("");
+      const refs = (S.paper.references || []).map((r) => {
+        const label = PR.refLabel(String(r.id));  // 作者-年份式的表不印编号，按悬挂缩进排
+        return '<li id="ref-' + PR.esc(r.id) + '"' + (label ? "" : ' class="plain"') + ">" + (label ? '<span class="n">' + PR.esc(label) + "</span>" : "") + "<span>" + linkify(r.text) + "</span></li>";
+      }).join("");
       if (!b.zh && b.en) return '<h2 class="zh en-main" lang="en" data-key="' + b.id + '"><span>' + PR.esc(b.en) + '</span></h2><div class="refs"><ol>' + refs + "</ol></div>";
       return '<h2 class="zh" data-key="' + b.id + '"><span>' + PR.esc(b.zh || PR.t("参考文献")) + '</span><span class="en-title" lang="en">' + PR.esc(b.en || "References") + "</span></h2>" +
         '<div class="refs"><p class="note">' + PR.t("条目保留原文，便于检索。") + "</p><ol>" + refs + "</ol></div>";

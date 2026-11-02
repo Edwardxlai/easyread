@@ -1,9 +1,10 @@
-/* 行内标记：$TeX$ / \(TeX\)、**粗体**、*斜体*、`代码`、[n] 引用，以及 [表 3](#tab:3) 这样指向论文里图表、公式、章节的链接。
-   译文、讨论、笔记都用同一套，用户编辑时看到的就是这套原始标记。 */
+/* 行内标记：$TeX$ / \(TeX\)、**粗体**、*斜体*、`代码`、[n] 引用、[Jimenez et al., 2024](#cite:Jimenez-2024) 作者-年份引用，
+   以及 [表 3](#tab:3) 这样指向论文里图表、公式、章节的链接。译文、讨论、笔记都用同一套，用户编辑时看到的就是这套原始标记。 */
 (function (PR) {
   "use strict";
   // 先识别代码和完整公式，避免分段、Markdown 和表格的 | 拆坏 TeX。
-  const TOKENS = /(?<!\\)(`+)([\s\S]*?)\1|(?<!\\)\$\$([\s\S]+?)(?<!\\)\$\$|(?<![\\$])\$(?!\$)((?:\\\$|[^$])+?)(?<!\\)\$(?!\$)|(?<!\\)\\\[([\s\S]+?)(?<!\\)\\\]|(?<!\\)\\\(([\s\S]+?)(?<!\\)\\\)|(?<!\\)\[((?:\\.|[^\]\\\n])+)\]\(((?:[^\s()<>]|\([^\s()<>]*\))+)\)/g;  // i18n-ok regex, not UI text
+  // 链接文字不以 [ 开头：[[A](#cite:…), [B](#cite:…)] 外层的方括号是正文，不是第一个链接的一部分。
+  const TOKENS = /(?<!\\)(`+)([\s\S]*?)\1|(?<!\\)\$\$([\s\S]+?)(?<!\\)\$\$|(?<![\\$])\$(?!\$)((?:\\\$|[^$])+?)(?<!\\)\$(?!\$)|(?<!\\)\\\[([\s\S]+?)(?<!\\)\\\]|(?<!\\)\\\(([\s\S]+?)(?<!\\)\\\)|(?<!\\)\[((?:\\.|[^\[\]\\\n])+)\]\(((?:[^\s()<>]|\([^\s()<>]*\))+)\)/g;  // i18n-ok regex, not UI text
   const mathCache = new Map();
 
   function tokens(text, blocks) {
@@ -23,13 +24,18 @@
     return { text: masked, values, inline: new RegExp(prefix + "(\\d+)I\uE001", "g"), blocks: new RegExp(prefix + "(\\d+)B\uE001", "g") };
   }
 
-  // 论文内部链接由模型按原文写出：[图 3](#fig:3)、第 [2.1](#sec:2.1) 节、[代码清单 3](#lst:3)。
-  // 类型:编号 查 PR.xindex（render.js 按块的编号建）；查不到、或这里不该有链接（opts.xref === false）就只留文字
+  // 论文内部链接由模型按原文写出：[图 3](#fig:3)、第 [2.1](#sec:2.1) 节、[代码清单 3](#lst:3)、[Jimenez 等人（2024）](#cite:Jimenez-2024)。
+  // 类型:编号 查 PR.xindex（render.js 按块的编号建），cite:键 查参考文献；查不到、或这里不该有链接（opts.xref/cite === false）就只留文字
   const INTERNAL = /^#(fig|tab|eq|sec|alg|lst):(.+)$/;
   function tokenHtml(t, block, opts) {
     if (t.link && t.link.startsWith("#")) {
+      opts = opts || {};
+      if (t.link.startsWith("#cite:")) {
+        const ref = opts.cite !== false && PR.citeTarget(t.link.slice(6));
+        return ref ? '<a class="cite" data-ref="' + PR.esc(ref) + '">' + PR.esc(t.text) + "</a>" : PR.esc(t.text);
+      }
       const m = t.link.match(INTERNAL);
-      const target = m && (opts || {}).xref !== false && PR.xindex && PR.xindex[m[1]] && PR.xindex[m[1]][m[2]];
+      const target = m && opts.xref !== false && PR.xindex && PR.xindex[m[1]] && PR.xindex[m[1]][m[2]];
       return target ? '<a class="xref" data-kind="' + m[1] + '" data-key="' + PR.esc(m[2]) + '">' + PR.esc(t.text) + "</a>" : PR.esc(t.text);
     }
     if (t.link) {
@@ -90,6 +96,27 @@
     if (!b) return {};
     return { footnotePage: b.page };
   };
+
+  /* 引用键（Jimenez-2024、Chen-Jiang-2025、JYW+24、13）：模型按论文印出来的标签写，参考文献条目的 id 和正文的 #cite:键 同一个写法。
+     比对时不看大小写、标点和重音。样式不同，et al. 前列几位作者也不同，所以对不上时退一步按“第一作者-年份”找，只有一条才算 */
+  const citeParts = (key) => String(key || "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    .split(/-+/).map((p) => p.replace(/[^a-z0-9+]/g, "")).filter(Boolean);
+  const looseKey = (parts) => (parts.length > 1 && /^\d{4}[a-z]?$/.test(parts[parts.length - 1]) ? parts[0] + "-" + parts[parts.length - 1] : "");
+  PR.buildCiteIndex = function (references) {
+    const exact = new Map(), loose = new Map();
+    for (const r of references || []) {
+      const id = String(r.id), parts = citeParts(id), short = looseKey(parts);
+      exact.set(parts.join("-"), id);
+      if (short) loose.set(short, loose.has(short) ? null : id);
+    }
+    PR.citeIndex = { exact, loose };
+  };
+  PR.citeTarget = function (key) {
+    const ix = PR.citeIndex, parts = citeParts(key);
+    return ix ? ix.exact.get(parts.join("-")) || ix.loose.get(looseKey(parts)) || "" : "";
+  };
+  /* 参考文献表左边那一列：编号式、字母标签式印着 [13]、[JYW+24]；作者-年份式（键以年份结尾）和程序补的 id 不印 */
+  PR.refLabel = (id) => (/^\d+[a-z]?$/.test(id) || !/\d{4}[a-z]?$|^r[0-9a-f]{8}$/.test(id) ? "[" + id + "]" : "");
 
   function citeLinks(s) {
     return s.replace(/\[(\d+(?:\s*[,，–-]\s*\d+)*)\]/g, (m, inner) => {

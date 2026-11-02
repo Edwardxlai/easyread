@@ -13,7 +13,8 @@ from easyread.translate import prompts, translate
 PAGE1 = (b"BT /F1 12 Tf 40 750 Td (Ann Lee) Tj ET BT /F1 7 Tf 90.4 755 Td (*) Tj ET "
          b"BT /F1 12 Tf 40 700 Td (See Figure 3 for details.) Tj ET "
          b"BT /F1 12 Tf 40 650 Td (We cite prior work) Tj ET BT /F1 7 Tf 169.6 655 Td (1) Tj ET "
-         b"BT /F1 12 Tf 173.8 650 Td ( here.) Tj ET")
+         b"BT /F1 12 Tf 173.8 650 Td ( here.) Tj ET "
+         b"BT /F1 12 Tf 40 600 Td (Shown by Lee et al. 2021 and [7].) Tj ET")
 PAGE2 = b"BT /F1 12 Tf 40 690 Td (Figure 3: A plot.) Tj ET BT /F1 9 Tf 40 80 Td (1 A footnote.) Tj ET"
 
 
@@ -31,6 +32,8 @@ def make_pdf(path: Path) -> None:
     writer.add_named_destination("Hfootnote.1", 1, Fit.xyz(left=38, top=92))
     writer.add_named_destination("Hfootnote.2", 1, Fit.xyz(left=38, top=92))
     writer.add_named_destination("page.2", 1, Fit.xyz(left=0, top=800))  # a back-reference: not a place to link
+    writer.add_named_destination("cite.lee2021", 1, Fit.xyz(left=38, top=300))
+    writer.add_named_destination("cite.smith7", 1, Fit.xyz(left=38, top=280))
 
     def link(rect, dest):
         return writer._add_object(DictionaryObject({
@@ -41,6 +44,9 @@ def make_pdf(path: Path) -> None:
         link([169, 653, 174, 663], "Hfootnote.1"),
         link([88, 745, 96, 763], "Hfootnote.2"),      # the rectangle also grazes the name before the mark
         link([40, 647, 60, 661], "page.2"),
+        link([104, 597, 177, 611], "cite.lee2021"),   # natbib links the names and the year of one citation separately:
+        link([183.5, 597, 213, 611], "cite.lee2021"),  # one hint, so the model links "Lee et al. 2021" as a whole
+        link([255.5, 597, 263.5, 611], "cite.smith7"),  # a numbered one is written [7] already: no hint
     ])
     with path.open("wb") as out:
         writer.write(out)
@@ -62,6 +68,7 @@ class XrefsTest(unittest.TestCase):
         self.assertIn("work[^1]", text)
         self.assertIn("Ann Lee[^*]", text)
         self.assertNotIn("We cite [prior", text)  # a back-reference to a page is not a reference
+        self.assertIn("Shown by [Lee et al. 2021](#) and [7].", text)
         self.assertNotIn("](#)", self.ws.root.joinpath("extract", "page-001.txt").read_text(encoding="utf-8"))
 
     def test_marks_are_dropped_where_text_is_not_rendered_as_markdown(self):

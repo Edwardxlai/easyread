@@ -190,6 +190,7 @@ def prompt(ws: Workspace, messages: list[dict], anchor: str | None, quote: str, 
             r"不要用 \(\) 或 \[\]，不要把公式放进反引号或代码块。"  # i18n-ok
             "行间公式的 $$ 单独占一行。公式内部可以换行，但不要在公式中插入空行；多行推导使用 aligned 环境。"  # i18n-ok
             "保留完整的上下标、括号和单位。提到本文有编号的图、表、公式、章节、附录、算法、代码清单时写成链接，和论文正文一样：[表 3](#tab:3)、[图 2](#fig:2)、式 [(5)](#eq:5)、第 [2.1](#sec:2.1) 节、[附录 C](#sec:C)、[算法 1](#alg:1)、[代码清单 3](#lst:3)；"  # i18n-ok
+            "引用文献也和正文一样：编号式写 [13]，作者-年份式写 [Jimenez 等人（2024）](#cite:Jimenez-2024)，键照论文正文里的写。"  # i18n-ok
             "其他位置说“第 4 页那段”，不要写 [p4-5] 这类内部编号。只输出回答本身，不要客套，不要重复问题。\n" + tool + "\n"  # i18n-ok
             + _context(ws, anchor, quote, refs)
             + ("\n\n" + whole if whole else "")
