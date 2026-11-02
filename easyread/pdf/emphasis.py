@@ -13,6 +13,7 @@ from contextlib import closing
 from pathlib import Path
 
 from ..library.store import write_json_atomic
+from . import textplace
 
 _VERSION = 1
 _ITALIC_FLAG = 0x40  # PDF font descriptor flag 7
@@ -25,7 +26,6 @@ _ITALIC_FONT = re.compile(r"ital|oblique|CMTI|CMSL", re.I)
 _WORD = re.compile(r"[^\W\d_]{2,}")
 _LEAD = re.compile(r"^[^\w(\[]+")  # a run starts at a word or an opening bracket
 _MARK = {"b": "**", "i": "*"}
-_CONTEXT = 24  # characters of text before a run, to tell repeated words apart
 
 
 def _style(name: str, weight: int, flags: int) -> str | None:
@@ -40,10 +40,6 @@ def _style(name: str, weight: int, flags: int) -> str | None:
     if flags & _ITALIC_FLAG or _ITALIC_FONT.search(name):
         return "i"
     return ""
-
-
-def _squash(text: str) -> str:
-    return re.sub(r"\s+|\*", "", text)
 
 
 def _runs(textpage) -> list[list[str]]:
@@ -103,7 +99,7 @@ def _runs(textpage) -> list[list[str]]:
         if not letters(stream[start:a]) and not letters(stream[b:end]):
             continue
         if _WORD.search(text):
-            runs.append([style, text, stream[max(0, a - _CONTEXT):a]])
+            runs.append([style, text, stream[max(0, a - textplace.CONTEXT):a]])
     return runs
 
 
@@ -147,28 +143,8 @@ def ensure(ws) -> dict[str, list[list[str]]]:
 def insert(text: str, runs: list[list[str]]) -> str:
     """Wrap each run at the occurrence whose preceding text matches the PDF, scanning forward in page order.
     A run that cannot be told apart from another occurrence is left plain."""
-    if not isinstance(text, str) or not text or not runs:
+    if not runs:
         return text
-    out, cursor = [], 0
-    for style, run, before in runs:
-        pattern = re.compile(r"\s+".join(re.escape(word) for word in run.split()))
-        want, choices = _squash(before), []
-        for match in pattern.finditer(text, cursor):
-            a, b = match.span()
-            # Whole words only, and never against a literal asterisk (it would merge with the markers).
-            if (a and (text[a - 1].isalnum() and text[a].isalnum() or text[a - 1] == "*")) or \
-               (b < len(text) and (text[b - 1].isalnum() and text[b].isalnum() or text[b] == "*")):
-                continue
-            have = _squash(text[max(0, a - 3 * _CONTEXT):a])
-            score = next((n for n in range(min(len(have), len(want)), 0, -1) if have[-n:] == want[-n:]), 0)
-            choices.append((score, -a, a, b))
-        if not choices:
-            continue
-        choices.sort(reverse=True)
-        score, _, a, b = choices[0]
-        if score < min(8, len(want)) or (len(choices) > 1 and choices[1][0] == score):
-            continue
-        mark = _MARK[style]
-        out.append(text[cursor:a] + mark + text[a:b] + mark)
-        cursor = b
-    return "".join(out) + text[cursor:]
+    # Never against a literal asterisk: it would merge with the markers.
+    return textplace.place(text, (textplace.Item(run, before, lambda s, m=_MARK[style]: m + s + m, guard="*")
+                                  for style, run, before in runs))

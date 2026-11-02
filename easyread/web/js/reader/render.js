@@ -47,7 +47,8 @@
   function buildIndex() {
     PR.buildFootnoteIndex(S.paper.blocks);
     PR.blockById = {};
-    PR.xindex = { eq: {}, tab: {}, fig: {}, sec: {} };
+    // 类型:编号 → 块 id，[表 3](#tab:3) 这样的链接靠它跳（markup.js）。代码清单、算法是带编号的 para 块（role listing/algorithm）
+    PR.xindex = { eq: {}, tab: {}, fig: {}, sec: {}, alg: {}, lst: {} };
     PR.headings = [];
     PR.refById = {};
     PR.order = {};
@@ -60,6 +61,7 @@
       if (b.type === "table" && b.num) PR.xindex.tab[b.num] = b.id;
       if (b.type === "figure" && b.num) PR.xindex.fig[b.num] = b.id;
       if (b.type === "heading" || b.type === "references") { if (b.num) PR.xindex.sec[b.num] = b.id; PR.headings.push(b); }
+      if (b.type === "para" && b.num && (b.role === "listing" || b.role === "algorithm")) PR.xindex[b.role === "listing" ? "lst" : "alg"][b.num] = b.id;
     });
   }
 

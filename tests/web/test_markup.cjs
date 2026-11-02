@@ -174,3 +174,30 @@ test("blank lines between numbered steps do not reset each displayed number to o
   assert.ok(html.includes('<ol start="2"><li>输入 <math>x</math>。</li></ol>'));
   assert.ok(html.includes('<ol start="3"><li>读取结果。</li></ol>'));
 });
+
+test("links into the paper go where their type and number say, never by guessing from the wording", () => {
+  const PR = markup();
+  PR.xindex = { tab: { 3: "tab3" }, lst: { 3: "p8-4" }, sec: { "C.1": "sC-1" }, eq: { 4: "eq4" }, fig: {}, alg: {} };
+  const kinds = (html) => [...html.matchAll(/data-kind="(\w+)" data-key="([\w.]+)">([^<]+)</g)].map(m => m[1] + ":" + m[2] + ":" + m[3]);
+  const html = PR.md("重复[列表 3](#lst:3)所示，见[表 3](#tab:3)、[附录 C.1](#sec:C.1)、式 [(4)](#eq:4)，[图 9](#fig:9)。");
+  assert.deepEqual(kinds(html), ["lst:3:列表 3", "tab:3:表 3", "sec:C.1:附录 C.1", "eq:4:(4)"]);
+  assert.ok(html.includes("，图 9。"), "a target not in the paper (yet) keeps only its words");
+  assert.ok(!html.includes("(#"));
+  assert.deepEqual(kinds(PR.md("重复列表 3 所示，见表 3 和 Table 3。")), []);  // words alone are not links
+  assert.equal(PR.md("[表 3](#tab:3)", { xref: false }), "表 3");  // places that must not link (captions in a preview, table cells)
+  assert.equal(PR.md("[Figure 3](#) and [x](#foo:1)"), "Figure 3 and x");  // an uncompleted hint or unknown target is just words
+  assert.ok(PR.md("[docs](https://example.com)").includes('class="external-link"'));  // web links unchanged
+});
+
+test("symbol footnote marks link like numbered ones and do not turn into italics", () => {
+  const PR = markup();
+  const blocks = [{ id: "p1", page: 1 }, { id: "fn-star", type: "para", role: "footnote", num: "∗", page: 1 },
+    { id: "fn-dag", type: "para", role: "footnote", num: "†", page: 1 }, { id: "fn1", type: "para", role: "footnote", num: "1", page: 1 }];
+  PR.blockById = Object.fromEntries(blocks.map(b => [b.id, b]));
+  PR.buildFootnoteIndex(blocks);
+  const html = PR.md("Ann Lee[^*], Bo Li[^†] wrote *this* work[^1].", PR.footnoteOptions("p1"));
+  for (const id of ["fn-star", "fn-dag", "fn1"]) assert.ok(html.includes('data-footnote="b-' + id + '"'), id);
+  assert.ok(html.includes("<em>this</em>"));
+  assert.ok(html.includes("<sup>&#42;</sup>"));
+  assert.ok(PR.md("x[^∗]", PR.footnoteOptions("p1")).includes('data-footnote="b-fn-star"'));  // ∗ and * are the same mark
+});

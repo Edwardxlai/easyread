@@ -31,7 +31,7 @@
 | type | 字段 | 说明 |
 |---|---|---|
 | `heading` | `level`(1/2)、`num`、`zh`、`en`、`appendix` | 章节标题。`num` 如 "2.1"、"A"；附录的标题加 `"appendix": true` |
-| `para` | `zh`、`en`、`role`、`cont` | 段落。`role: "abstract"` 用摘要样式；`cont: true` 表示接着公式的半句（如 “其中 …”） |
+| `para` | `zh`、`en`、`role`、`num`、`cont` | 段落。`role: "abstract"` 用摘要样式；`role: "footnote"` 是脚注，`role: "listing"`/`"algorithm"` 是带编号的代码清单/算法，`num` 是它们的原编号；`cont: true` 表示接着公式的半句（如 “其中 …”） |
 | `list` | `ordered`、`items: [{zh, en}]` | 列表 |
 | `math` | `tex`、`tag` | 行间公式。`tag` 是原文编号（"1"），无编号不写。多行用 `aligned` / `gathered` |
 | `table` | `num`、`head: [[…]]`、`rows: [[…]]`、`align`、`caption_zh`、`caption_en`、`caption_pos` | 表格。单元格支持行内标记，`\n` 换行（第二行括号内容自动变灰，适合“均值\n(标准误)”）。`align` 如 "lrrr" |
@@ -56,7 +56,8 @@
 - `$...$` 行内公式（KaTeX）；字面美元符写 `\$`
 - `**粗体**`、`*斜体*`、`` `代码` ``
 - `[7]`、`[2, 5]` 自动链到参考文献
-- 中文里的“公式 (4)”“公式 (9) 和 (10)”“表 2”“图 3”“第 2.2 节”“附录 A”，英文里的 “Equation 4”“Table 2”“Section 2.2”“Appendix A”，自动变成可悬停预览、点击跳转的链接（目标要存在）
+- `[文字](#类型:编号)`：指向本文图、表、公式、章节、附录、算法、代码清单的链接，由翻译的模型按原文写在 en 和译文里，例如 `[图 3](#fig:3)`、`第 [2.1](#sec:2.1) 节`、`式 [(4)](#eq:4)`、`[附录 C.1](#sec:C.1)`、`[代码清单 3](#lst:3)`。类型 `fig`/`tab`/`eq`/`sec`/`alg`/`lst` 分别对到 `num` 相同的图、表、标题（含附录），`tag` 相同的公式，`role` 为 `algorithm`/`listing` 且 `num` 相同的 para 块；找不到目标（比如还没翻译到）只显示文字。带链接的 PDF 在给模型的材料里把链接标成 `[文字](#)`，提示这里是引用。问 AI 的回答也这样写
+- `[^13]`、`[^*]`、`[^†]`：脚注标记（数字或符号，`∗` 当 `*`），链到同页 `role: "footnote"`、`num` 相同的块
 - 讨论正文里空行分段；单独一段 `$$...$$` 是行间公式
 
 JSON 里 TeX 的反斜杠要写两个（`\\frac`）。`\f` `\b` `\t` `\n` `\r` 开头的命令（`\frac`、`\bar`、`\text`、`\nu`、`\right`）写错会被 JSON 悄悄吃掉，`paper.py check` 会报“含控制字符”。

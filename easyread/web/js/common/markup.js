@@ -1,4 +1,4 @@
-/* 行内标记：$TeX$ / \(TeX\)、**粗体**、*斜体*、`代码`、[n] 引用，以及“公式 (1) / 表 2 / 第 2.2 节 / 附录 A”这类交叉引用。
+/* 行内标记：$TeX$ / \(TeX\)、**粗体**、*斜体*、`代码`、[n] 引用，以及 [表 3](#tab:3) 这样指向论文里图表、公式、章节的链接。
    译文、讨论、笔记都用同一套，用户编辑时看到的就是这套原始标记。 */
 (function (PR) {
   "use strict";
@@ -23,7 +23,15 @@
     return { text: masked, values, inline: new RegExp(prefix + "(\\d+)I\uE001", "g"), blocks: new RegExp(prefix + "(\\d+)B\uE001", "g") };
   }
 
-  function tokenHtml(t, block) {
+  // 论文内部链接由模型按原文写出：[图 3](#fig:3)、第 [2.1](#sec:2.1) 节、[代码清单 3](#lst:3)。
+  // 类型:编号 查 PR.xindex（render.js 按块的编号建）；查不到、或这里不该有链接（opts.xref === false）就只留文字
+  const INTERNAL = /^#(fig|tab|eq|sec|alg|lst):(.+)$/;
+  function tokenHtml(t, block, opts) {
+    if (t.link && t.link.startsWith("#")) {
+      const m = t.link.match(INTERNAL);
+      const target = m && (opts || {}).xref !== false && PR.xindex && PR.xindex[m[1]] && PR.xindex[m[1]][m[2]];
+      return target ? '<a class="xref" data-kind="' + m[1] + '" data-key="' + PR.esc(m[2]) + '">' + PR.esc(t.text) + "</a>" : PR.esc(t.text);
+    }
     if (t.link) {
       if (!/^(https?:\/\/|mailto:)/i.test(t.link) || /[\x00-\x20\x7f]/.test(t.link)) return PR.esc(t.raw);
       try {
@@ -37,9 +45,12 @@
     return block ? '<div class="eq">' + html + "</div>" : html;
   }
 
-  function restore(s, saved, raw) {
-    return s.replace(saved.inline, (m, i) => raw ? saved.values[i].raw : tokenHtml(saved.values[i], false));
+  function restore(s, saved, raw, opts) {
+    return s.replace(saved.inline, (m, i) => raw ? saved.values[i].raw : tokenHtml(saved.values[i], false, opts));
   }
+
+  /* [表 3](#tab:3) -> 表 3：拿到阅读页以外（导出的 Markdown）时，指向论文里的链接没有去处，只留文字 */
+  PR.unlink = (text) => String(text || "").replace(/(?<!\\)\[((?:\\.|[^\]\\\n])+)\]\(#[^)\s]*\)/g, (m, words) => words.replace(/\\([\[\]\\])/g, "$1"));
 
   PR.tex = function (tex, display) {
     const key = (display ? "D" : "I") + tex;
@@ -67,9 +78,10 @@
     const index = { pages: new Map(), all: new Map() };
     const add = (map, key, id) => map.set(key, map.has(key) ? null : id);
     for (const b of blocks || []) {
-      if (b.type !== "para" || b.role !== "footnote" || !/^\d{1,3}$/.test(String(b.num || ""))) continue;
-      add(index.pages, b.page + ":" + b.num, b.id);
-      add(index.all, String(b.num), b.id);
+      const num = footnoteNum(b.num || "");
+      if (b.type !== "para" || b.role !== "footnote" || !/^(\d{1,3}|[*†‡§¶]{1,3})$/.test(num)) continue;
+      add(index.pages, b.page + ":" + num, b.id);
+      add(index.all, num, b.id);
     }
     PR.footnoteIndex = index;
   };
@@ -88,31 +100,6 @@
     });
   }
 
-  function xref(kind, key, label) {
-    const ix = PR.xindex && PR.xindex[kind];
-    if (!ix || !ix[key]) return label;
-    return '<a class="xref" data-kind="' + kind + '" data-key="' + PR.esc(key) + '">' + label + "</a>";
-  }
-
-  function xrefLinks(s) {
-    // 公式 (9) 和 (10)：把这一串里每个编号都链上
-    s = s.replace(/公式\s*[（(]\d+[）)](?:\s*(?:和|与|及|、|或|,|，)\s*[（(]\d+[）)])*/g,
-      (m) => m.replace(/[（(](\d+)[）)]/g, (mm, n) => xref("eq", n, mm)));
-    s = s.replace(/公式\s*(\d+)(?![\d.）)])/g, (m, n) => xref("eq", n, m));
-    s = s.replace(/表\s*(\d+)/g, (m, n) => xref("tab", n, m));
-    s = s.replace(/图\s*(\d+)/g, (m, n) => xref("fig", n, m));
-    s = s.replace(/第\s*(\d+(?:\.\d+)*)\s*节/g, (m, n) => xref("sec", n, m));
-    s = s.replace(/附录\s*([A-Z])(?![a-zA-Z])/g, (m, n) => xref("sec", n, m));
-    // 英文原文里的
-    s = s.replace(/\b(Equations?)\s+(\d+)(?:\s+(and)\s+(\d+))?/g, (m, w, a, and, b) =>
-      w + " " + xref("eq", a, a) + (b ? " " + and + " " + xref("eq", b, b) : ""));
-    s = s.replace(/\bTable\s+(\d+)/g, (m, n) => xref("tab", n, m));
-    s = s.replace(/\bFigure\s+(\d+)/g, (m, n) => xref("fig", n, m));
-    s = s.replace(/\bSection\s+(\d+(?:\.\d+)*)/g, (m, n) => xref("sec", n, m));
-    s = s.replace(/\bAppendix\s+([A-Z])\b/g, (m, n) => xref("sec", n, m));
-    return s;
-  }
-
   /* AI 回答里偶尔会带出段落编号 [p4-5]、[eq7]，换成读者看得懂的“式 7”“第 4 页” */
   function blockLabel(s) {
     return s.replace(/\[([a-z]+\d*(?:-[\w-]+)?)\]/g, (m, id) => {
@@ -122,18 +109,23 @@
     });
   }
 
-  function inline(text, opts) {
-    let s = blockLabel(PR.esc(text).replace(/\\\$/g, "$"));
-    s = s.replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
-    s = s.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, "$1<em>$2</em>");
-    s = s.replace(/(?<!\\)\[\^(\d{1,3})\]/g, (raw, n) => {
-      const ix = PR.footnoteIndex, key = opts.footnotePage + ":" + n;
+  /* 脚注标记 [^13]，符号脚注 [^*]、[^†]（∗ 当 * 算）。要在粗体斜体之前处理：[^*] 里的星号不能被当成斜体的一半 */
+  const FOOTNOTE = /(?<!\\)\[\^(\d{1,3}|[*∗†‡§¶]{1,3})\]/g;
+  const footnoteNum = (n) => String(n).replace(/∗/g, "*");
+  function footnoteRefs(s, opts) {
+    return s.replace(FOOTNOTE, (raw, mark) => {
+      const n = footnoteNum(mark), ix = PR.footnoteIndex, key = opts.footnotePage + ":" + n;
       const id = ix && (ix.pages.has(key) ? ix.pages.get(key) : ix.all.get(n));
-      const label = "<sup>" + n + "</sup>";
+      const label = "<sup>" + n.replace(/\*/g, "&#42;") + "</sup>";
       return id ? '<a class="footnote-ref" href="#b-' + PR.esc(id) + '" data-footnote="b-' + PR.esc(id) + '">' + label + "</a>" : label;
     });
+  }
+
+  function inline(text, opts) {
+    let s = footnoteRefs(blockLabel(PR.esc(text).replace(/\\\$/g, "$")), opts);
+    s = s.replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
+    s = s.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, "$1<em>$2</em>");
     if (opts.cite !== false) s = citeLinks(s);
-    if (opts.xref !== false) s = xrefLinks(s);
     return s.replace(/\n/g, "<br>");
   }
 
@@ -142,15 +134,15 @@
     opts = opts || {};
     text = String(text == null ? "" : text);
     const saved = tokens(text, false);
-    return restore(inline(saved.text, opts), saved);
+    return restore(inline(saved.text, opts), saved, false, opts);
   };
 
   /* 行间公式先拆出来，再按空行分段；已有回答的 \[...\] 也能显示，不需要改记录。 */
   PR.mdBlocks = function (text, opts) {
     const saved = tokens(String(text || "").trim(), true);
-    const html = saved.text.split(saved.blocks).map((part, i) => i % 2 ? tokenHtml(saved.values[part], true) :
+    const html = saved.text.split(saved.blocks).map((part, i) => i % 2 ? tokenHtml(saved.values[part], true, opts) :
       part.split(/\n\s*\n/).map((p) => para(p, opts)).join("")).join("");
-    return restore(html, saved);
+    return restore(html, saved, false, opts);
   };
 
   function isTableDelimiter(line) {
