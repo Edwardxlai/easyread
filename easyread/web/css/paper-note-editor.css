@@ -98,3 +98,18 @@ body:has(#notespanel.pn-expanded) .tiptap-popover, body:has(#notespanel.pn-expan
 .pn-quote-controls { display: flex; gap: 10px; align-items: center; font: 12px/1.8 var(--ui); margin-top: 2px; }
 .pn-quote-controls button { padding: 0; color: var(--ink-2); }
 .pn-quote-controls a { margin-left: 0 !important; }
+
+.pn-export-menu { position: fixed; inset: auto; margin: 0; padding: 4px; width: 150px; border: 1px solid var(--rule); border-radius: 8px; background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+.pn-export-menu:popover-open { display: flex; flex-direction: column; }
+.pn-export-menu .btn { text-align: left; width: 100%; }
+
+.pn-source-quote { background: var(--surface-2); border-radius: 6px; }
+.pn-source-quote .pn-quote-content a[href^="#b-"] { display: none; }
+.pn-source-quote .pn-quote-content p + p { margin-top: .5em; }
+#paper .pn-source-links { position: absolute; right: -28px; top: 0; margin: 0; }
+#paper .pn-source-links .btn { padding: 3px; opacity: .65; }
+#paper .pn-source-links .btn:hover { opacity: 1; }
+#paper .pn-source-highlight { background: var(--accent-soft); }
+.pn-reference-menu { position: fixed; inset: auto; margin: 0; width: min(290px, calc(100vw - 16px)); max-height: 210px; overflow: auto; padding: 5px; border: 1px solid var(--rule); border-radius: 8px; background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+.pn-reference-menu .btn { display: block; width: 100%; text-align: left; white-space: normal; margin-bottom: 4px; }
+@media(max-width: 759px) { #paper .pn-source-links { right: 0; top: -20px; } }

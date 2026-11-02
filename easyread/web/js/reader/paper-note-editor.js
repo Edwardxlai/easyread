@@ -156,9 +156,9 @@
     const background = document.createElementNS(ns, "rect");
     for (const [key, value] of Object.entries({ x, y, width, height, fill: getComputedStyle(workspace().querySelector(".pn-mindmap")).backgroundColor })) background.setAttribute(key, value);
     copy.insertBefore(background, group);
-    const meta = PR.state.paper.meta || {}, stem = (meta.short_zh || meta.title_zh || meta.title_en || PR.t("论文笔记")).replace(/[\\/:*?"<>|]/g, "");
+    const meta = PR.state.paper.meta || {}, stem = (meta.title_zh || meta.title_en || meta.short_zh || PR.t("论文笔记")).replace(/[\\/:*?"<>|]/g, "");
     const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(copy)], { type: "image/svg+xml;charset=utf-8" }));
-    const link = PR.el("a", { href: url, download: stem + PR.t("-思维导图.svg") });
+    const link = PR.el("a", { href: url, download: stem + ".svg" });
     document.body.appendChild(link); link.click(); link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
@@ -195,7 +195,7 @@
         '<form class="pn-formula" hidden><input class="input" data-note-latex aria-label="' + label(PR.t("LaTeX 公式")) + '" placeholder="E = mc^2"><label><input type="checkbox" data-note-display> ' + PR.t("独立公式") + '</label><button class="btn sm accent" type="submit">' + PR.t("应用") + '</button><button class="btn sm" type="button" data-note-math-cancel>' + PR.t("取消") + '</button></form>' +
         '<div class="pn-content"><div class="pn-rich-pane"><div class="pn-rich"></div></div><div class="pn-source" hidden><textarea id="paperNote" spellcheck="false" aria-label="' + label(PR.t("论文笔记 Markdown")) + '">' + PR.esc(body) + '</textarea></div></div></section>' +
         '<div class="pn-divider" role="separator" tabindex="0" aria-label="' + label(PR.t("调整笔记与思维导图的高度")) + '" aria-orientation="horizontal" aria-valuemin="25" aria-valuemax="80" aria-controls="pnMindmap" title="' + label(PR.t("拖动调整高度，方向键微调，双击恢复")) + '"></div>' +
-        '<section id="pnMindmap" class="pn-mindmap" aria-label="' + label(PR.t("思维导图")) + '"><div class="pn-bar"><b>Markmap</b><span class="pn-sync">' + PR.t("随笔记同步") + '</span><span class="grow"></span><button class="btn sm" data-note-map-export title="' + label(PR.t("导出 SVG")) + '">' + PR.t("导出") + '</button><button class="btn sm" data-note-zoom="fit">' + PR.t("适合窗口") + '</button><button class="btn sm" data-note-zoom="out" aria-label="' + label(PR.t("缩小思维导图")) + '">−</button><button class="btn sm" data-note-zoom="in" aria-label="' + label(PR.t("放大思维导图")) + '">+</button></div>' +
+        '<section id="pnMindmap" class="pn-mindmap" aria-label="' + label(PR.t("思维导图")) + '"><div class="pn-bar"><b>Markmap</b><span class="grow"></span><button class="btn sm" popovertarget="pnExportMenu">' + PR.t("导出") + ' ▾</button><div id="pnExportMenu" class="pn-export-menu" popover><button class="btn sm" data-note-xmind>XMind (.xmind)</button><button class="btn sm" data-note-map-export>SVG (.svg)</button></div><button class="btn sm" data-note-zoom="fit">' + PR.t("适合窗口") + '</button><button class="btn sm" data-note-zoom="out" aria-label="' + label(PR.t("缩小思维导图")) + '">−</button><button class="btn sm" data-note-zoom="in" aria-label="' + label(PR.t("放大思维导图")) + '">+</button></div>' +
         '<div class="pn-map"><svg class="pn-map-svg" role="img" tabindex="0" aria-label="' + label(PR.t("思维导图：拖动平移、滚轮缩放，点击圆点展开或收起")) + '"></svg><p class="pn-map-empty">' + PR.t("写下笔记，思维导图会自动出现在这里。") + '</p></div></section></div>';
     },
     mount(body) {
@@ -226,19 +226,24 @@
     },
     insertSources(parts) {
       setMode("rich");
-      const content = [];
+      const paragraphs = [];
       for (const part of parts) {
         const block = PR.blockById[part.anchor];
         if (!block) continue;
         const title = PR.t("第 {page} 页", { page: block.page || 1 });
-        content.push({ type: "blockquote", content: [{ type: "paragraph", content: [
+        paragraphs.push({ type: "paragraph", content: [
           { type: "text", text: part.quote + " " },
           { type: "text", text: title, marks: [{ type: "link", attrs: { href: "#b-" + part.anchor } }] },
-        ] }] });
+        ] });
       }
-      if (!content.length) return;
-      content.push({ type: "paragraph" });
-      rich.chain().focus().insertContentAt(rich.state.selection.from, content).scrollIntoView().run();
+      if (!paragraphs.length) return;
+      const content = [{ type: "blockquote", content: paragraphs }, { type: "paragraph" }];
+      const { $from } = rich.state.selection;
+      let position = $from.pos;
+      for (let depth = 1; depth <= $from.depth; depth++) {
+        if ($from.node(depth).type.name === "blockquote") { position = $from.after(depth); break; }
+      }
+      rich.chain().focus().insertContentAt(position, content).scrollIntoView().run();
       PR.finishPanelNote();
     },
     revealSource(anchor, index = 0) {
@@ -271,12 +276,20 @@
     chain.run(); e.target.hidden = true;
   });
   panel.addEventListener("click", e => {
+    const exportButton = e.target.closest('[popovertarget="pnExportMenu"]');
+    if (exportButton) {
+      const rect = exportButton.getBoundingClientRect(), menu = panel.querySelector("#pnExportMenu");
+      menu.style.top = rect.bottom + 4 + "px";
+      menu.style.left = Math.max(8, rect.right - 150) + "px";
+    }
     const source = e.target.closest('a[href^="#b-"]');
     if (source) {
       const id = source.getAttribute("href").slice(3);
       if (!PR.blockById[id]) return;
       e.preventDefault(); e.stopPropagation();
       expanded = false; setLayout();
+      PR.$$("#paper .pn-source-highlight").forEach(el => el.classList.remove("pn-source-highlight"));
+      for (const anchor of (source.dataset.noteSources || id).split(" ")) document.getElementById("b-" + anchor)?.classList.add("pn-source-highlight");
       PR.jumpTo("b-" + id, { instant: true });
       return;
     }
@@ -285,6 +298,14 @@
     if (layoutButton) { layout = layoutButton.dataset.noteLayout; PR.ls.set("easyread-note-layout", layout); setLayout(); return; }
     const focusButton = e.target.closest("[data-note-focus]");
     if (focusButton) { focus = focusButton.dataset.noteFocus; setLayout(); return; }
+    if (e.target.closest("[data-note-xmind], [data-note-map-export]")) panel.querySelector("#pnExportMenu").hidePopover();
+    if (e.target.closest("[data-note-xmind]")) {
+      const body = PR.$("#paperNote").value;
+      const doc = body === richSource ? rich.getJSON() : rich.markdown.parse(body);
+      const meta = PR.state.paper.meta || {};
+      const title = meta.title_zh || meta.title_en || meta.short_zh || PR.t("论文笔记");
+      libraries.exportXmind(libraries.toMindMap(doc, title), title.replace(/[\\/:*?"<>|]/g, "")); return;
+    }
     if (e.target.closest("[data-note-map-export]")) { exportMap(); return; }
     if (e.target.closest("[data-note-map-toggle]")) {
       if (expanded) { focus = focus === "note" ? "both" : "note"; setLayout(); return; }

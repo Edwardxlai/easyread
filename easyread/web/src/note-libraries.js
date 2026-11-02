@@ -1,3 +1,4 @@
+import { exportXmind } from './note-xmind';
 import { Editor, Extension } from '@tiptap/core';
 import { Plugin } from '@tiptap/pm/state';
 import { NoteQuote } from './note-quote';
@@ -108,6 +109,7 @@ function inline(node) {
   let html = node.type === 'text' ? PR.esc(node.text) : (node.content || []).map(inline).join('');
   for (const mark of node.marks || []) {
     const tag = { bold: 'strong', italic: 'em', underline: 'u', strike: 's', code: 'code' }[mark.type];
+    if (mark.type === 'link' && mark.attrs?.href) html = `<a href="${PR.esc(mark.attrs.href)}">${html}</a>`;
     if (tag) html = `<${tag}>${html}</${tag}>`;
     if (mark.type === 'highlight') {
       const color = mark.attrs?.color;
@@ -150,7 +152,15 @@ function toMindMap(doc, title) {
       return;
     }
     if (node.type === 'blockquote') {
-      (node.content || []).forEach(part => append(part, parent));
+      const sources = new Map();
+      function withoutSources(part) {
+        const source = part.marks?.find(mark => mark.type === 'link' && /^#b-[\w-]+$/.test(mark.attrs?.href));
+        if (source) { sources.set(source.attrs.href, part.text || ''); return { type: 'text', text: '' }; }
+        return { ...part, ...(part.content ? { content: part.content.map(withoutSources) } : {}) };
+      }
+      const paragraphs = (node.content || []).map(part => '<p>' + inline(withoutSources(part)) + '</p>').join('');
+      const links = [...sources].map(([href, title]) => '<a href="' + PR.esc(href) + '">' + PR.esc(title) + '</a>').join(' · ');
+      parent.children.push({ content: paragraphs + (links ? '<p>' + links + '</p>' : ''), children: [], payload: ranges.get(node) });
       return;
     }
     if (node.type === 'horizontalRule') return;
@@ -184,4 +194,4 @@ function findMapNode(root, position) {
   return match;
 }
 
-PR.noteLibraries = { createEditor, Markmap, toMindMap, findMapNode, mountNoteToolbar, insertNoteImages };
+PR.noteLibraries = { exportXmind, createEditor, Markmap, toMindMap, findMapNode, mountNoteToolbar, insertNoteImages };

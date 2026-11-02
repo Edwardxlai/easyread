@@ -28,6 +28,7 @@
     "electron": "^44.5.1",
     "electron-builder": "^26.15.3",
     "esbuild": "^0.28.2",
+    "fflate": "^0.8.3",
     "markmap-lib": "^0.18.12",
     "markmap-view": "^0.18.12",
     "react": "^18.3.1",
