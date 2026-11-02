@@ -9,7 +9,7 @@ async page => {
  await page.waitForFunction(()=>document.querySelector('.pn-prose a[href="#b-p1-1"]'));
  check((await page.locator('#paperNote').inputValue()).includes('#b-p1-1'),'source not serialized');
  await page.locator('[data-note-expand]').click();
- await page.locator('.pn-prose a[href="#b-p1-1"]').click();
+ await page.locator('.pn-quote-content a[href="#b-p1-1"]').click();
  check(!await page.locator('#notespanel').evaluate(el=>el.classList.contains('pn-expanded')),'fullscreen not exited');
  check(new URL(page.url()).hash==='#b-p1-1','source jump failed');
  await page.locator('[data-paper-note-source=p1-1]').click();
