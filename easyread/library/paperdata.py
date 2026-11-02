@@ -43,6 +43,16 @@ def parse_pages(spec) -> list[int]:
     return out
 
 
+def reference_id(entry: dict) -> str:
+    """The entry's id: its printed number or citation key; failing that, one derived from its text, so an entry
+    re-sent by a retry merges with itself instead of every unnumbered entry colliding on an empty id."""
+    given = str(entry.get("id") or "").strip()
+    if given:
+        return given
+    text = "".join(c for c in str(entry.get("text") or "").casefold() if c.isalnum())
+    return "r" + hashlib.sha1(text.encode()).hexdigest()[:8]
+
+
 def merge_blocks(ws: Workspace, data: dict, done=None, replace_pages=None, en_only: bool = False, drop_ids=None) -> dict:
     """并入一批块。同 id 整块替换；新块按 _after 或页码顺序插入。
     replace_pages：先删掉这些页上已有的块（重新翻译某几页时用）。
@@ -87,10 +97,20 @@ def merge_blocks(ws: Workspace, data: dict, done=None, replace_pages=None, en_on
             blocks.insert(pos, b)
             last = b["id"]
             n_new += 1
-        for key, ident in (("glossary", "en"), ("references", "id")):
-            if data.get(key):
-                have = {str(x.get(ident)) for x in paper.get(key, [])}
-                paper[key] = paper.get(key, []) + [x for x in data[key] if str(x.get(ident)) not in have]
+        if data.get("glossary"):
+            have = {str(x.get("en")) for x in paper.get("glossary", [])}
+            paper["glossary"] = paper.get("glossary", []) + [x for x in data["glossary"] if str(x.get("en")) not in have]
+        if data.get("references"):
+            refs = paper.setdefault("references", [])
+            have = {str(x.get("id")) for x in refs}
+            for x in data["references"]:
+                if isinstance(x, dict) and str(x.get("text") or "").strip():
+                    x = {**x, "id": reference_id(x)}
+                    if x["id"] not in have:
+                        refs.append(x)
+                        have.add(x["id"])
+            # Batches finish out of order; entries keep their place in the list (stable within a page).
+            refs.sort(key=lambda x: x.get("page") or 0)
         if data.get("meta"):
             meta = paper.setdefault("meta", {})
             for k, v in data["meta"].items():

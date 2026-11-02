@@ -92,6 +92,7 @@ def _normalize(data: dict, pages: list[int], taken: set[str]) -> dict:
     for r in data.get("references") or []:
         if isinstance(r, dict):
             r["text"] = xrefs.plain(r.get("text"))
+            r["page"] = pages[0]  # 一批里的条目算在这批的第一页：合并后按页排，几批并行译完的先后不影响顺序
     return data
 
 
