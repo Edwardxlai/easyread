@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 
+from ..library.glossary import valid_entries
 from . import codeblocks
 
 _MATH = re.compile(r"(\$[^$]*\$)")
@@ -101,10 +102,12 @@ def _block_en(b: dict) -> str:
 def unify(glossary: list[dict], data: dict, en_of: dict | None = None) -> list[tuple[str, str, str]]:
     """就地改 data（模型的一批输出：blocks，或只读原文补译时的 zh 字典），返回换了哪些。
     en_of：补译时 {键: 英文}，用来判断这个键的原文里有没有这个术语。"""
-    found = conflicts(glossary, data.get("glossary") or [])
+    new = valid_entries(data.get("glossary"))
+    found = conflicts(glossary, new)
     if not found:
         return []
-    known = {str(g.get("zh") or "") for g in list(glossary or []) + list(data.get("glossary") or []) if isinstance(g, dict)}
+    known = {g["zh"] for g in new}
+    known.update(str(g.get("zh") or "") for g in glossary or [] if isinstance(g, dict))
 
     def swaps_for(en_text: str):
         # 已有译法包含 mine 时（“标准误差”含“标准误”）old 本身也要护住，免得换成“标准误差差”
@@ -150,5 +153,5 @@ def unify(glossary: list[dict], data: dict, en_of: dict | None = None) -> list[t
                 data["zh"][k] = fix(v, swaps, en_text) if isinstance(v, str) else cells(v, swaps)
     # 术语表里只留已有的那条，这批的冲突条目丢掉（merge 本来也会丢，这里显式一点）
     bad = {_key(en) for en, _, _ in found}
-    data["glossary"] = [g for g in data.get("glossary") or [] if not (isinstance(g, dict) and _key(g.get("en")) in bad)]
+    data["glossary"] = [g for g in new if _key(g["en"]) not in bad]
     return found

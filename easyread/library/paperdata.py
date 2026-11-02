@@ -6,6 +6,7 @@ import json
 
 from ..translate import codeblocks, sentences
 from ..app.i18n import tr
+from .glossary import merge_glossary
 from .store import Workspace, now_iso
 
 BLOCK_TYPES = {"heading", "para", "list", "math", "table", "figure", "references", "note"}
@@ -87,10 +88,10 @@ def merge_blocks(ws: Workspace, data: dict, done=None, replace_pages=None, en_on
             blocks.insert(pos, b)
             last = b["id"]
             n_new += 1
-        for key, ident in (("glossary", "en"), ("references", "id")):
-            if data.get(key):
-                have = {str(x.get(ident)) for x in paper.get(key, [])}
-                paper[key] = paper.get(key, []) + [x for x in data[key] if str(x.get(ident)) not in have]
+        merge_glossary(paper, data.get("glossary"))
+        if data.get("references"):
+            have = {str(x.get("id")) for x in paper.get("references", [])}
+            paper["references"] = paper.get("references", []) + [x for x in data["references"] if str(x.get("id")) not in have]
         if data.get("meta"):
             meta = paper.setdefault("meta", {})
             for k, v in data["meta"].items():
@@ -149,9 +150,7 @@ def fill_zh(ws: Workspace, data: dict, pages: list[int], keys: set[str], sents: 
         for k in ("title_zh", "short_zh"):
             if (data.get("meta") or {}).get(k):
                 meta[k] = data["meta"][k]
-        if data.get("glossary"):
-            have = {str(x.get("en")) for x in paper.get("glossary", [])}
-            paper["glossary"] = paper.get("glossary", []) + [x for x in data["glossary"] if isinstance(x, dict) and str(x.get("en")) not in have]
+        merge_glossary(paper, data.get("glossary"))
         missing = [k for k in keys if k not in got and not k.endswith("#head")]  # 表头没译不算漏
         left = {by_id[k.partition("#")[0]].get("page") for k in missing if k.partition("#")[0] in by_id}
         translation = paper.setdefault("translation", {})
