@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from . import codeblocks, consistency, continuation, front_context, langs, page_check, prompts, prompts_en, segments, sentences, terms
 from ..engines import engines, netcheck
-from ..pdf import figures, pdfwork, sources, blank_pages
+from ..pdf import emphasis, figures, pdfwork, sources, blank_pages
 from ..library.checks import block_problems, tex_problems
 from ..pdf.figures import normalize_figure, prepare_figures
 from ..app.i18n import tr
@@ -48,11 +48,11 @@ def prepare(ws: Workspace) -> None:
 
 
 def _next_head(ws: Workspace, n: int, whole: bool = False) -> str:
-    """下一页开头的抽取文字。whole：整页都给（不能看图的引擎在分段交界处，续文可能排在表格、图注后面）。"""
+    """下一页开头的抽取文字（粗体、斜体和正文一样标出）。whole：整页都给（不能看图的引擎在分段交界处，续文可能排在表格、图注后面）。"""
     p = ws.root / "extract" / f"page-{n:03d}.txt"
     if not p.exists():
         return ""
-    text = p.read_text(encoding="utf-8")
+    text = emphasis.insert(p.read_text(encoding="utf-8"), emphasis.ensure(ws).get(str(n), []))
     return text if whole else text[:1500]
 
 

@@ -6,7 +6,7 @@ import re
 
 from . import langs, sentences, prompt_style
 from ..library.store import Workspace
-from ..pdf import links
+from ..pdf import emphasis, links
 
 MATH_RULES = r"""- 行内数学一律写成 $TeX$（KaTeX 能渲染的 LaTeX）：即使只有一个变量，也必须有成对的 $；变量、下标、上标都用 TeX，不要直接照抄 PDF 抽取出的散乱字符或用 Unicode 拼。
 - en 和 zh、标题、列表、表头、单元格、图内文字及题注都遵守同一公式规则。例如：原文 "Let $x_i \in \mathbb{R}^d$."，译文 "令 $x_i \in \mathbb{R}^d$。"；不要输出裸露的 x_i、\alpha 或 \frac{a}{b}，不要把整句正文包进 $。
@@ -17,6 +17,7 @@ RULES = """翻译要求：
 - 材料是用户提供的论文，本任务用于用户本人的学术阅读、学习与引用。按要求完整翻译提供的内容并保留结构，不要用摘要或概述代替逐块译文。
 """ + prompt_style.START + "\n" + prompt_style.DEFAULT + "\n" + prompt_style.END + """
 - 保留材料中的 Markdown 链接 [文字](URL)：原文保留链接文字，译文翻译链接文字，两边 URL 必须原样保留，不猜网址，不把链接移到段落外。
+- 保留粗体和斜体：材料（抽取的文字、英文原文）里 **…** 是原文的粗体，*…* 是斜体，由程序按 PDF 字体标出。en 照录这些标记，译文在对应的词句上用同样的标记；标记成对出现，不跨句子分界 ‖，不放进 $公式$ 和代码。整行加粗的标题、题注开头的编号（Figure 1:）不用标；原文没有粗体或斜体的地方不要自己加。有原页图时以原页为准，补上抽取文字里漏标的。
 - 但要留心原文自己的问题：数字前后对不上（表和正文、两张表之间）、公式和文字说的不一致、符号用错、明显的笔误。发现了就写进 checks，正文照录不改；没有就不写，不要为了写而写，也不要写翻译说明。
 """ + MATH_RULES + """
 - 表格重排成 table 块，表头译成中文，数字原样。图用 figure 块：尽量给出图在原页中的归一化裁剪框 `box:[x0,y0,x1,y1]`（左上和右下坐标，范围 0 到 1，框住图本身、不含题注），并翻译图内可读的标题、坐标轴、图例、流程框文字和标签到 `image_zh`（使用目标语言），原文写入 `image_en`；没有原页图时不猜裁剪框，看不清或没有文字就留空，不猜。`src` 留空，由程序按 `box` 从原 PDF 裁图。
@@ -172,11 +173,12 @@ def _context(ws: Workspace, pages: list[int], new_blocks: bool = True, skip_head
 
 def _page_texts(ws: Workspace, pages: list[int]) -> str:
     texts = []
-    urls = links.ensure(ws)
+    urls, styles = links.ensure(ws), emphasis.ensure(ws)
     for n in pages:
         p = ws.root / "extract" / f"page-{n:03d}.txt"
         text = p.read_text(encoding="utf-8") if p.exists() else ""
-        texts.append(f"===== 第 {n} 页（抽取的文字，公式和表格可能是乱的）=====\n" + links.insert(text, urls.get(str(n), [])))
+        text = emphasis.insert(text, styles.get(str(n), []))
+        texts.append(f"===== 第 {n} 页（抽取的文字，公式和表格可能是乱的；**粗体**、*斜体* 按 PDF 字体标出）=====\n" + links.insert(text, urls.get(str(n), [])))
     return "\n\n".join(texts)
 
 
