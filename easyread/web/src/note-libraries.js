@@ -1,5 +1,6 @@
 import { Editor, Extension } from '@tiptap/core';
 import { Plugin } from '@tiptap/pm/state';
+import { NoteQuote } from './note-quote';
 import StarterKit from '@tiptap/starter-kit';
 import { Markdown } from '@tiptap/markdown';
 import { TableKit } from '@tiptap/extension-table';
@@ -61,7 +62,8 @@ function createEditor({ element, content, onChange, onSelection, onMathClick }) 
     element,
     extensions: [
       NoteComposition,
-      StarterKit.configure({ link: { openOnClick: false } }),
+      NoteQuote,
+      StarterKit.configure({ blockquote: false, link: { openOnClick: false } }),
       Markdown.configure({ markedOptions: { gfm: true, breaks: true }, indentation: { style: 'space', size: 2 } }),
       TableKit, TaskList, TaskItem.configure({ nested: true }), Image.configure({ allowBase64: true }), NoteHighlight.configure({ multicolor: true }),
       NoteInlineMath.configure({ katexOptions: { throwOnError: false, trust: false }, onClick: (node, pos) => onMathClick(node, pos, false) }),

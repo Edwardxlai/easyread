@@ -68,3 +68,33 @@
 .pn-submenu-arrow { transform: rotate(-90deg); }
 
 .pn-map-svg .pn-map-image { display: block; width: 160px; height: 110px; object-fit: contain; }
+
+.pn-display-bar { display: flex; flex: none; align-items: center; justify-content: flex-end; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.pn-display-bar .btn { display: inline-flex; align-items: center; gap: 6px; }
+.pn-view-controls { display: flex; flex: 1; gap: 10px; flex-wrap: wrap; }
+body.np-open #notespanel.pn-expanded { inset: 0; width: 100vw; z-index: 90; }
+#notespanel.pn-expanded .pn-workspace { min-height: 0; }
+#notespanel.pn-expanded .np-paper { overflow: hidden; }
+.pn-workspace.pn-side { grid-template-rows: minmax(0, 1fr); grid-template-columns: clamp(280px, var(--note-split), calc(100% - 230px)) 10px minmax(0, 1fr); }
+.pn-side .pn-divider { cursor: col-resize; }
+.pn-side .pn-divider::after { width: 3px; height: 40px; top: calc(50% - 20px); left: 3px; }
+.pn-side.pn-resizing { cursor: col-resize; }
+.pn-workspace.pn-map-hidden, .pn-workspace.pn-map-only { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+
+body:has(#notespanel.pn-expanded) .tiptap-popover, body:has(#notespanel.pn-expanded) .tiptap-dropdown-menu { z-index: 91; }
+
+.pn-bar [data-note-expand] { display: inline-flex; align-items: center; justify-content: center; width: 28px; padding: 5px; flex: none; }
+
+.pn-source-links { display: flex; justify-content: flex-end; margin-top: 4px; }
+.pn-source-links .btn { color: var(--accent); font: 12px var(--ui); display: inline-flex; align-items: center; gap: 4px; }
+.pn-prose a[href^="#b-"] { cursor: pointer; font-family: var(--ui); font-size: .9em; }
+
+.pn-prose blockquote:has(a[href^="#b-"]) { border-left-width: 2px; padding: 2px 10px; margin: .35em 0; }
+.pn-prose blockquote:has(a[href^="#b-"]) p { margin: 0; }
+.pn-prose blockquote a[href^="#b-"] { display: inline; white-space: nowrap; margin-left: .4em; font-size: 12px; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+
+.pn-quote-content { line-height: inherit; }
+.pn-quote-collapsed .pn-quote-content { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.pn-quote-controls { display: flex; gap: 10px; align-items: center; font: 12px/1.8 var(--ui); margin-top: 2px; }
+.pn-quote-controls button { padding: 0; color: var(--ink-2); }
+.pn-quote-controls a { margin-left: 0 !important; }

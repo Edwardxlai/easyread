@@ -6,6 +6,9 @@
   let mode = "rich", split = PR.ls.get("easyread-note-split", 58), firstMap = true;
   let mapBody = null, selectingFromMap = false;
   let mapVisible = PR.ls.get("easyread-note-map-visible", true);
+  let expanded = false, layout = PR.ls.get("easyread-note-layout", "side"), focus = "both";
+  const wide = window.matchMedia("(min-width: 900px)");
+  const horizontal = () => expanded && layout === "side" && wide.matches;
   const workspace = () => panel.querySelector(".pn-workspace");
   const label = text => PR.esc(text);
 
@@ -32,11 +35,46 @@
     workspace().querySelector(".pn-divider").setAttribute("aria-valuenow", String(Math.round(split)));
   }
 
+  function setLayout() {
+    const el = workspace();
+    if (!el) return;
+    panel.classList.toggle("pn-expanded", expanded);
+    el.classList.toggle("pn-side", horizontal());
+    el.classList.toggle("pn-map-only", expanded && focus === "map");
+    el.querySelector(".pn-writing").hidden = expanded && focus === "map";
+    const displayBar = panel.querySelector(".pn-display-bar");
+    const expandButton = panel.querySelector("[data-note-expand]");
+    displayBar.hidden = !expanded;
+    panel.querySelector(".pn-view-controls").hidden = !expanded;
+    (expanded ? displayBar : el.querySelector(".pn-writing > .pn-bar")).appendChild(expandButton);
+    const expandLabel = expanded ? PR.t("退出全屏") : PR.t("全屏工作区");
+    expandButton.setAttribute("aria-pressed", String(expanded));
+    expandButton.setAttribute("aria-label", expandLabel);
+    expandButton.title = expandLabel;
+    expandButton.querySelector("span").textContent = expandLabel;
+    expandButton.querySelector("span").hidden = !expanded;
+    panel.querySelectorAll("[data-note-layout]").forEach(button => {
+      button.classList.toggle("on", button.dataset.noteLayout === layout);
+      button.setAttribute("aria-pressed", String(button.dataset.noteLayout === layout));
+    });
+    panel.querySelectorAll("[data-note-focus]").forEach(button => {
+      button.classList.toggle("on", button.dataset.noteFocus === focus);
+      button.setAttribute("aria-pressed", String(button.dataset.noteFocus === focus));
+    });
+    const divider = el.querySelector(".pn-divider");
+    divider.setAttribute("aria-orientation", horizontal() ? "vertical" : "horizontal");
+    const hint = horizontal() ? PR.t("调整笔记与思维导图的宽度") : PR.t("调整笔记与思维导图的高度");
+    divider.setAttribute("aria-label", hint); divider.title = hint;
+    setMapVisible(mapVisible);
+  }
+  wide.addEventListener("change", setLayout);
+
   function setMapVisible(visible) {
     mapVisible = visible;
+    visible = expanded ? focus !== "note" : visible;
     const el = workspace(), button = el.querySelector("[data-note-map-toggle]");
     el.classList.toggle("pn-map-hidden", !visible);
-    el.querySelector(".pn-divider").hidden = !visible;
+    el.querySelector(".pn-divider").hidden = !visible || (expanded && focus === "map");
     el.querySelector(".pn-mindmap").hidden = !visible;
     button.setAttribute("aria-expanded", String(visible));
     button.setAttribute("aria-pressed", String(visible));
@@ -48,7 +86,7 @@
   }
 
   async function revealSelection() {
-    if (!mapVisible || !map || !rich || rich.view.composing || !rich.isFocused || mode !== "rich" || selectingFromMap || PR.$("#paperNote").value !== mapBody) return;
+    if (workspace().querySelector(".pn-mindmap").hidden || !map || !rich || rich.view.composing || !rich.isFocused || mode !== "rich" || selectingFromMap || PR.$("#paperNote").value !== mapBody) return;
     const current = map, match = libraries.findMapNode(current.state.data, rich.state.selection.from);
     if (!match) return;
     for (const ancestor of match.ancestors) if (ancestor.payload?.fold) await current.toggleNode(ancestor);
@@ -58,7 +96,7 @@
   }
 
   async function updateMap() {
-    if (!mapVisible || !rich || !map || rich.view.composing) return;
+    if (!rich || !map || workspace().querySelector(".pn-mindmap").hidden || rich.view.composing) return;
     const body = PR.$("#paperNote").value, current = map;
     const doc = body === richSource ? rich.getJSON() : rich.markdown.parse(body);
     const meta = PR.state.paper.meta || {};
@@ -66,7 +104,7 @@
     const empty = !body.trim();
     workspace().querySelector(".pn-map-empty").hidden = !empty;
     await current.setData(root);
-    if (current !== map || !mapVisible) return;
+    if (current !== map || workspace().querySelector(".pn-mindmap").hidden) return;
     mapBody = body;
     if (firstMap && !empty) { firstMap = false; await current.fit(); }
     if (empty) firstMap = true;
@@ -129,6 +167,7 @@
     const range = node.payload;
     if (range?.from == null) return;
     selectingFromMap = true;
+    if (expanded && focus === "map") { focus = "both"; setLayout(); }
     setMode("rich");
     const source = rich.state.doc.nodeAt(range.from);
     if (source?.isAtom || source?.type.name === "table") rich.chain().focus().setNodeSelection(range.from).scrollIntoView().run();
@@ -150,7 +189,7 @@
   PR.paperNoteEditor = {
     html(body) {
       const modes = [["rich", PR.t("预览")], ["source", "Markdown"]];
-      return '<div class="pn-workspace"><section class="pn-writing" aria-label="' + label(PR.t("论文笔记编辑器")) + '">' +
+      return '<div class="pn-display-bar"><div class="pn-view-controls" hidden><div class="seg" role="group" aria-label="' + label(PR.t("工作区布局")) + '">' + [["side", PR.t("左右")], ["stack", PR.t("上下")]].map(([key, text]) => '<button data-note-layout="' + key + '">' + text + '</button>').join("") + '</div><div class="seg" role="group" aria-label="' + label(PR.t("显示内容")) + '">' + [["both", PR.t("笔记与导图")], ["note", PR.t("仅笔记")], ["map", PR.t("仅导图")]].map(([key, text]) => '<button data-note-focus="' + key + '">' + text + '</button>').join("") + '</div></div><button class="btn sm" data-note-expand aria-pressed="false"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></svg><span>' + PR.t("全屏工作区") + '</span></button></div><div class="pn-workspace"><section class="pn-writing" aria-label="' + label(PR.t("论文笔记编辑器")) + '">' +
         '<div class="pn-bar"><div class="seg" role="group" aria-label="' + label(PR.t("笔记显示方式")) + '">' + modes.map(([key, text]) => '<button data-note-mode="' + key + '">' + text + '</button>').join("") + '</div><span class="grow"></span><button class="btn sm" data-note-map-toggle aria-controls="pnMindmap">Markmap</button></div>' +
         '<div class="pn-format"></div>' +
         '<form class="pn-formula" hidden><input class="input" data-note-latex aria-label="' + label(PR.t("LaTeX 公式")) + '" placeholder="E = mc^2"><label><input type="checkbox" data-note-display> ' + PR.t("独立公式") + '</label><button class="btn sm accent" type="submit">' + PR.t("应用") + '</button><button class="btn sm" type="button" data-note-math-cancel>' + PR.t("取消") + '</button></form>' +
@@ -174,15 +213,45 @@
       });
       unmountToolbar = libraries.mountNoteToolbar(workspace().querySelector(".pn-format"), rich, () => openFormula());
       map = libraries.Markmap.create(workspace().querySelector("svg"), { duration: 0, maxWidth: 220, paddingX: 10, spacingVertical: 8 });
-      setMode(mode); setSplit(split); setMapVisible(mapVisible);
-      observer = new ResizeObserver(() => { if (mapVisible && map && !firstMap) map.fit(); });
+      setMode(mode); setSplit(split); setLayout();
+      observer = new ResizeObserver(() => { if (!workspace().querySelector(".pn-mindmap").hidden && map && !firstMap) map.fit(); });
       observer.observe(workspace().querySelector(".pn-map"));
     },
     destroy() {
+      expanded = false; panel.classList.remove("pn-expanded");
       updateSoon.cancel(); observer?.disconnect(); observer = null;
       if (unmountToolbar) { unmountToolbar(); unmountToolbar = null; }
       if (map) { map.destroy(); map = null; }
       if (rich) { rich.destroy(); rich = null; }
+    },
+    insertSources(parts) {
+      setMode("rich");
+      const content = [];
+      for (const part of parts) {
+        const block = PR.blockById[part.anchor];
+        if (!block) continue;
+        const title = PR.t("第 {page} 页", { page: block.page || 1 });
+        content.push({ type: "blockquote", content: [{ type: "paragraph", content: [
+          { type: "text", text: part.quote + " " },
+          { type: "text", text: title, marks: [{ type: "link", attrs: { href: "#b-" + part.anchor } }] },
+        ] }] });
+      }
+      if (!content.length) return;
+      content.push({ type: "paragraph" });
+      rich.chain().focus().insertContentAt(rich.state.doc.content.size, content).scrollIntoView().run();
+      PR.finishPanelNote();
+    },
+    revealSource(anchor, index = 0) {
+      expanded = false; setLayout(); setMode("rich");
+      const ranges = [];
+      rich.state.doc.descendants((node, pos) => {
+        if (!node.isText || !node.marks.some(mark => mark.type.name === "link" && mark.attrs.href === "#b-" + anchor)) return;
+        const last = ranges[ranges.length - 1];
+        if (last && last.to === pos) last.to += node.nodeSize;
+        else ranges.push({ from: pos, to: pos + node.nodeSize });
+      });
+      if (!ranges.length) return;
+      rich.chain().focus().setTextSelection(ranges[index % ranges.length]).scrollIntoView().run();
     },
     getBody: () => rich ? PR.$("#paperNote").value : null,
     update: updateSoon,
@@ -202,8 +271,23 @@
     chain.run(); e.target.hidden = true;
   });
   panel.addEventListener("click", e => {
+    const source = e.target.closest('a[href^="#b-"]');
+    if (source) {
+      const id = source.getAttribute("href").slice(3);
+      if (!PR.blockById[id]) return;
+      e.preventDefault(); e.stopPropagation();
+      expanded = false; setLayout();
+      PR.jumpTo("b-" + id, { instant: true });
+      return;
+    }
+    if (e.target.closest("[data-note-expand]")) { expanded = !expanded; setLayout(); return; }
+    const layoutButton = e.target.closest("[data-note-layout]");
+    if (layoutButton) { layout = layoutButton.dataset.noteLayout; PR.ls.set("easyread-note-layout", layout); setLayout(); return; }
+    const focusButton = e.target.closest("[data-note-focus]");
+    if (focusButton) { focus = focusButton.dataset.noteFocus; setLayout(); return; }
     if (e.target.closest("[data-note-map-export]")) { exportMap(); return; }
     if (e.target.closest("[data-note-map-toggle]")) {
+      if (expanded) { focus = focus === "note" ? "both" : "note"; setLayout(); return; }
       setMapVisible(!mapVisible);
       PR.ls.set("easyread-note-map-visible", mapVisible);
       return;
@@ -221,6 +305,10 @@
     }
   });
   panel.addEventListener("keydown", e => {
+    if (e.key === "Escape" && expanded && !e.isComposing && !e.defaultPrevented) {
+      e.preventDefault(); e.stopPropagation(); expanded = false; setLayout();
+      panel.querySelector("[data-note-expand]").focus(); return;
+    }
     if (e.target.matches(".pn-map-svg")) {
       if (["+", "=", "-", "0"].includes(e.key) && map) {
         e.preventDefault(); e.stopPropagation();
@@ -229,7 +317,7 @@
       return;
     }
     if (!e.target.matches(".pn-divider")) return;
-    const next = { ArrowUp: split - 5, ArrowDown: split + 5, Home: 25, End: 80 }[e.key];
+    const next = { [horizontal() ? "ArrowLeft" : "ArrowUp"]: split - 5, [horizontal() ? "ArrowRight" : "ArrowDown"]: split + 5, Home: 25, End: 80 }[e.key];
     if (next == null) return;
     e.preventDefault(); e.stopPropagation(); setSplit(next); PR.ls.set("easyread-note-split", split);
   });
@@ -239,7 +327,7 @@
     e.preventDefault();
     const grip = e.target, el = workspace(), rect = el.getBoundingClientRect();
     grip.focus(); grip.setPointerCapture(e.pointerId); el.classList.add("pn-resizing");
-    const move = ev => setSplit((ev.clientY - rect.top) / rect.height * 100);
+    const move = ev => setSplit(horizontal() ? (ev.clientX - rect.left) / rect.width * 100 : (ev.clientY - rect.top) / rect.height * 100);
     const stop = () => {
       grip.removeEventListener("pointermove", move); grip.removeEventListener("pointerup", stop); grip.removeEventListener("pointercancel", stop);
       el.classList.remove("pn-resizing"); PR.ls.set("easyread-note-split", split);

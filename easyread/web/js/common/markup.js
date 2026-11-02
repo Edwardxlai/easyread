@@ -25,6 +25,7 @@
 
   function tokenHtml(t, block) {
     if (t.link) {
+      if (/^#b-[\w-]+$/.test(t.link)) return '<a href="' + PR.esc(t.link) + '">' + PR.esc(t.text) + '</a>';
       if (!/^(https?:\/\/|mailto:)/i.test(t.link) || /[\x00-\x20\x7f]/.test(t.link)) return PR.esc(t.raw);
       try {
         const url = new URL(t.link);
