@@ -126,6 +126,14 @@ def _is_note(b: dict) -> bool:
 _ENDS = (".", "?", "!", ":", ";", "。", "？", "！", "：", ")", "]", "\"", "”", "’")
 
 
+def _glossary_items(paper: dict) -> list[str]:
+    gl = paper.get("glossary")
+    if not isinstance(gl, list):
+        return []
+    return [f"{g['en']} = {g['zh']}" for g in gl
+            if isinstance(g, dict) and str(g.get("en") or "").strip() and str(g.get("zh") or "").strip()]
+
+
 def _context(ws: Workspace, pages: list[int], new_blocks: bool = True, skip_head: bool = False) -> str:
     """new_blocks=False：只给已有的块补译文（只读原文之后再翻译），不用提块 id 和上一批的续文。
     skip_head：上一页由另一段同时在译（分段并行的交界），跨页那段由它补完整，这批跳过页首续文。"""
@@ -133,9 +141,9 @@ def _context(ws: Workspace, pages: list[int], new_blocks: bool = True, skip_head
     meta = paper.get("meta", {})
     blocks = paper.get("blocks", [])
     lines = [f"论文：{meta.get('title_en') or meta.get('source', '')}，共 {meta.get('page_count', '?')} 页。"]
-    gl = paper.get("glossary", [])
+    gl = _glossary_items(paper)
     if gl:
-        lines.append("已有术语表（必须沿用）：" + "；".join(f"{g['en']} = {g['zh']}" for g in gl))
+        lines.append("已有术语表（必须沿用）：" + "；".join(gl))
     heads = [f"{b.get('num', '')} {b.get('zh') or b.get('en', '')}".strip() for b in blocks if b.get("type") == "heading"]
     if heads:
         lines.append("已有的章节：" + " / ".join(heads))
@@ -302,7 +310,7 @@ def retranslate(ws: Workspace, key: str, hint: str) -> tuple[str, tuple | None]:
         if cut:
             en, ends = marked, (src.get("en", ""), cut)
     near = "\n".join(_block_text(x) for x in blocks[max(0, idx - 2): idx + 3] if x is not b)
-    gl = "；".join(f"{g['en']} = {g['zh']}" for g in paper.get("glossary", []))
+    gl = "；".join(_glossary_items(paper))
     target = langs.of_paper(paper.get("meta"))
     return (f"请重新翻译论文里的一段，译成{langs.prompt_name(target)}。\n{rules(target)}\n\n术语表：{gl}\n\n前后文（译文）：\n{near}\n\n"
             f"英文原文：\n{en}\n\n现在的译文：\n{zh}\n\n"
