@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, Menu, shell, ipcMain } = require("electron");
+const { app, BrowserWindow, crashReporter, dialog, Menu, shell, ipcMain } = require("electron");
 const { execFileSync, spawn } = require("child_process");
 const fs = require("fs");
 const os = require("os");
@@ -171,7 +171,7 @@ async function stopBackendGracefully() {
 /* 退出前先让页面把没落盘的东西写回去再停后端；页面没应就照常退出 */
 function savePageState() {
   const wc = mainWindow && mainWindow.webContents;
-  if (!wc || wc.isDestroyed()) return Promise.resolve();
+  if (!wc || wc.isDestroyed() || wc.isCrashed?.()) return Promise.resolve();
   return new Promise((resolve, reject) => {
     let timer;
     function done(error) {
@@ -267,6 +267,34 @@ async function createWindow() {
     return { action: "deny" };
   });
   desktopTabs.bindShortcuts(mainWindow);
+  const window = mainWindow, wc = window.webContents;
+  let lastCrash = 0, readerUrl;
+  function rememberShell(raw) {
+    const url = new URL(raw);
+    if (url.origin === backendUrl && url.pathname === "/web/tabs.html") readerUrl = raw;
+  }
+  wc.on("did-navigate", (_event, url) => rememberShell(url));
+  wc.on("did-navigate-in-page", (_event, url, mainFrame) => { if (mainFrame) rememberShell(url); });
+  wc.on("render-process-gone", async (_event, details) => {
+    if (quitting || window !== mainWindow || details.reason === "clean-exit" || !backendUrl) return;
+    startup.mark(app, `renderer-gone reason=${details.reason} exitCode=${details.exitCode}`);
+    const repeated = Date.now() - lastCrash < 15000;
+    lastCrash = Date.now();
+    let target = readerUrl || desktopTabs.shellUrl(backendUrl);
+    try {
+      if (repeated) {
+        const { response } = await dialog.showMessageBox(window, {
+          type: "warning", message: isZh() ? "阅读窗口再次退出" : "The reader stopped again",
+          buttons: isZh() ? ["回到文献库", "重新打开标签页"] : ["Open library", "Restore tabs"],
+          defaultId: 0, cancelId: 0,
+        });
+        if (response === 0) target = desktopTabs.shellUrl(backendUrl);
+      }
+      if (!quitting && window === mainWindow) await window.loadURL(target);
+    } catch (error) {
+      if (!quitting && window === mainWindow) dialog.showErrorBox("EasyRead", error.message);
+    }
+  });
   // A native context menu is separate from the application Edit menu.
   // Electron does not emit this event when the page prevents contextmenu,
   // so the library's and reader's custom menus keep working.
@@ -328,6 +356,7 @@ async function createWindow() {
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
+  if (process.platform === "win32") crashReporter.start({ uploadToServer: false });
   Menu.setApplicationMenu(process.platform === "darwin"
     ? Menu.buildFromTemplate([{ role: "appMenu" }, { role: "editMenu" }, { role: "windowMenu" }])
     : null);

@@ -224,7 +224,10 @@ def _codex_once(exe: str, c: dict, prompt: str, cwd: Path, images: list[Path], c
             args += ["-c", key + "=" + json.dumps(c[field])]
     args += extra
     if c.get("_chat"):
-        args += ["-c", 'web_search="live"']
+        # Codex dispatches built-in web search through its code-mode host.
+        args += ["-c", "features.code_mode_host=true", "-c", 'web_search="live"']
+    elif extra:
+        args += ["-c", "features.code_mode_host=false"]
     args += ["-"]
     try:
         out = _communicate(_popen(args, cwd), prompt, int(c.get("timeout") or 1200), cancel)

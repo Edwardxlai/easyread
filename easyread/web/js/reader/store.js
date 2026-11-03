@@ -72,6 +72,8 @@
   /* 页面调用这个提交修改 */
   PR.commit = function (op) {
     op.at = op.at || PR.nowIso();
+    const noteId = op.op === "note" ? op.note.id : op.op === "note_del" ? op.id : null;
+    const previous = noteId && S.reader.notes?.[noteId];
     // 同一目标还没发出去的旧操作合并掉，避免队列无限长
     if (op.op === "note") outbox = outbox.filter((o) => !(o.op === "note" && o.note.id === op.note.id));
     if (op.op === "edit") outbox = outbox.filter((o) => !(o.op === "edit" && o.block === op.block));
@@ -79,7 +81,10 @@
     outbox.push(op);
     saveOutbox();
     rebuildReader();
-    PR.emit("reader", op);
+    const changed = noteId ? [previous, S.reader.notes?.[noteId]].filter(Boolean) : [];
+    if (changed.length && changed.every(n => n.kind === "highlight" && n.anchor && !n.parts?.length)) {
+      PR.emit("reader", { ...op, highlightBlocks: [...new Set(changed.map(n => n.anchor))] });
+    } else PR.emit("reader", op);
     if (mode === "server") { if (op.op !== "progress" && !storageFailed) setStatus("saving", PR.t("保存中")); scheduleFlush(op.op === "progress" ? 3000 : 250); }
     else statusIdle();
   };

@@ -14,6 +14,11 @@
     return p;
   };
   PR.prefs = Object.assign({}, DEF, PR.migratePrefs(PR.ls.get("easyread-prefs", {})));
+  PR.persistReaderPrefs = function () {
+    const p = PR.prefs;
+    PR.ls.set("easyread-prefs", Object.assign(PR.migratePrefs(PR.ls.get("easyread-prefs", {})), p));
+    if (PR.store.mode === "server") PR.savePrefs("reader", p);
+  };
   PR.applyPrefs = function () {
     const p = PR.prefs, root = document.documentElement;
     root.style.setProperty("--fs", p.fs + "px");
@@ -24,8 +29,7 @@
     body.classList.toggle("mode-bi", p.mode === "bi");
     body.classList.toggle("no-margin", !p.margin);
     if (PR.applyReadingLanguage) PR.applyReadingLanguage();
-    PR.ls.set("easyread-prefs", Object.assign(PR.migratePrefs(PR.ls.get("easyread-prefs", {})), p));
-    if (PR.store.mode === "server") PR.savePrefs("reader", p);
+    PR.persistReaderPrefs();
   };
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => PR.applyPrefs());
   const relayout = PR.debounce(() => { PR.fitWide(); PR.renderMargin(); PR.syncPage && PR.syncPage(true); }, 60);

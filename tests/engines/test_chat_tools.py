@@ -54,7 +54,10 @@ class ChatToolsTest(unittest.TestCase):
         with mock.patch.object(engines, "_popen", side_effect=lambda args, cwd: args), \
                 mock.patch.object(engines, "_communicate", side_effect=communicate):
             for cfg in ({}, {"_chat": True}):
-                engines._codex_once("codex", cfg, "q", Path("."), [], None, [])
+                engines._codex_once("codex", cfg, "q", Path("."), [], None, engines.codex_lean.features())
         self.assertNotIn('web_search="live"', calls[0])
+        self.assertIn('features.code_mode_host=false', calls[0])
         self.assertIn('web_search="live"', calls[1])
+        self.assertIn('features.code_mode_host=true', calls[1])
+        self.assertNotIn('features.code_mode_host=false', calls[1])
         self.assertEqual(calls[1][calls[1].index("--sandbox") + 1], "read-only")

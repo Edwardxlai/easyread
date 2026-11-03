@@ -58,7 +58,7 @@ def args(path: Path | None = None) -> list[str]:
 # 进程从 19 个降到 3 个，内存从约 840 MB 降到约 200 MB。只关这一次调用，不改用户的配置。
 # 版本不认某个名字时 Codex 照常忽略；真报错时 run_codex 会去掉这些参数再调一次。
 FEATURES_OFF = ("apps", "plugins", "browser_use", "browser_use_external", "computer_use", "image_generation", "multi_agent",
-                "memories", "goals", "skill_search", "in_app_browser", "tool_suggest", "realtime_conversation", "code_mode_host",
+                "memories", "goals", "skill_search", "in_app_browser", "tool_suggest", "realtime_conversation",
                 "sleep_tool")
 
 
