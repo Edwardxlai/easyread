@@ -36,10 +36,23 @@
     "sass": "^1.106.1"
   },
   "build": {
-    "publish": [{ "provider": "github", "owner": "Edwardxlai", "repo": "easyread" }],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Edwardxlai",
+        "repo": "easyread"
+      }
+    ],
     "appId": "com.edwardxlai.easyread",
     "productName": "EasyRead",
-    "protocols": [{ "name": "EasyRead", "schemes": ["easyread"] }],
+    "protocols": [
+      {
+        "name": "EasyRead",
+        "schemes": [
+          "easyread"
+        ]
+      }
+    ],
     "asar": true,
     "directories": {
       "output": "dist/electron"

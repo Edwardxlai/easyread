@@ -232,7 +232,7 @@
         if (!block) continue;
         const title = PR.t("第 {page} 页", { page: block.page || 1 });
         paragraphs.push({ type: "paragraph", content: [
-          { type: "text", text: part.quote + " " },
+          ...(block.type === "math" && block.tex ? [{ type: "inlineMath", attrs: { latex: block.tex } }, { type: "text", text: " " }] : [...(part.quoteContent || [{ type: "text", text: part.quote }]), { type: "text", text: " " }]),
           { type: "text", text: title, marks: [{ type: "link", attrs: { href: "#b-" + part.anchor } }] },
         ] });
       }
@@ -304,7 +304,7 @@
       const doc = body === richSource ? rich.getJSON() : rich.markdown.parse(body);
       const meta = PR.state.paper.meta || {};
       const title = meta.title_zh || meta.title_en || meta.short_zh || PR.t("论文笔记");
-      libraries.exportXmind(libraries.toMindMap(doc, title), title.replace(/[\\/:*?"<>|]/g, "")); return;
+      libraries.exportXmind(libraries.toMindMap(doc, title), title.replace(/[\\/:*?"<>|]/g, "")).catch(error => PR.toast(error.message)); return;
     }
     if (e.target.closest("[data-note-map-export]")) { exportMap(); return; }
     if (e.target.closest("[data-note-map-toggle]")) {

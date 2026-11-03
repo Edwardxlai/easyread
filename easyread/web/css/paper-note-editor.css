@@ -113,3 +113,4 @@ body:has(#notespanel.pn-expanded) .tiptap-popover, body:has(#notespanel.pn-expan
 .pn-reference-menu { position: fixed; inset: auto; margin: 0; width: min(290px, calc(100vw - 16px)); max-height: 210px; overflow: auto; padding: 5px; border: 1px solid var(--rule); border-radius: 8px; background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
 .pn-reference-menu .btn { display: block; width: 100%; text-align: left; white-space: normal; margin-bottom: 4px; }
 @media(max-width: 759px) { #paper .pn-source-links { right: 0; top: -20px; } }
+

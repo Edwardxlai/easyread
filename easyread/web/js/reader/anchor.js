@@ -128,6 +128,28 @@
     const quote = text.slice(s, e);
     if (!quote.trim()) return null;
     const out = { anchor: blk.dataset.id, key: math ? blk.dataset.id : zh.dataset.key, quote, prefix: text.slice(Math.max(0, s - 32), s), suffix: text.slice(e, e + 32) };
+    const quoteRange = range.cloneRange();
+    const startMath = (range.startContainer.parentElement || range.startContainer).closest?.('.katex');
+    const endMath = (range.endContainer.parentElement || range.endContainer).closest?.('.katex');
+    if (startMath && el.contains(startMath)) quoteRange.setStartBefore(startMath);
+    if (endMath && el.contains(endMath)) quoteRange.setEndAfter(endMath);
+    if (!el.contains(quoteRange.startContainer)) quoteRange.setStart(el, 0);
+    if (!el.contains(quoteRange.endContainer)) quoteRange.setEnd(el, el.childNodes.length);
+    const content = [];
+    function collect(node) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        if (node.textContent) content.push({ type: 'text', text: node.textContent });
+        return;
+      }
+      if (node.matches?.('.katex')) {
+        const latex = node.querySelector('annotation[encoding="application/x-tex"]')?.textContent;
+        if (latex) { content.push({ type: 'inlineMath', attrs: { latex } }); return; }
+      }
+      if (node.matches?.(SKIP)) return;
+      node.childNodes.forEach(collect);
+    }
+    collect(quoteRange.cloneContents());
+    out.quoteContent = content;
     if (math) out.math = true;
     if (PR.isEnEl(el)) out.side = "en";
     return out;
@@ -201,11 +223,11 @@
 
   PR.selectionAction = function (kind, color) {
     if (!pendingSel) return;
-    const { anchor, key, quote, prefix, suffix, side, parts, rect } = pendingSel;
+    const { anchor, key, quote, prefix, suffix, side, parts, rect, quoteContent } = pendingSel;
     selbar().classList.remove("open");
     getSelection().removeAllRanges();
     pendingSel = null;
-    if (kind === "paper-note") { PR.openPaperNote(); PR.paperNoteEditor.insertSources(parts || [{ anchor, quote }]); return; }
+    if (kind === "paper-note") { PR.openPaperNote(); PR.paperNoteEditor.insertSources(parts || [{ anchor, quote, quoteContent }]); return; }
     if (kind === "translate") { PR.translateSelection({ anchor, quote, rect }); return; }
     if (kind === "en") { PR.toggleEn(anchor, true); return; }
     if (kind === "copy") { navigator.clipboard.writeText(quote).then(() => PR.toast(PR.t("已复制"))); return; }
