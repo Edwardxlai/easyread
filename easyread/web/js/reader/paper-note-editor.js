@@ -256,7 +256,17 @@
         else ranges.push({ from: pos, to: pos + node.nodeSize });
       });
       if (!ranges.length) return;
-      rich.chain().focus().setTextSelection(ranges[index % ranges.length]).scrollIntoView().run();
+      const range = ranges[index % ranges.length];
+      const { node } = rich.view.domAtPos(range.from);
+      const card = (node.parentElement || node).closest(".pn-source-quote");
+      const source = card?.querySelector(":scope > .pn-quote-controls a");
+      if (source) {
+        rich.commands.setTextSelection(range.from);
+        source.focus({ preventScroll: true });
+        source.scrollIntoView({ block: "nearest" });
+      } else {
+        rich.chain().focus().setTextSelection(range).scrollIntoView().run();
+      }
     },
     getBody: () => rich ? PR.$("#paperNote").value : null,
     update: updateSoon,

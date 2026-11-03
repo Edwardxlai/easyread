@@ -104,6 +104,7 @@ body:has(#notespanel.pn-expanded) .tiptap-popover, body:has(#notespanel.pn-expan
 .pn-export-menu .btn { text-align: left; width: 100%; }
 
 .pn-source-quote { background: var(--surface-2); border-radius: 6px; }
+.pn-source-quote:has(> .pn-quote-controls a:focus) { outline: 2px solid var(--accent); outline-offset: -2px; }
 .pn-source-quote .pn-quote-content a[href^="#b-"] { display: none; }
 .pn-source-quote .pn-quote-content p + p { margin-top: .5em; }
 #paper .pn-source-links { position: absolute; right: -28px; top: 0; margin: 0; }

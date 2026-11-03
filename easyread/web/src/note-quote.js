@@ -18,10 +18,9 @@ export const NoteQuote = Blockquote.extend({
         const line = parseFloat(getComputedStyle(contentDOM).lineHeight);
         const long = !!href && contentDOM.scrollHeight > line * 2 + 2;
         dom.classList.toggle('pn-quote-collapsed', long && !expanded);
-        controls.hidden = !href; toggle.hidden = !long;
+        toggle.hidden = !long;
         toggle.textContent = window.PR.t(expanded ? '收起引用' : '展开引用');
         toggle.setAttribute('aria-expanded', String(expanded));
-        source.href = href; source.textContent = title;
       };
       const read = current => {
         href = ''; title = '';
@@ -32,6 +31,9 @@ export const NoteQuote = Blockquote.extend({
         });
         const unique = [...new Set(pages)].sort((a, b) => a - b);
         title = unique.length ? '↗ ' + window.PR.t('第 {page} 页', { page: unique.length === 1 ? unique[0] : unique[0] + '–' + unique[unique.length - 1] }) : window.PR.t('来源');
+        controls.hidden = !href;
+        source.href = href;
+        source.textContent = title;
         source.dataset.noteSources = [...new Set(anchors)].join(' ');
         dom.classList.toggle('pn-source-quote', !!href);
         requestAnimationFrame(measure);

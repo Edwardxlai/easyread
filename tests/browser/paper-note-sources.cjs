@@ -9,14 +9,17 @@ async page => {
  await page.waitForFunction(()=>document.querySelector('.pn-prose a[href="#b-p1-1"]'));
  check((await page.locator('#paperNote').inputValue()).includes('#b-p1-1'),'source not serialized');
  await page.locator('[data-note-expand]').click();
- await page.locator('.pn-quote-content a[href="#b-p1-1"]').click();
+ const source = page.locator('.pn-quote-controls a[href="#b-p1-1"]');
+ const checkTarget = () => source.evaluate(link => link === document.activeElement &&
+   link.getBoundingClientRect().height > 0 && getComputedStyle(link.closest('blockquote')).outlineStyle === 'solid');
+ await source.click();
  check(!await page.locator('#notespanel').evaluate(el=>el.classList.contains('pn-expanded')),'fullscreen not exited');
  check(new URL(page.url()).hash==='#b-p1-1','source jump failed');
  await page.locator('[data-paper-note-source=p1-1]').click();
- check((await page.evaluate(()=>getSelection().toString())).includes('第 1 页'),'reverse jump failed');
+ check(await checkTarget(),'reverse jump did not highlight the source card');
  await page.reload();
  await page.locator('[data-paper-note-source=p1-1]').click();
- check((await page.evaluate(()=>getSelection().toString())).includes('第 1 页'),'reload lost reference');
+ check(await checkTarget(),'reload lost reference');
  await page.locator('[data-note-mode=source]').click(); await page.locator('#paperNote').fill(original); await page.locator('[data-note-mode=rich]').click(); await page.evaluate(() => window.PR.finishPanelNote());
  return {quote:true,sourceJump:true,reverseJump:true,persistence:true};
 }

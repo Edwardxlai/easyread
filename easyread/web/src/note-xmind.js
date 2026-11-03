@@ -32,7 +32,7 @@ export async function exportXmind(root, filename) {
         } finally { URL.revokeObjectURL(imageUrl); }
       })());
     });
-    const link = el.querySelector('a[href]');
+    const link = el.querySelector('a[href^="#b-"]') || el.querySelector('a[href]');
     if (link) {
       const href = link.getAttribute('href');
       if (href.startsWith('#b-')) {
