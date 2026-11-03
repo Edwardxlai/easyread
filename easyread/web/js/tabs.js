@@ -71,15 +71,23 @@
       try {
         const response = await fetch(url.href);
         if (!response.ok) throw new Error(t("没有这篇论文"));
-        return open(response.url);
+        const target = new URL(response.url);
+        const block = url.searchParams.get("block");
+        if (block) target.hash = block;
+        return open(target.href);
       } catch (error) { notify(error.message); return; }
     }
     const match = url.pathname.match(/^\/read\/([a-zA-Z0-9_-]+)$/);
     if (url.origin !== location.origin || !match) return;
     const id = match[1];
-    if (!tabs.has(id)) create(id, url.href, t("正在打开…"));
-    else if (url.hash) tabs.get(id).frame.contentWindow.location.hash = url.hash;
+    const existing = tabs.has(id);
+    if (!existing) create(id, url.href, t("正在打开…"));
     select(id);
+    if (existing && url.hash) {
+      const win = tabs.get(id).frame.contentWindow;
+      win.location.hash = url.hash;
+      if (win.PR?.jumpTo) requestAnimationFrame(() => win.PR.jumpTo(url.hash.slice(1), { instant: true }));
+    }
   }
   function bind(tab) {
     const win = tab.frame.contentWindow, doc = win.document;

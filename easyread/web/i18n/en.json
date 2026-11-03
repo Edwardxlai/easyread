@@ -1597,5 +1597,21 @@
   "返回更多工具": "Back to more tools",
   "笔记图片每张不能超过 2 MiB，请压缩后重试": "Each note image must be at most 2 MiB. Compress it and try again.",
   "插入图片后笔记不能超过 4 MiB，请减少图片或压缩后重试": "The note must stay under 4 MiB after adding images. Remove or compress images and try again.",
-  "读取笔记图片失败，请重新选择图片": "Could not read the note image. Please select it again."
+  "读取笔记图片失败，请重新选择图片": "Could not read the note image. Please select it again.",
+ "退出全屏": "Exit full screen",
+ "全屏工作区": "Full-screen workspace",
+ "工作区布局": "Workspace layout",
+ "显示内容": "Visible panes",
+ "左右": "Side by side",
+ "上下": "Stacked",
+ "笔记与导图": "Notes and map",
+ "仅笔记": "Notes only",
+ "仅导图": "Map only",
+ "调整笔记与思维导图的宽度": "Resize notes and mind map width",
+ "引用到论文笔记": "Quote in paper notes",
+ "来源：第 {page} 页": "Source: page {page}",
+ "关联笔记 {n}": "Linked notes {n}",
+ "点击查看关联笔记，再次点击切换下一处": "View linked notes; click again for the next reference",
+ "展开引用": "Expand quote",
+ "收起引用": "Collapse quote"
 }

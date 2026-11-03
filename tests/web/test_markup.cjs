@@ -243,3 +243,9 @@ test("symbol footnote marks link like numbered ones and do not turn into italics
   assert.ok(html.includes("<sup>&#42;</sup>"));
   assert.ok(PR.md("x[^∗]", PR.footnoteOptions("p1")).includes('data-footnote="b-fn-star"'));  // ∗ and * are the same mark
 });
+
+test("paper-note source links preserve block anchors and code stays literal", () => {
+  const PR = markup();
+  assert.equal(PR.md('[来源](#b-p1-1)'), '<a href="#b-p1-1">来源</a>');
+  assert.ok(!PR.md('`[来源](#b-p1-1)`').includes('<a'));
+});
