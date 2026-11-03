@@ -205,10 +205,30 @@ test("links into the paper go where their type and number say, never by guessing
   assert.deepEqual(kinds(html), ["lst:3:列表 3", "tab:3:表 3", "sec:C.1:附录 C.1", "eq:4:(4)"]);
   assert.ok(html.includes("，图 9。"), "a target not in the paper (yet) keeps only its words");
   assert.ok(!html.includes("(#"));
-  assert.deepEqual(kinds(PR.md("重复列表 3 所示，见表 3 和 Table 3。")), []);  // words alone are not links
+  assert.deepEqual(kinds(PR.md("重复列表 3 所示，见表 3 和 Table 3。")), ["tab:3:表 3", "tab:3:Table 3"]);
+  assert.deepEqual(kinds(PR.md("表 3", { xref: false })), []);
+  assert.deepEqual(kinds(PR.md("See Table 3, [Table 3](#lst:3) and `Table 3`")), ["tab:3:Table 3", "lst:3:Table 3"]);
   assert.equal(PR.md("[表 3](#tab:3)", { xref: false }), "表 3");  // places that must not link (captions in a preview, table cells)
   assert.equal(PR.md("[Figure 3](#) and [x](#foo:1)"), "Figure 3 and x");  // an uncompleted hint or unknown target is just words
   assert.ok(PR.md("[docs](https://example.com)").includes('class="external-link"'));  // web links unchanged
+});
+
+test("paper-note block anchors retain their destination alongside rich text citations", () => {
+  const PR = markup();
+  const link = "[来源](#b-p1-1)";
+  assert.equal(PR.md(link), '<a href="#b-p1-1">来源</a>');
+  assert.equal(PR.unlink(link + " [图](#fig:3)"), link + " 图");
+});
+
+test("Unicode citation keys retain surnames and ambiguous or empty keys cannot link", () => {
+  const PR = markup();
+  const refs = ["王-2024", "李-2024", "Garcia-2024", "García-2024", "李"].map(id => ({ id }));
+  refs.push({id: "r00000001", cite_key: "Smith-2024"}, {id: "r00000002", cite_key: "Smith-2024"});
+  PR.buildCiteIndex(refs);
+  assert.match(PR.md("[王](#cite:王-2024)"), /data-ref="王-2024"/);
+  assert.match(PR.md("[李](#cite:李)"), /data-ref="李"/);
+  for (const key of ["赵-2024", "Garcia-2024", "Smith-2024", "Smith-Lee-2024", "", "???"])
+    assert.equal(PR.md("[label](#cite:" + key + ")"), "label");
 });
 
 test("symbol footnote marks link like numbered ones and do not turn into italics", () => {

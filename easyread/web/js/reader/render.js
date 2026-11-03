@@ -153,7 +153,7 @@
     note: (b) => '<div class="inline-note"><div class="lbl">' + PR.t("阅读批注（非原文）") + "</div>" + PR.mdBlocks(b.zh) + "</div>",
     references(b) {
       const refs = (S.paper.references || []).map((r) => {
-        const label = PR.refLabel(String(r.id));  // 作者-年份式的表不印编号，按悬挂缩进排
+        const label = PR.refLabel(String(r.cite_key || r.id || ""));  // 作者-年份式的表不印编号，按悬挂缩进排
         return '<li id="ref-' + PR.esc(r.id) + '"' + (label ? "" : ' class="plain"') + ">" + (label ? '<span class="n">' + PR.esc(label) + "</span>" : "") + "<span>" + linkify(r.text) + "</span></li>";
       }).join("");
       if (!b.zh && b.en) return '<h2 class="zh en-main" lang="en" data-key="' + b.id + '"><span>' + PR.esc(b.en) + '</span></h2><div class="refs"><ol>' + refs + "</ol></div>";

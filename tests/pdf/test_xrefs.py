@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 
 from pypdf import PdfWriter
-from pypdf.generic import ArrayObject, DecodedStreamObject, DictionaryObject, Fit, FloatObject, NameObject, TextStringObject
+from pypdf.generic import ArrayObject, DecodedStreamObject, Destination, DictionaryObject, Fit, FloatObject, NameObject, TextStringObject
 
 from easyread.library.store import Workspace, write_json_atomic
 from easyread.pdf import pdfwork, xrefs
@@ -28,12 +28,10 @@ def make_pdf(path: Path) -> None:
         content = DecodedStreamObject()
         content.set_data(data)
         page[NameObject("/Contents")] = writer._add_object(content)
-    writer.add_named_destination("figure.3", 1, Fit.xyz(left=38, top=705))
-    writer.add_named_destination("Hfootnote.1", 1, Fit.xyz(left=38, top=92))
-    writer.add_named_destination("Hfootnote.2", 1, Fit.xyz(left=38, top=92))
-    writer.add_named_destination("page.2", 1, Fit.xyz(left=0, top=800))  # a back-reference: not a place to link
-    writer.add_named_destination("cite.lee2021", 1, Fit.xyz(left=38, top=300))
-    writer.add_named_destination("cite.smith7", 1, Fit.xyz(left=38, top=280))
+    for title, left, top in [("figure.3", 38, 705), ("Hfootnote.1", 38, 92), ("Hfootnote.2", 38, 92),
+                             ("page.2", 0, 800), ("cite.lee2021", 38, 300), ("cite.smith7", 38, 280)]:
+        dest = Destination(title, writer.pages[1].indirect_reference, Fit.xyz(left=left, top=top))
+        writer.add_named_destination_object(dest)
 
     def link(rect, dest):
         return writer._add_object(DictionaryObject({

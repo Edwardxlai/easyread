@@ -6,6 +6,7 @@ import json
 
 from ..translate import codeblocks, sentences
 from ..app.i18n import tr
+from .reference_entries import merge_references
 from .store import Workspace, now_iso
 
 BLOCK_TYPES = {"heading", "para", "list", "math", "table", "figure", "references", "note"}
@@ -41,16 +42,6 @@ def parse_pages(spec) -> list[int]:
         elif part.strip():
             out.append(int(part))
     return out
-
-
-def reference_id(entry: dict) -> str:
-    """The entry's id: its printed number or citation key; failing that, one derived from its text, so an entry
-    re-sent by a retry merges with itself instead of every unnumbered entry colliding on an empty id."""
-    given = str(entry.get("id") or "").strip()
-    if given:
-        return given
-    text = "".join(c for c in str(entry.get("text") or "").casefold() if c.isalnum())
-    return "r" + hashlib.sha1(text.encode()).hexdigest()[:8]
 
 
 def merge_blocks(ws: Workspace, data: dict, done=None, replace_pages=None, en_only: bool = False, drop_ids=None) -> dict:
@@ -101,16 +92,7 @@ def merge_blocks(ws: Workspace, data: dict, done=None, replace_pages=None, en_on
             have = {str(x.get("en")) for x in paper.get("glossary", [])}
             paper["glossary"] = paper.get("glossary", []) + [x for x in data["glossary"] if str(x.get("en")) not in have]
         if data.get("references"):
-            refs = paper.setdefault("references", [])
-            have = {str(x.get("id")) for x in refs}
-            for x in data["references"]:
-                if isinstance(x, dict) and str(x.get("text") or "").strip():
-                    x = {**x, "id": reference_id(x)}
-                    if x["id"] not in have:
-                        refs.append(x)
-                        have.add(x["id"])
-            # Batches finish out of order; entries keep their place in the list (stable within a page).
-            refs.sort(key=lambda x: x.get("page") or 0)
+            paper["references"] = merge_references(paper.get("references", []), data["references"])
         if data.get("meta"):
             meta = paper.setdefault("meta", {})
             for k, v in data["meta"].items():

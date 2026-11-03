@@ -7,6 +7,7 @@ from unittest import mock
 
 from easyread.app import config
 from easyread.engines import engines
+from easyread.library.paperdata import merge_blocks
 from easyread.translate import prompts, segments, terms, translate
 from tests.translate.test_translate import make_ws
 
@@ -189,6 +190,19 @@ class SkipHeadTest(unittest.TestCase):
             translate.translate_pages(self.ws, cfg, list(range(1, 9)), threading.Event(), lambda *a: None)
         texts = [r["text"].split(".")[0] for r in self.ws.load("paper")["references"]]
         self.assertEqual(texts, ["Author1a", "Author1b", "Author3a", "Author3b", "Author5a", "Author5b", "Author7a", "Author7b"])
+
+    def test_reference_key_collision_preserves_entries_and_retry_is_idempotent(self):
+        refs = [{"id": "Smith-2024", "text": "Smith. Paper A."},
+                {"id": "Smith-2024", "text": "Smith. Paper B."}]
+        self.ws.update("paper", lambda p: p.update(references=[{"id": "", "text": refs[0]["text"]}]))
+        for entry in refs:
+            merge_blocks(self.ws, {"references": [entry]})
+        saved = self.ws.load("paper")["references"]
+        self.assertEqual([r["text"] for r in saved], [r["text"] for r in refs])
+        self.assertEqual(len({r["id"] for r in saved}), 2)
+        self.assertEqual([r["cite_key"] for r in saved], ["Smith-2024", "Smith-2024"])
+        merge_blocks(self.ws, {"references": refs})
+        self.assertEqual(self.ws.load("paper")["references"], saved)
 
     def test_prev_paragraph_skips_footnote_and_flags_unfinished(self):
         def add(*blocks):

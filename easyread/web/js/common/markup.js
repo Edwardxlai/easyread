@@ -28,6 +28,7 @@
   // 类型:编号 查 PR.xindex（render.js 按块的编号建），cite:键 查参考文献；查不到、或这里不该有链接（opts.xref/cite === false）就只留文字
   const INTERNAL = /^#(fig|tab|eq|sec|alg|lst):(.+)$/;
   function tokenHtml(t, block, opts) {
+    if (t.link && /^#b-[\w-]+$/.test(t.link)) return '<a href="' + PR.esc(t.link) + '">' + PR.esc(t.text) + '</a>';
     if (t.link && t.link.startsWith("#")) {
       opts = opts || {};
       if (t.link.startsWith("#cite:")) {
@@ -35,8 +36,7 @@
         return ref ? '<a class="cite" data-ref="' + PR.esc(ref) + '">' + PR.esc(t.text) + "</a>" : PR.esc(t.text);
       }
       const m = t.link.match(INTERNAL);
-      const target = m && opts.xref !== false && PR.xindex && PR.xindex[m[1]] && PR.xindex[m[1]][m[2]];
-      return target ? '<a class="xref" data-kind="' + m[1] + '" data-key="' + PR.esc(m[2]) + '">' + PR.esc(t.text) + "</a>" : PR.esc(t.text);
+      return m && opts.xref !== false ? xref(m[1], m[2], PR.esc(t.text)) : PR.esc(t.text);
     }
     if (t.link) {
       if (!/^(https?:\/\/|mailto:)/i.test(t.link) || /[\x00-\x20\x7f]/.test(t.link)) return PR.esc(t.raw);
@@ -56,7 +56,7 @@
   }
 
   /* [表 3](#tab:3) -> 表 3：拿到阅读页以外（导出的 Markdown）时，指向论文里的链接没有去处，只留文字 */
-  PR.unlink = (text) => String(text || "").replace(/(?<!\\)\[((?:\\.|[^\]\\\n])+)\]\(#[^)\s]*\)/g, (m, words) => words.replace(/\\([\[\]\\])/g, "$1"));
+  PR.unlink = (text) => String(text || "").replace(/(?<!\\)\[((?:\\.|[^\[\]\\\n])+)\]\(#(?!b-)[^)\s]*\)/g, (m, words) => words.replace(/\\([\[\]\\])/g, "$1"));
 
   PR.tex = function (tex, display) {
     const key = (display ? "D" : "I") + tex;
@@ -100,31 +100,59 @@
   /* 引用键（Jimenez-2024、Chen-Jiang-2025、JYW+24、13）：模型按论文印出来的标签写，参考文献条目的 id 和正文的 #cite:键 同一个写法。
      比对时不看大小写、标点和重音。样式不同，et al. 前列几位作者也不同，所以对不上时退一步按“第一作者-年份”找，只有一条才算 */
   const citeParts = (key) => String(key || "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
-    .split(/-+/).map((p) => p.replace(/[^a-z0-9+]/g, "")).filter(Boolean);
+    .split(/-+/).map((p) => p.replace(/[^\p{L}\p{M}\p{N}+]/gu, "")).filter(Boolean);
   const looseKey = (parts) => (parts.length > 1 && /^\d{4}[a-z]?$/.test(parts[parts.length - 1]) ? parts[0] + "-" + parts[parts.length - 1] : "");
   PR.buildCiteIndex = function (references) {
     const exact = new Map(), loose = new Map();
+    const add = (map, key, id) => { if (key) map.set(key, map.has(key) ? null : id); };
     for (const r of references || []) {
-      const id = String(r.id), parts = citeParts(id), short = looseKey(parts);
-      exact.set(parts.join("-"), id);
-      if (short) loose.set(short, loose.has(short) ? null : id);
+      const id = String(r.id || "");
+      if (!id) continue;
+      const parts = citeParts(r.cite_key || id);
+      add(exact, parts.join("-"), id);
+      add(loose, looseKey(parts), id);
     }
     PR.citeIndex = { exact, loose };
   };
   PR.citeTarget = function (key) {
     const ix = PR.citeIndex, parts = citeParts(key);
-    return ix ? ix.exact.get(parts.join("-")) || ix.loose.get(looseKey(parts)) || "" : "";
+    if (!ix || !parts.length) return "";
+    const exact = parts.join("-");
+    return (ix.exact.has(exact) ? ix.exact.get(exact) : ix.loose.get(looseKey(parts))) || "";
   };
   /* 参考文献表左边那一列：编号式、字母标签式印着 [13]、[JYW+24]；作者-年份式（键以年份结尾）和程序补的 id 不印 */
-  PR.refLabel = (id) => (/^\d+[a-z]?$/.test(id) || !/\d{4}[a-z]?$|^r[0-9a-f]{8}$/.test(id) ? "[" + id + "]" : "");
+  PR.refLabel = (id) => (id && (/^\d+[a-z]?$/.test(id) || !/\d{4}[a-z]?$|^r[0-9a-f]{8}x*$/.test(id)) ? "[" + id + "]" : "");
 
   function citeLinks(s) {
     return s.replace(/\[(\d+(?:\s*[,，–-]\s*\d+)*)\]/g, (m, inner) => {
       const parts = inner.split(/(\s*[,，–-]\s*)/);
-      const linked = parts.map((p) => (/^\d+$/.test(p) && PR.refById && PR.refById[p])
+      const linked = parts.map((p) => (/^\d+$/.test(p) && PR.refById && PR.refById[p] && (!PR.citeIndex || PR.citeTarget(p) === p))
         ? '<a class="cite" data-ref="' + p + '">' + p + "</a>" : p).join("");
       return "[" + linked + "]";
     });
+  }
+
+  function xref(kind, key, label) {
+    const index = PR.xindex && PR.xindex[kind];
+    return index && Object.hasOwn(index, key) && index[key]
+      ? '<a class="xref" data-kind="' + kind + '" data-key="' + PR.esc(key) + '">' + label + "</a>" : label;
+  }
+
+  // 已译论文里的纯文字仍可跳转；显式 Markdown 链接、代码和公式已经由 tokens 隔开。
+  function legacyXrefs(text) {
+    text = text.replace(/公式\s*[（(]\d+[）)](?:\s*(?:和|与|及|、|或|,|，)\s*[（(]\d+[）)])*/g,
+      (m) => m.replace(/[（(](\d+)[）)]/g, (label, n) => xref("eq", n, label)));
+    text = text.replace(/公式\s*(\d+)(?![\d.）)])/g, (m, n) => xref("eq", n, m));
+    text = text.replace(/(?<!列)表\s*(\d+)/g, (m, n) => xref("tab", n, m));
+    text = text.replace(/图\s*(\d+)/g, (m, n) => xref("fig", n, m));
+    text = text.replace(/第\s*(\d+(?:\.\d+)*)\s*节/g, (m, n) => xref("sec", n, m));
+    text = text.replace(/附录\s*([A-Z])(?![a-zA-Z])/g, (m, n) => xref("sec", n, m));
+    text = text.replace(/\b(Equations?)\s+(\d+)(?:\s+(and)\s+(\d+))?/g, (m, w, a, and, b) =>
+      w + " " + xref("eq", a, a) + (b ? " " + and + " " + xref("eq", b, b) : ""));
+    text = text.replace(/\bTable\s+(\d+)/g, (m, n) => xref("tab", n, m));
+    text = text.replace(/\bFigure\s+(\d+)/g, (m, n) => xref("fig", n, m));
+    text = text.replace(/\bSection\s+(\d+(?:\.\d+)*)/g, (m, n) => xref("sec", n, m));
+    return text.replace(/\bAppendix\s+([A-Z])\b/g, (m, n) => xref("sec", n, m));
   }
 
   /* AI 回答里偶尔会带出段落编号 [p4-5]、[eq7]，换成读者看得懂的“式 7”“第 4 页” */
@@ -149,7 +177,9 @@
   }
 
   function inline(text, opts) {
-    let s = footnoteRefs(blockLabel(PR.esc(text).replace(/\\\$/g, "$")), opts);
+    let s = blockLabel(PR.esc(text).replace(/\\\$/g, "$"));
+    if (opts.xref !== false) s = legacyXrefs(s);
+    s = footnoteRefs(s, opts);
     s = s.replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
     s = s.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, "$1<em>$2</em>");
     if (opts.cite !== false) s = citeLinks(s);
