@@ -174,3 +174,9 @@ test("blank lines between numbered steps do not reset each displayed number to o
   assert.ok(html.includes('<ol start="2"><li>输入 <math>x</math>。</li></ol>'));
   assert.ok(html.includes('<ol start="3"><li>读取结果。</li></ol>'));
 });
+
+test("paper-note source links preserve block anchors and code stays literal", () => {
+  const PR = markup();
+  assert.equal(PR.md('[来源](#b-p1-1)'), '<a href="#b-p1-1">来源</a>');
+  assert.ok(!PR.md('`[来源](#b-p1-1)`').includes('<a'));
+});

@@ -30,6 +30,8 @@ node --test tests/web/test_*.cjs tests/desktop/test_*.cjs
 
 论文笔记的浏览器回归脚本在 `tests/browser/paper-note-workspace.cjs`。用 Playwright CLI 打开临时文献库中的中文阅读页后，执行 `run-code --filename=tests/browser/paper-note-workspace.cjs`，可验证中文输入法退格、图片上传／粘贴／拖入、缩放设置和导图缩略图；脚本会恢复测试笔记、缩放比例和导图开关。
 
+全屏工作区的布局回归脚本为 `tests/browser/paper-note-layout.cjs`，在中文阅读页执行可检查左右／上下分栏、鼠标和键盘调整比例、单栏聚焦、窄屏布局及 Esc 退出。
+
 提 PR 后 GitHub Actions 会在 Windows、macOS、Linux 上自动跑一遍。第一次贡献的 PR 需要维护者点一下批准才会开始跑，稍等就好。
 
 ## 提 PR
@@ -49,3 +51,9 @@ node --test tests/web/test_*.cjs tests/desktop/test_*.cjs
 ## 报问题
 
 直接开 Issue 就行，有模板提示要写哪些信息，填不全也没关系。
+
+论文笔记支持从正文选文菜单引用，来源以 Markdown 段落链接保存。点击来源回到正文，正文的“关联笔记”入口可循环定位同一段落的多处引用。
+
+`tests/browser/paper-note-quotes.cjs` 验证长引用两行折叠、展开、来源跳转及内容保留。
+
+`tests/browser/paper-note-sources.cjs` 在临时 DPO 示例阅读页验证选文引用、全屏返回正文、反向定位及刷新后的引用恢复。

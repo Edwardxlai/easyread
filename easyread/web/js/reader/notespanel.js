@@ -16,6 +16,14 @@
     if (open) PR.renderNotesPanel();
   };
 
+  PR.openPaperNote = function () {
+    PR.finishPanelNote();
+    tab = "paper";
+    PR.ls.set("easyread-np-tab", tab);
+    PR.openSide("notes");
+    PR.renderNotesPanel();
+  };
+
   function sectionOf(id) {
     let cur = null;
     for (const b of S.paper.blocks || []) {
