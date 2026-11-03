@@ -154,6 +154,7 @@ table.tbl td .sub { color: var(--ink-3); }
 .refs ol { list-style: none; margin: 0; padding: 0; }
 .refs li { display: grid; grid-template-columns: 2.6em 1fr; margin: 0 0 .7em; border-radius: 3px; overflow-wrap: anywhere; }
 .refs li .n { color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.refs li.plain { display: block; padding-left: 1.6em; text-indent: -1.6em; }
 .refs li.flash { animation: flash 1.6s ease; }
 
 /* 未译的页 */

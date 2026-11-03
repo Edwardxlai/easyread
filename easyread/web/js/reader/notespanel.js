@@ -202,6 +202,6 @@
       out.push("", "## " + PR.t("问 AI 的对话"), "");
       for (const c of chat) out.push(c.role === "user" ? PR.t("**我**：") + c.content : PR.t("**AI**（{model}）：", { model: c.model || "" }) + c.content, "");
     }
-    return out.join("\n");
+    return PR.unlink(out.join("\n"));
   };
 })(window.PR);
