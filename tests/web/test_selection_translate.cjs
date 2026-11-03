@@ -83,11 +83,17 @@ function selectionToolbar(mode, side) {
   const text = { data: 'We attend to tokens.', nodeType: 3 };
   const element = {
     classList: { contains: () => false },
-    closest: selector => selector === '.blk' ? { dataset: { id: 'p1' } } : element,
+    closest: selector => selector === '.blk' ? { dataset: { id: 'p1' } } : selector === '.katex' ? null : element,
     contains: () => true, querySelector: () => null,
   };
   text.parentElement = element;
-  const range = { startContainer: text, endContainer: text, startOffset: 3, endOffset: 12, getBoundingClientRect: () => rect };
+  const range = { startContainer: text, endContainer: text, startOffset: 3, endOffset: 12, getBoundingClientRect: () => rect,
+    cloneRange() {
+      return { ...this, cloneContents() {
+        return { nodeType: 11, childNodes: [{ nodeType: 3, textContent: text.data.slice(this.startOffset, this.endOffset) }] };
+      } };
+    },
+  };
   const selection = { isCollapsed: false, rangeCount: 1, getRangeAt: () => range, removeAllRanges() { this.isCollapsed = true; } };
   const classes = new Set();
   const bar = { classList: { add: s => classes.add(s), remove: s => classes.delete(s), contains: s => classes.has(s) },
@@ -105,7 +111,7 @@ function selectionToolbar(mode, side) {
   };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../easyread/web/js/reader/anchor.js'), 'utf8'), {
     window: { PR, getSelection: () => selection }, document, getSelection: () => selection,
-    NodeFilter: { SHOW_TEXT: 4 }, innerWidth: 1000, setTimeout: fn => fn(),
+    Node: { TEXT_NODE: 3 }, NodeFilter: { SHOW_TEXT: 4 }, innerWidth: 1000, setTimeout: fn => fn(),
   });
   events.mouseup({ target: { closest: () => null } });
   return { bar, calls, selection, click: () => clicks.click({ target: { closest: s => s === 'button[data-s]' ? { dataset: { s: 'translate' } } : null } }) };
