@@ -325,11 +325,15 @@
       else map.rescale(zoomButton.dataset.noteZoom === "in" ? 1.25 : 0.8);
     }
   });
+  document.addEventListener("keydown", e => {
+    if (e.key !== "Escape" || e.isComposing || !expanded) return;
+    if (e.target.closest?.('[role="dialog"], [role="menu"], .tiptap-popover, .tiptap-dropdown-menu, [popover]:popover-open')) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    if (e.repeat) return;
+    expanded = false; setLayout();
+    panel.querySelector("[data-note-expand]").focus();
+  }, true);
   panel.addEventListener("keydown", e => {
-    if (e.key === "Escape" && expanded && !e.isComposing && !e.defaultPrevented) {
-      e.preventDefault(); e.stopPropagation(); expanded = false; setLayout();
-      panel.querySelector("[data-note-expand]").focus(); return;
-    }
     if (e.target.matches(".pn-map-svg")) {
       if (["+", "=", "-", "0"].includes(e.key) && map) {
         e.preventDefault(); e.stopPropagation();
