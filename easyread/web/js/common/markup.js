@@ -97,6 +97,28 @@
     return { footnotePage: b.page };
   };
 
+  // Author/year references are linked only when the first author and year
+  // identify exactly one bibliography entry. Ambiguous citations stay plain.
+  PR.buildCitationIndex = function (refs) {
+    const index = new Map();
+    for (const ref of refs || []) {
+      const text = String(ref.text || ""), first = text.split(",")[0].split(/\s+and\s+/i)[0].split(/(?<=[\p{L}]{2})\.\s/u)[0];
+      const author = (first.match(/[\p{L}][\p{L}'’-]*/gu) || []).pop();
+      const years = [...text.matchAll(/\b(?:19|20)\d{2}[a-z]?\b/gi)].map(m => m[0].toLowerCase());
+      const bases = new Set(years.map(y => y.slice(0, 4)));
+      const suffixed = new Set(years.filter(y => y.length === 5));
+      // A publication year cannot be inferred safely when the entry mentions
+      // different years (for example, an access date or an earlier edition).
+      if (!author || bases.size !== 1 || suffixed.size > 1) continue;
+      const year = suffixed.size ? [...suffixed][0] : [...bases][0];
+      const key = author.toLowerCase() + ":" + year;
+      if (index.has(key)) index.set(key, null); else index.set(key, String(ref.id));
+    }
+    PR.citationIndex = index;
+  };
+  function citeAnchor(id, label) {
+    return '<a class="cite" href="#ref-' + PR.esc(id) + '" data-ref="' + PR.esc(id) + '">' + label + '</a>';
+  }
   /* 引用键（Jimenez-2024、Chen-Jiang-2025、JYW+24、13）：模型按论文印出来的标签写，参考文献条目的 id 和正文的 #cite:键 同一个写法。
      比对时不看大小写、标点和重音。样式不同，et al. 前列几位作者也不同，所以对不上时退一步按“第一作者-年份”找，只有一条才算 */
   const citeParts = (key) => String(key || "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
@@ -124,12 +146,21 @@
   PR.refLabel = (id) => (id && (/^\d+[a-z]?$/.test(id) || !/\d{4}[a-z]?$|^r[0-9a-f]{8}x*$/.test(id)) ? "[" + id + "]" : "");
 
   function citeLinks(s) {
-    return s.replace(/\[(\d+(?:\s*[,，–-]\s*\d+)*)\]/g, (m, inner) => {
-      const parts = inner.split(/(\s*[,，–-]\s*)/);
-      const linked = parts.map((p) => (/^\d+$/.test(p) && PR.refById && PR.refById[p] && (!PR.citeIndex || PR.citeTarget(p) === p))
-        ? '<a class="cite" data-ref="' + p + '">' + p + "</a>" : p).join("");
-      return "[" + linked + "]";
+    // Exact reference IDs support numeric and alphanumeric labels, including +.
+    const matches = key => PR.refById && Object.hasOwn(PR.refById, key) && (!PR.citeIndex || PR.citeTarget(key) === key);
+    s = s.replace(/\[([^\]\n]{1,160})\]/g, (raw, inner) => {
+      const parts = inner.split(/(\s*[,，;；–-]\s*)/);
+      const ids = parts.filter((_, i) => i % 2 === 0);
+      if (!ids.some(matches) ||
+          !ids.every(p => /^\d+$/.test(p) || matches(p))) return raw;
+      return "[" + parts.map(p => matches(p) ? citeAnchor(p, p) : p).join("") + "]";
     });
+    // Parenthetical and narrative citations: Smith et al., 2020 or Smith (2020).
+    return s.replace(/(?<![\p{L}\d])([\p{Lu}][\p{L}'’-]+)(?:\s+(?:et al\.|(?:and|&amp;)\s+[\p{Lu}][\p{L}'’-]+))?\s*(?:,\s*|\(\s*)((?:19|20)\d{2}[a-z]?)(\)?)/gu,
+      (raw, author, year) => {
+        const id = PR.citationIndex && PR.citationIndex.get(author.toLowerCase() + ":" + year.toLowerCase());
+        return id ? citeAnchor(id, raw) : raw;
+      });
   }
 
   function xref(kind, key, label) {
