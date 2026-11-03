@@ -43,6 +43,15 @@ class UnmarkTest(unittest.TestCase):
         sentences.attach([b])
         self.assertEqual((b["en"], b["zh"]), ("Bounds on ‖w‖", "‖w‖ 的界"))
 
+    def test_boundary_after_a_bold_or_italic_sentence(self):
+        # Bold run-in headings come back as "**Overall findings.**‖": the closing marks sit between the stop and ‖.
+        b = {"id": "p", "type": "para", "en": "**Overall findings.** ‖ Table 2 shows it.", "zh": "**总体发现。**‖表 2 给出了结果。"}
+        sentences.attach([b])
+        self.assertEqual((b["en"], b["zh"]), ("**Overall findings.** Table 2 shows it.", "**总体发现。**表 2 给出了结果。"))
+        self.assertEqual(b["sents"], [[21, 9], [39, 19]])
+        self.assertEqual(sentences.unmark("*斜体句子。*‖下一句。"), ("*斜体句子。*下一句。", [7]))
+        self.assertEqual(sentences.unmark("**‖w‖** bound"), ("**‖w‖** bound", None))  # a bold norm is still not a boundary
+
     def test_korean_keeps_space_between_sentences(self):
         self.assertEqual(sentences.unmark("첫 문장입니다. ‖ 다음"), ("첫 문장입니다. 다음", [8]))
 

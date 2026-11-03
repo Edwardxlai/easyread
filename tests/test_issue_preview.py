@@ -75,8 +75,9 @@ class PreviewTests(unittest.TestCase):
         self.assertEqual(env.get("PATH"), os.environ.get("PATH"))
         self.assertEqual(json.loads(env["OPENCODE_PERMISSION"]), {"*": "deny"})
         config = json.loads(env["OPENCODE_CONFIG_CONTENT"])
-        self.assertEqual(config["agent"]["easyread-reader"]["permission"], {"*": "deny"})
+        self.assertEqual(config["permission"], {"*": "deny"})
         args = opencode_cli.build_args("opencode", {"model": "provider/model"}, [Path("image.png")])
+        self.assertNotIn("--agent", args)
         self.assertIn("provider/model", args)
         self.assertIn(str(Path("image.png").resolve()), args)
 

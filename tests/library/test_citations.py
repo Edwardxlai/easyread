@@ -21,6 +21,19 @@ class CitationGraphTest(unittest.TestCase):
         folder.mkdir(exist_ok=True)
         (folder / "paper.json").write_text(json.dumps({"meta": {"title_en": title, **meta}, "references": list(refs)}))
 
+    def test_manual_link_survives_disambiguated_printed_key(self):
+        self.paper("source", "Source", [
+            {"id": "r11111111", "cite_key": "Lee-2024", "text": "First reference"},
+            {"id": "r22222222", "cite_key": "Lee-2024", "text": "Other reference"},
+        ])
+        self.paper("target", "Target")
+        (self.root / "source" / "item.json").write_text(json.dumps({
+            "citation_links": {"Lee-2024": {"text": "First reference", "target": "target"}}
+        }))
+        first, other = graph_for(self.lib, "source")["references"]
+        self.assertEqual((first["target"], first["id"], first["cite_key"]), ("target", "r11111111", "Lee-2024"))
+        self.assertIsNone(other["target"])
+
     def test_both_directions_refresh_and_unmatched_references(self):
         self.paper("paperA", "An Introduction to Interesting Studies", [
             {"id": "12", "text": "Someone. A Thorough Study of Interesting Things. arXiv:2301.12345v2."},

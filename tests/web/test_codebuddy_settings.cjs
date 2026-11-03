@@ -8,7 +8,8 @@ function settings() {
   const PR = { t: (s, v = {}) => s.replace(/\{(\w+)\}/g, (_, k) => v[k]),
     esc: String, icon: () => "", settingsTabs: {}, $$: () => [],
     $: (selector) => selector === "#settingsDlg" ? dialog : selector === "#cmModel" ? input : null };
-  const context = { window: { PR, addEventListener() {} }, document: { addEventListener() {} } };
+  const context = { window: { PR, addEventListener() {} }, document: { addEventListener() {} },
+    location: { search: "" }, URLSearchParams };
   for (const name of ["settings.js", "settings-models.js", "settings-translation.js", "settings-chat.js"]) {
     vm.runInNewContext(fs.readFileSync("easyread/web/js/common/" + name, "utf8"), context);
   }

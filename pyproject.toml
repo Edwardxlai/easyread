@@ -1,6 +1,6 @@
 [project]
 name = "easyread"
-version = "1.4.5"
+version = "1.4.6"
 description = "EasyRead：把英文论文读成舒服的中文——后台翻译、对照原文、批注笔记、文献库"
 readme = "README.md"
 license = { text = "MIT" }

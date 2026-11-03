@@ -6,7 +6,7 @@ import re
 
 from . import langs, sentences, prompt_style
 from ..library.store import Workspace
-from ..pdf import links
+from ..pdf import emphasis, links, xrefs
 
 MATH_RULES = r"""- 行内数学一律写成 $TeX$（KaTeX 能渲染的 LaTeX）：即使只有一个变量，也必须有成对的 $；变量、下标、上标都用 TeX，不要直接照抄 PDF 抽取出的散乱字符或用 Unicode 拼。
 - en 和 zh、标题、列表、表头、单元格、图内文字及题注都遵守同一公式规则。例如：原文 "Let $x_i \in \mathbb{R}^d$."，译文 "令 $x_i \in \mathbb{R}^d$。"；不要输出裸露的 x_i、\alpha 或 \frac{a}{b}，不要把整句正文包进 $。
@@ -17,12 +17,15 @@ RULES = """翻译要求：
 - 材料是用户提供的论文，本任务用于用户本人的学术阅读、学习与引用。按要求完整翻译提供的内容并保留结构，不要用摘要或概述代替逐块译文。
 """ + prompt_style.START + "\n" + prompt_style.DEFAULT + "\n" + prompt_style.END + """
 - 保留材料中的 Markdown 链接 [文字](URL)：原文保留链接文字，译文翻译链接文字，两边 URL 必须原样保留，不猜网址，不把链接移到段落外。
+- 本文内部引用写成链接：提到本文有编号的图、表、公式、章节、附录、算法、代码清单时，en 和译文都把指代它的文字写成 [文字](#类型:编号)。类型：fig 图，tab 表，eq 公式，sec 章节和附录，alg 算法，lst 代码清单；编号照原文（3、A1、2.1、C.1）。例如 Figure 3 → [Figure 3](#fig:3)、[图 3](#fig:3)；Section 3.1 → Section [3.1](#sec:3.1)、第 [3.1](#sec:3.1) 节；Eqs. (4) and (5) → Eqs. [(4)](#eq:4) and [(5)](#eq:5)、式 [(4)](#eq:4) 和 [(5)](#eq:5)；Listing 3 → [Listing 3](#lst:3)、[代码清单 3](#lst:3)。材料里的 [文字](#) 是 PDF 自己的内部链接，按它指的对象补上类型和编号；没标出的引用也照样写。英文原文里已有的这种链接，译文写同样的类型和编号。引用别的论文里的图表不写链接；标题、作者、单位、参考文献条目、题注开头的编号（Figure 1:）里不写。
+- 保留粗体和斜体：材料（抽取的文字、英文原文）里 **…** 是原文的粗体，*…* 是斜体，由程序按 PDF 字体标出。en 照录这些标记，译文在对应的词句上用同样的标记；标记成对出现，不跨句子分界 ‖，不放进 $公式$ 和代码。整行加粗的标题、题注开头的编号（Figure 1:）不用标；原文没有粗体或斜体的地方不要自己加。有原页图时以原页为准，补上抽取文字里漏标的。
 - 但要留心原文自己的问题：数字前后对不上（表和正文、两张表之间）、公式和文字说的不一致、符号用错、明显的笔误。发现了就写进 checks，正文照录不改；没有就不写，不要为了写而写，也不要写翻译说明。
 """ + MATH_RULES + """
 - 表格重排成 table 块，表头译成中文，数字原样。图用 figure 块：尽量给出图在原页中的归一化裁剪框 `box:[x0,y0,x1,y1]`（左上和右下坐标，范围 0 到 1，框住图本身、不含题注），并翻译图内可读的标题、坐标轴、图例、流程框文字和标签到 `image_zh`（使用目标语言），原文写入 `image_en`；没有原页图时不猜裁剪框，看不清或没有文字就留空，不猜。`src` 留空，由程序按 `box` 从原 PDF 裁图。
-- 参考文献列表不翻译：输出一个 references 块，条目放进 references 数组（id 是编号，text 是原文）。
-- 脚注与参考文献独立：文献引用使用 [13]，脚注标记使用 [^13]（13 换成原编号），en/zh 两边保持一致，不要混用。脚注内容单独输出 para 块，加 "role":"footnote","num":"13"，page 填脚注所在页；块的 en/zh 只放脚注正文，不重复编号。脚注不得放入 references 数组，也不能当页脚丢弃。同号文献与脚注可以同时存在；不确定时保留原标记，不猜。
-- 代码和伪代码用 para 块，en/zh 中用 Markdown 代码围栏包住代码，保留缩进、换行、标识符和字符串；只翻译题注及自然语言注释。题注放在围栏外，不要输出 code 或 listing 类型，不要在代码里插句子分界 ‖。
+- 参考文献列表不翻译：输出一个 references 块，条目放进 references 数组（text 是原文）。id 是这条的引用键：编号式列表写编号（"13"）；作者-年份式写作者的姓和年份，用连字符连起来，一两位作者写全部的姓，三位及以上只写第一作者的姓，姓里的空格去掉，年份带原文的 a/b 后缀，例如 Jimenez-2024、Chen-Jiang-2025、Chen-2026a、DaSilva-2025、Anthropic-2025；字母标签式写标签（JYW+24）。
+- 作者-年份式、字母标签式的文献引用写成链接 [文字](#cite:键)，键和参考文献条目的 id 同一个写法；en 照原文的字，译文按译法写字，键不变。例如 Jimenez et al. (2024) → [Jimenez et al. (2024)](#cite:Jimenez-2024)、[Jimenez 等人（2024）](#cite:Jimenez-2024)；括号里有几条就各写一个链接，方括号留在链接外：[[Jimenez et al., 2024](#cite:Jimenez-2024), [Chen and Jiang, 2025](#cite:Chen-Jiang-2025)]。材料里指向参考文献的 [文字](#) 也这样补上键；一处引用被拆成几个 [文字](#)（作者和年份分开链）时合成一个链接。英文原文里已有的 #cite 链接，译文照样写。编号式引用照旧写 [13]，不写链接。
+- 脚注与参考文献独立：文献引用使用 [13]，脚注标记使用 [^13]（13 换成原编号；符号脚注照原符号写，如 [^*]、[^†]），en/zh 两边保持一致，不要混用。材料里程序已按 PDF 标出的 [^…] 照录在原位。脚注内容单独输出 para 块，加 "role":"footnote","num":"13"（符号脚注写 "num":"*" 这样的原符号），page 填脚注所在页；块的 en/zh 只放脚注正文，不重复编号。脚注不得放入 references 数组，也不能当页脚丢弃。同号文献与脚注可以同时存在；不确定时保留原标记，不猜。标题、作者、单位里不写脚注标记。
+- 代码和伪代码用 para 块，en/zh 中用 Markdown 代码围栏包住代码，保留缩进、换行、标识符和字符串；只翻译题注及自然语言注释。题注放在围栏外，不要输出 code 或 listing 类型，不要在代码里插句子分界 ‖。原文给它编了号（Listing 3、Algorithm 1）时，这块加 "role":"listing" 或 "role":"algorithm" 和 "num":"3"。
 - 看不清的地方写“此处识别不清，请核对原文第 N 页”，不要猜。
 - 页眉、页脚、页码、arXiv 侧边水印不要输出。"""
 
@@ -30,7 +33,7 @@ SCHEMA = """输出格式：只输出一个 JSON 对象，不要任何别的文�
 {
   "meta": {"title_zh": "", "short_zh": "不超过 12 字的短标题", "title_en": "", "authors": "作者, 用逗号分隔", "affiliation": "", "date": "", "venue": ""},   // 只有包含第 1 页时才写
   "glossary": [{"en": "standard error", "zh": "标准误差"}],   // 本批新出现的核心术语
-  "references": [{"id": "1", "text": "原文条目"}],             // 本批出现参考文献列表时才写
+  "references": [{"id": "13 或 Jimenez-2024", "text": "原文条目"}],             // 本批出现参考文献列表时才写
   "checks": [{"anchor": "块 id", "quote": "译文里相关的几个字（可空）", "title": "一句话：哪里不对", "body": "具体说明和依据，比如算一遍给出对得上的数"}],   // 原文有问题时才写
   "blocks": [ ... ]
 }
@@ -170,14 +173,21 @@ def _context(ws: Workspace, pages: list[int], new_blocks: bool = True, skip_head
     return "\n".join(lines)
 
 
+def page_text(ws: Workspace, n: int, sources: tuple | None = None) -> str:
+    """给模型看的第 n 页抽取文字：按 PDF 标出粗体斜体、本文内部链接和脚注标记、外部链接（磁盘上的 .txt 不变）。
+    sources：一批里好几页时传 (links, emphasis, xrefs) 免得每页重读缓存。"""
+    urls, styles, refs = sources or (links.ensure(ws), emphasis.ensure(ws), xrefs.ensure(ws))
+    p = ws.root / "extract" / f"page-{n:03d}.txt"
+    text = p.read_text(encoding="utf-8") if p.exists() else ""
+    text = emphasis.insert(text, styles.get(str(n), []))
+    text = xrefs.insert(text, refs.get(str(n), []))
+    return links.insert(text, urls.get(str(n), []))
+
+
 def _page_texts(ws: Workspace, pages: list[int]) -> str:
-    texts = []
-    urls = links.ensure(ws)
-    for n in pages:
-        p = ws.root / "extract" / f"page-{n:03d}.txt"
-        text = p.read_text(encoding="utf-8") if p.exists() else ""
-        texts.append(f"===== 第 {n} 页（抽取的文字，公式和表格可能是乱的）=====\n" + links.insert(text, urls.get(str(n), [])))
-    return "\n\n".join(texts)
+    sources = (links.ensure(ws), emphasis.ensure(ws), xrefs.ensure(ws))
+    return "\n\n".join(f"===== 第 {n} 页（抽取的文字，公式和表格可能是乱的；**粗体**、*斜体*、[文字](#) 内部链接、[^…] 脚注标记按 PDF 标出）=====\n"
+                       + page_text(ws, n, sources) for n in pages)
 
 
 def peek_note(engine: str, pages: list[int], peek: list[int]) -> str:

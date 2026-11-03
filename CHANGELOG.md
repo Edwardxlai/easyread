@@ -1,5 +1,15 @@
 # 更新记录
 
+## v1.4.6（2026-11-01）
+
+- **论文笔记与导图**：可用富文本编辑笔记，切换到 Markdown，或把标题层级展开为导图。修复中文输入法组合输入，支持粘贴、拖入和缩放图片；桌面退出时等待大笔记保存，浏览器存储空间不足时提示导出。每张新增图片上限为 2 MiB。[PR #113](https://github.com/Edwardxlai/easyread/pull/113) · [PR #127](https://github.com/Edwardxlai/easyread/pull/127)
+- **选词翻译与朗读**：在正文选中单词或短语即可查询释义，英文单词可查看英美音标，使用本机语音朗读。[PR #117](https://github.com/Edwardxlai/easyread/pull/117)
+- **译图随阅读模式切换**：在翻译设置里开启“生成译图”后，可为新论文生成译图，也可给旧论文补图。原文、译文和双语模式分别显示对应图片；生成失败时仍能阅读原图和文字译文。替换自动裁图后会清理失去引用的旧截图，保留共享图片和手动裁图。[PR #120](https://github.com/Edwardxlai/easyread/pull/120) · [PR #122](https://github.com/Edwardxlai/easyread/pull/122)
+- **导入时生成中文 PDF**：可选用 BabelDOC 单独生成中文 PDF，沿用 EasyRead 的翻译引擎；可只生成 PDF，或把已有结果另存到指定目录，同名文件不会被覆盖。此选项默认关闭，需另行安装 BabelDOC。[PR #123](https://github.com/Edwardxlai/easyread/pull/123)
+- **问 AI 与 CLI**：标准、简明、精读三种问答都附带已整理的论文正文，上限为 30,000 字符。支持工具的 CLI 可继续读取论文或联网检索；新增 Qoder CN CLI 接入，OpenCode 改用内置 agent，避免依赖自定义 agent 注册。[#118](https://github.com/Edwardxlai/easyread/issues/118) · [#125](https://github.com/Edwardxlai/easyread/issues/125) · [#128](https://github.com/Edwardxlai/easyread/issues/128) · [#129](https://github.com/Edwardxlai/easyread/issues/129)
+- **正文字号与公式标记**：在正文按 Ctrl / ⌘ 并滚动滚轮可调整字号。行内与独立公式的标记按实际行对齐，保留局部选区和下划线；原生滚动条跟随深浅主题。[#116](https://github.com/Edwardxlai/easyread/issues/116) · [#126](https://github.com/Edwardxlai/easyread/issues/126)
+- **Windows 阅读器崩溃修复**：修复搜索或段落跳转后，点击正文或开始拖选文字可能导致阅读器白屏的问题。#124 反馈的划线白屏仍待反馈者复测。[#133](https://github.com/Edwardxlai/easyread/issues/133) · [#124](https://github.com/Edwardxlai/easyread/issues/124)
+
 ## v1.4.5（2026-10-26）
 
 - 发版检查：三平台 CI 通过，Python 554 项（1 项跳过）、前端与桌面 227 项；真实 Electron 验证多标签打开、切换、关闭、保存、桌面能力调用和主题同步。修复 OpenCode 无代理环境启动错误，补齐繁体词条；构建结果与真实 CLI 等未验收项见 [1.4.5 整合记录](docs/release-1.4.5-integration.md)

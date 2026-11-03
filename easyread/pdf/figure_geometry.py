@@ -355,9 +355,8 @@ def locate_figures(root: Path, blocks: list[dict], layout: dict) -> dict[str, di
                         log.exception("渲染原页失败 %s 第 %s 页", root, pn)
                         return None
                 page = pdf.pages[pn - 1]
-                paragraphs = [" ".join(it.get("en", "") for it in block.get("items", []))
-                              if block.get("type") == "list" else block.get("en", "")
-                              for block in blocks if block.get("type") in ("para", "list", "heading")
+                from .pdfwork import block_english  # link targets in en are not printed on the page
+                paragraphs = [block_english(block) for block in blocks if block.get("type") in ("para", "list", "heading")
                               and block.get("page") in (pn - 1, pn)]
                 try:
                     result.update(_page_regions(page, captions, occupied, render, running.get(pn, ()), paragraphs))

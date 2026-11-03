@@ -33,12 +33,27 @@ def _found(page: str, have: str) -> bool:
     return any(page[i:i + PROBE] in have for i in spots)
 
 
+_REF_HEADING = re.compile(r"^\s*(?:references|bibliography)\s*$", re.I | re.M)
+
+
+def _bibliography(ws: Workspace, n: int) -> bool:
+    """这页有参考文献条目（References 标题之后、或整页都是）：只有一个落在页底的标题不算。"""
+    src = _source(ws, n)
+    head = _REF_HEADING.search(src)
+    return len(_letters(src[head.end():] if head else src)) >= MIN_LETTERS
+
+
 def missing_pages(ws: Workspace, batch: list[int], data: dict) -> list[int]:
-    """这批里漏译的页。整批为空另有处理（continuation），这里只管“有的页有、有的页没有”。"""
+    """这批里漏译的页。整批为空另有处理（continuation），这里只管“有的页有、有的页没有”，
+    以及给了参考文献标题块、却一条条目都没给的参考文献页（条目丢了，正文链不过去）。"""
     blocks = data.get("blocks") or []
+    refs = [b.get("page") or batch[0] for b in blocks if b.get("type") == "references"]
+    if refs and not data.get("references"):
+        lost = [n for n in batch if n >= min(refs) and _bibliography(ws, n)]
+        if lost:
+            return lost
     if len(batch) < 2 or not blocks:
         return []
-    refs = [b.get("page") or batch[0] for b in blocks if b.get("type") == "references"]
     if data.get("references") and not refs:
         return []  # 参考文献续页只给 references，没有块，也没法逐页对
     have = _letters(json.dumps(blocks, ensure_ascii=False))

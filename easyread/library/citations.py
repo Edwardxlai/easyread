@@ -95,13 +95,24 @@ def graph_for(lib, pid):
     inward = defaultdict(list)
     for source, paper in papers.items():
         refs = []
+        # A later translation batch can reveal a duplicate printed key and
+        # assign new IDs. Preserve a unique manual link to the unchanged text.
+        targets_by_text = defaultdict(set)
+        for link in paper["citation_links"].values():
+            if isinstance(link, dict) and link.get("target") in papers:
+                targets_by_text[link.get("text")].add(link["target"])
         for ref in paper["references"]:
             if not isinstance(ref, dict): continue
             manual = paper["citation_links"].get(str(ref.get("id", ""))) or {}
             target = manual.get("target") if manual.get("text") == str(ref.get("text") or "") else None
+            previous = targets_by_text.get(ref.get("text"))
+            if not target and previous and len(previous) == 1:
+                target = next(iter(previous))
             if target not in papers or target == source:
                 target = resolve(ref, source)
             row = {"id": str(ref.get("id", "")), "text": str(ref.get("text") or ""), "target": target}
+            if ref.get("cite_key"):
+                row["cite_key"] = ref["cite_key"]
             dois, arxivs = _doi(row["text"]), _arxiv(row["text"])
             row["fingerprint"] = hashlib.sha256(row["text"].encode("utf-8")).hexdigest()
             if len(dois) == 1:

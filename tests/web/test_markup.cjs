@@ -48,6 +48,28 @@ test("footnotes and same-number references have separate destinations", () => {
   assert.equal(PR.md("[^13]", PR.footnoteOptions("p2")), "<sup>13</sup>");
 });
 
+test("author-year citations link by the key of their printed label, whatever the style lists before et al.", () => {
+  const PR = markup();
+  const refs = ["Jimenez-2024", "Chen-Jiang-2025", "Chen-2026a", "Chen-2026b", "DaSilva-2025", "JYW+24", "13", "Smith-2020", "Smith-Lee-2020"].map(id => ({ id }));
+  PR.refById = Object.fromEntries(refs.map(r => [r.id, r]));
+  PR.buildCiteIndex(refs);
+  const cites = (html) => [...html.matchAll(/<a class="cite" data-ref="([^"]+)">([^<]+)<\/a>/g)].map(m => m[1] + ":" + m[2]);
+  // Several citations in one bracket each link; the brackets stay text.
+  const group = PR.md("[[Jimenez et al., 2024](#cite:Jimenez-2024), [Chen 和 Jiang，2025](#cite:chen-jiang-2025)]");
+  assert.deepEqual(cites(group), ["Jimenez-2024:Jimenez et al., 2024", "Chen-Jiang-2025:Chen 和 Jiang，2025"]);
+  assert.ok(group.startsWith("[<a") && group.endsWith("</a>]"));
+  // Year suffixes tell same-author entries apart; case, punctuation and accents do not matter.
+  assert.deepEqual(cites(PR.md("[Chen 等人（2026b）](#cite:Chen-2026b) [Da Silva 等（2025）](#cite:DáSilva-2025)")), ["Chen-2026b:Chen 等人（2026b）", "DaSilva-2025:Da Silva 等（2025）"]);
+  // A style that names three authors still finds the entry by first author and year, but only when one entry fits.
+  assert.deepEqual(cites(PR.md("[Jimenez, Yang, and Wettig 2024](#cite:Jimenez-Yang-Wettig-2024)")), ["Jimenez-2024:Jimenez, Yang, and Wettig 2024"]);
+  assert.equal(PR.md("[Smith, Jones, and Lee 2020](#cite:Smith-Jones-Lee-2020)"), "Smith, Jones, and Lee 2020");
+  assert.deepEqual(cites(PR.md("[JYW+24](#cite:JYW+24)")), ["JYW+24:JYW+24"]);
+  assert.equal(PR.md("[Nobody, 2019](#cite:Nobody-2019)"), "Nobody, 2019");  // not in the list (yet): words only
+  assert.equal(PR.md("[Jimenez et al., 2024](#cite:Jimenez-2024)", { cite: false }), "Jimenez et al., 2024");
+  // Only numbered and alphabetic lists print a label in front of entries.
+  assert.deepEqual(["13", "JYW+24", "Jimenez-2024", "r0a1b2c3d"].map(PR.refLabel), ["[13]", "[JYW+24]", "", ""]);
+});
+
 test("inline external links preserve labels and URLs without linking code or unsafe schemes", () => {
   const PR = markup();
   const html = PR.md("Read [here](https://example.com/docs?q=1&lang=en), [此处](https://example.com/other), and `[here](https://example.com/code)`.");
@@ -173,6 +195,59 @@ test("blank lines between numbered steps do not reset each displayed number to o
   assert.ok(html.includes('<ol><li>准备器件。</li></ol>'));
   assert.ok(html.includes('<ol start="2"><li>输入 <math>x</math>。</li></ol>'));
   assert.ok(html.includes('<ol start="3"><li>读取结果。</li></ol>'));
+});
+
+test("links into the paper go where their type and number say, never by guessing from the wording", () => {
+  const PR = markup();
+  PR.xindex = { tab: { 3: "tab3" }, lst: { 3: "p8-4" }, sec: { "C.1": "sC-1" }, eq: { 4: "eq4" }, fig: {}, alg: {} };
+  const kinds = (html) => [...html.matchAll(/data-kind="(\w+)" data-key="([\w.]+)">([^<]+)</g)].map(m => m[1] + ":" + m[2] + ":" + m[3]);
+  const html = PR.md("重复[列表 3](#lst:3)所示，见[表 3](#tab:3)、[附录 C.1](#sec:C.1)、式 [(4)](#eq:4)，[图 9](#fig:9)。");
+  assert.deepEqual(kinds(html), ["lst:3:列表 3", "tab:3:表 3", "sec:C.1:附录 C.1", "eq:4:(4)"]);
+  assert.ok(html.includes("，图 9。"), "a target not in the paper (yet) keeps only its words");
+  assert.ok(!html.includes("(#"));
+  assert.deepEqual(kinds(PR.md("重复列表 3 所示，见表 3 和 Table 3。")), ["tab:3:表 3", "tab:3:Table 3"]);
+  assert.deepEqual(kinds(PR.md("表 3", { xref: false })), []);
+  assert.deepEqual(kinds(PR.md("See Table 3, [Table 3](#lst:3) and `Table 3`")), ["tab:3:Table 3", "lst:3:Table 3"]);
+  assert.equal(PR.md("[表 3](#tab:3)", { xref: false }), "表 3");  // places that must not link (captions in a preview, table cells)
+  assert.equal(PR.md("[Figure 3](#) and [x](#foo:1)"), "Figure 3 and x");  // an uncompleted hint or unknown target is just words
+  assert.ok(PR.md("[docs](https://example.com)").includes('class="external-link"'));  // web links unchanged
+});
+
+test("paper-note block anchors retain their destination alongside rich text citations", () => {
+  const PR = markup();
+  const link = "[来源](#b-p1-1)";
+  assert.equal(PR.md(link), '<a href="#b-p1-1">来源</a>');
+  assert.equal(PR.unlink(link + " [图](#fig:3)"), link + " 图");
+});
+
+test("Unicode citation keys retain surnames and ambiguous or empty keys cannot link", () => {
+  const PR = markup();
+  const refs = ["王-2024", "李-2024", "Garcia-2024", "García-2024", "李"].map(id => ({ id }));
+  refs.push({id: "r00000001", cite_key: "Smith-2024"}, {id: "r00000002", cite_key: "Smith-2024"});
+  PR.buildCiteIndex(refs);
+  assert.match(PR.md("[王](#cite:王-2024)"), /data-ref="王-2024"/);
+  assert.match(PR.md("[李](#cite:李)"), /data-ref="李"/);
+  for (const key of ["赵-2024", "Garcia-2024", "Smith-2024", "Smith-Lee-2024", "", "???"])
+    assert.equal(PR.md("[label](#cite:" + key + ")"), "label");
+});
+
+test("symbol footnote marks link like numbered ones and do not turn into italics", () => {
+  const PR = markup();
+  const blocks = [{ id: "p1", page: 1 }, { id: "fn-star", type: "para", role: "footnote", num: "∗", page: 1 },
+    { id: "fn-dag", type: "para", role: "footnote", num: "†", page: 1 }, { id: "fn1", type: "para", role: "footnote", num: "1", page: 1 }];
+  PR.blockById = Object.fromEntries(blocks.map(b => [b.id, b]));
+  PR.buildFootnoteIndex(blocks);
+  const html = PR.md("Ann Lee[^*], Bo Li[^†] wrote *this* work[^1].", PR.footnoteOptions("p1"));
+  for (const id of ["fn-star", "fn-dag", "fn1"]) assert.ok(html.includes('data-footnote="b-' + id + '"'), id);
+  assert.ok(html.includes("<em>this</em>"));
+  assert.ok(html.includes("<sup>&#42;</sup>"));
+  assert.ok(PR.md("x[^∗]", PR.footnoteOptions("p1")).includes('data-footnote="b-fn-star"'));  // ∗ and * are the same mark
+});
+
+test("paper-note source links preserve block anchors and code stays literal", () => {
+  const PR = markup();
+  assert.equal(PR.md('[来源](#b-p1-1)'), '<a href="#b-p1-1">来源</a>');
+  assert.ok(!PR.md('`[来源](#b-p1-1)`').includes('<a'));
 });
 
 test("links exact alphanumeric labels and unique author-year citations, leaving ambiguity alone", () => {

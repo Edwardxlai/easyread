@@ -26,7 +26,7 @@ function exporter(chat, mode, failure) {
     toast: text => result.notices.push(text),
   };
   const context = { window: { PR, addEventListener() {} }, document: { addEventListener() {} }, Blob };
-  for (const file of ['reader/notespanel.js', 'common/export-dialog.js', 'reader/export.js']) {
+  for (const file of ['common/markup.js', 'reader/notespanel.js', 'common/export-dialog.js', 'reader/export.js']) {
     vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../easyread/web/js', file), 'utf8'), context);
   }
   return { PR, result, click: () => handler({ target: { closest: selector => selector === '[data-export-go]' ? go : null } }) };
@@ -36,12 +36,14 @@ test('Markdown export retains every conversation and complete answer, online and
   const answer = '## Complete answer\n\n$$x^2$$\n\n```python\nx = 1\n```';
   const chat = { threads: [
     { messages: [{ role: 'user', content: 'first' }, { role: 'assistant', content: answer }] },
-    { messages: [{ role: 'user', content: 'second' }, { role: 'assistant', content: 'normal answer' }] },
+    { messages: [{ role: 'user', content: 'second' }, { role: 'assistant', content: 'normal answer, see [表 3](#tab:3)' }] },
   ] };
   for (const mode of ['server', 'static']) {
     const e = exporter(chat, mode);
     await e.PR.openExport(); await e.click();
-    for (const text of [answer, 'first', 'second', 'normal answer']) assert.ok(e.result.text.includes(text));
+    // A link into the paper has nowhere to go in a Markdown file: only its words are exported.
+    for (const text of [answer, 'first', 'second', 'normal answer, see 表 3']) assert.ok(e.result.text.includes(text));
+    assert.ok(!e.result.text.includes('(#tab:3)'));
     assert.equal(e.result.closed, true);
   }
 });

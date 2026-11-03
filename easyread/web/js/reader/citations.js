@@ -27,7 +27,8 @@
   const importButton = (paper, ref) => '<button class="linkish" data-cite-import="' + E(paper) + '" data-cite-ref="' + E(ref) + '">' + PR.t("加入文献库") + '</button>';
   function groups(data, path) {
     const refs = data.references.map(r => {
-      const prefix = r.id ? '[' + E(r.id) + '] ' : '';
+      const label = PR.refLabel(r.cite_key || r.id);
+      const prefix = label ? E(label) + ' ' : '';
       return r.target ? '<div class="cite-tree-entry">' + prefix + node(r.target, r.title, path, '') + '</div>'
         : '<div class="cite-tree-entry cite-unmatched">' + prefix + E(r.text) + '<div>' + importButton(data.paper.id, r.id) + ' ' + source(r.source_url) + search(r.text) + '</div></div>';
     }).join('');

@@ -17,7 +17,7 @@ test('citation tree exposes both directions, avoids cycles, and offers unmatched
   const box = {isConnected:true, innerHTML:'', classList:{contains: s => s === 'citations'}, querySelector: () => root,
     addEventListener: (type, fn) => { events[type] = fn; }};
   const document = {addEventListener(){}, getElementById(){return null;}, createElement(){return {};}};
-  const PR = {esc:escape, t:(s,v) => v ? s.replace(/\{(\w+)\}/g, (m,k) => v[k]) : s,
+  const PR = {esc:escape, refLabel:id => id ? '[' + id + ']' : '', t:(s,v) => v ? s.replace(/\{(\w+)\}/g, (m,k) => v[k]) : s,
     pid:'paperA', store:{mode:'server'}, state:{paper:{references:[]}}, blockById:{}, $$:() => [], on(){},
     api:url => { requests.push(url); return Promise.resolve(graphs[url.split('/')[3]]); }};
   vm.runInNewContext(source,{window:{PR}, document, encodeURIComponent, Map, Promise});
