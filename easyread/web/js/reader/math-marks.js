@@ -3,6 +3,19 @@
   "use strict";
   const watched = new Set(), pending = new Set();
   let frame = 0;
+  // Inline math shares the actual painted box of the same annotation in prose.
+  // A wrapped text mark has a separate client rect on each visual line.
+  function proseBoxes(math, mark) {
+    if (math.closest(".katex-display")) return [];
+    const prose = math.closest(".zh, .en");
+    if (!prose) return [];
+    const key = mark.dataset.note ? "note" : "card";
+    const selector = 'mark.hl[data-' + key + '="' + CSS.escape(mark.dataset[key]) + '"]';
+    return [...prose.querySelectorAll(selector)]
+      .filter(el => !el.closest(".katex"))
+      .flatMap(el => [...el.getClientRects()]);
+  }
+
   function draw(math) {
     math.querySelectorAll("mark.math-band").forEach(mark => mark.remove());
     const fragments = [...math.querySelectorAll("mark.hl")];
@@ -32,9 +45,14 @@
       group.marks.push(mark);
       }
     }
-    for (const line of lines) for (const group of line.groups.values()) {
+    const textBoxes = new Map();
+    for (const line of lines) for (const [id, group] of line.groups) {
       if (!Number.isFinite(group.left) || group.right <= group.left) continue;
       const { base, bounds, scaleX, scaleY } = group;
+      if (!textBoxes.has(id)) textBoxes.set(id, proseBoxes(math, group.first));
+      const prose = textBoxes.get(id).find(rect => rect.width && rect.top <= line.baseline && line.baseline < rect.bottom);
+      const top = prose ? prose.top : line.top;
+      const bottom = prose ? prose.bottom : line.bottom;
       const band = document.createElement("mark");
       band.className = group.first.className + " math-band";
       for (const key of ["note", "card"]) if (group.first.dataset[key]) band.dataset[key] = group.first.dataset[key];
@@ -43,9 +61,9 @@
       // Join those sharing a baseline, while keeping wrapped lines separate.
       // Partial selections retain their horizontal span and saved text anchor.
       band.style.left = (group.left - bounds.left) / scaleX + "px";
-      band.style.top = (line.top - bounds.top) / scaleY + "px";
+      band.style.top = (top - bounds.top) / scaleY + "px";
       band.style.width = (group.right - group.left) / scaleX + "px";
-      band.style.height = (line.bottom - line.top) / scaleY + "px";
+      band.style.height = (bottom - top) / scaleY + "px";
       base.appendChild(band);
       group.marks.forEach(mark => mark.classList.add("math-fragment"));
     }
