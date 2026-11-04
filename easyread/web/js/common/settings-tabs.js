@@ -6,7 +6,13 @@
   /* ---------- 阅读 ---------- */
   /* 排版：和阅读页 Aa 面板是同一份设置，这里多一个“恢复默认” */
   function typeHtml(s) {
-    if (!s.type) s.type = Object.assign({}, PR.TYPE_DEFAULTS, PR.ls.get("easyread-prefs", {}));
+    if (!s.type) {
+      const saved = PR.ls.get("easyread-prefs", {}) || {};
+      s.type = Object.assign({}, PR.TYPE_DEFAULTS);
+      for (const key of [...Object.keys(PR.TYPE_DEFAULTS), "mode", "lead", "biOrder"]) {
+        if (key in saved) s.type[key] = saved[key];
+      }
+    }
     const t = Object.assign({ view: s.type.mode === "bi" ? "both" : s.type.lead === "original" ? "original" : "translation" }, s.type), range = (a, b, step) => { const out = []; for (let v = a; v <= b + 1e-9; v += step) out.push([+v.toFixed(2), +v.toFixed(2)]); return out; };
     const sel = (key, label, list) => '<label class="field"><span>' + label + '</span><select class="input" data-type="' + key + '">' + PR.opt(list, t[key]) + "</select></label>";
     return '<h4 class="set-h">' + PR.t("排版") + '</h4><div class="settings-sec grid3">' +
