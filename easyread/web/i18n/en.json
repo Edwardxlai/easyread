@@ -256,6 +256,7 @@
   "「{q}」": "“{q}”",
   "「{title}」。已经放到页边的讨论不受影响。": "“{title}”. Notes already pinned to the margin won't be affected.",
   "一个 Key 用各家模型；带 :free 的免费，有频率限制，名单常变，点“获取模型列表”看最新的。": "One key for models from many providers. Models ending in :free are free but rate-limited, and the list changes often; click “Fetch model list” for the latest.",
+  "一个 Key 用各家模型，按量付费；名单常变，点“获取模型列表”看最新的。": "One key for models from many providers, pay as you go. The list changes often; click “Fetch model list” for the latest.",
   "一个公式": "An equation",
   "上一段": "Previous paragraph",
   "上一页（[）": "Previous page ([)",

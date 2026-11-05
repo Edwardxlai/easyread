@@ -59,6 +59,10 @@ def _build(tr) -> list[dict]:
         {"id": "cerebras", "region": "intl", "name": "Cerebras", "base_url": "https://api.cerebras.ai/v1", "model": "gpt-oss-120b", "key": True, "free": True,
          "models": [_m("gpt-oss-120b", "GPT-OSS 120B", tr("免费额度")), _m("qwen-3.8-27b", "Qwen3.8 27B", tr("免费额度"))],
          "key_url": "https://cloud.cerebras.ai", "note": tr("开源模型、速度很快。")},
+        {"id": "atlascloud", "region": "intl", "name": "Atlas Cloud", "base_url": "https://api.atlascloud.ai/v1", "model": "deepseek-ai/deepseek-v4-flash", "key": True, "free": False,
+         "models": [_m("deepseek-ai/deepseek-v4-flash", "DeepSeek V4 Flash", tr("付费")), _m("moonshotai/kimi-k3", "Kimi K3", tr("付费、能看图"), True),
+                    _m("zai-org/glm-5.3", "GLM-5.3", tr("付费"))],
+         "key_url": "https://console.atlascloud.ai/api-keys", "note": tr("一个 Key 用各家模型，按量付费；名单常变，点“获取模型列表”看最新的。")},
         # ---- 本机 ----
         {"id": "ollama", "region": "local", "name": "Ollama", "base_url": "http://127.0.0.1:11434/v1", "model": "qwen3.5:9b", "key": False, "free": True,
          "models": [_m("qwen3.5:9b", "Qwen3.5 9B", tr("下载 6.6 GB，推荐")), _m("qwen3.5:4b", "Qwen3.5 4B", tr("下载 3.4 GB，显卡小用")),
