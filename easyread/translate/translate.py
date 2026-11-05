@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import re
 import threading
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 
 from . import codeblocks, consistency, continuation, front_context, langs, page_check, prompts, prompts_en, segments, sentences, terms
@@ -174,7 +175,9 @@ def _one_batch(ws: Workspace, cfg: dict, batch: list[int], total_pages: int, can
     try:
         data = engines.parse_json(text)
     except engines.EngineError:
-        (ws.root / "extract" / f"failed-{batch[0]:03d}.txt").write_text(text, encoding="utf-8")
+        failed = ws.root / "extract"
+        failed.mkdir(parents=True, exist_ok=True)
+        (failed / f"failed-{batch[0]:03d}-{uuid.uuid4().hex}.txt").write_text(text, encoding="utf-8")
         raise
     data = _normalize(data, batch, _taken(ws, batch))
     expected_notes = footnotes.expected(ws, data["blocks"])

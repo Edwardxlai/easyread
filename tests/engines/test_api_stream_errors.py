@@ -63,7 +63,7 @@ class APIStreamErrorsTest(unittest.TestCase):
 
     def test_valid_completion_markers(self):
         for api, events, done in [
-            ("chat", [{"choices": [{"delta": {"content": "好"}}]}], True),
+            ("chat", [{"choices": [{"delta": {"content": "好"}, "finish_reason": "stop"}]}], True),
             ("chat", [{"choices": [{"delta": {"content": "好"}, "finish_reason": "stop"}]}], False),
             ("responses", [{"type": "response.output_text.delta", "delta": "好"}, {"type": "response.completed"}], False),
         ]:
@@ -72,8 +72,14 @@ class APIStreamErrorsTest(unittest.TestCase):
             self.assertTrue(response.closed)
 
     def test_multiline_sse_data_and_comments(self):
-        response = io.BytesIO(b': ping\r\nevent: message\r\ndata: {"choices": [\r\ndata: {"delta": {"content": "ok"}}]}\r\n\r\ndata: [DONE]\r\n\r\n')
+        response = io.BytesIO(b': ping\r\nevent: message\r\ndata: {"choices": [\r\ndata: {"delta": {"content": "ok"}, "finish_reason": "stop"}]}\r\n\r\ndata: [DONE]\r\n\r\n')
         self.assertEqual(self.run_stream(response), "ok")
+
+    def test_done_without_completion_is_not_a_successful_answer(self):
+        for api, first in [("chat", {"choices": [{"delta": {"content": "partial"}}]}),
+                           ("responses", {"type": "response.output_text.delta", "delta": "partial"})]:
+            with self.subTest(api=api), self.assertRaises(openai_api.StreamInterrupted):
+                self.run_stream(sse([first], done=True), api)
 
     def test_relay_framing_without_blank_lines(self):
         delta = b'data: {"choices": [{"delta": {"content": "ok"}}]}'
