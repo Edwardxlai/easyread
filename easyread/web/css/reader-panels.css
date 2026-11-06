@@ -35,7 +35,7 @@ body.drawer-open #scrim { opacity: 1; pointer-events: auto; }
 
 /* 右侧面板（原页 / 笔记，一次一个） */
 .side-panel { position: fixed; top: var(--bar-h); right: 0; bottom: 0; z-index: 40; width: var(--side-w); background: var(--surface); border-left: 1px solid var(--rule); transform: translateX(102%); transition: transform .22s cubic-bezier(.2, .8, .2, 1); display: flex; flex-direction: column; }
-body.pv-open #pageview, body.np-open #notespanel { transform: none; }
+body.pv-open #pageview, body.np-open #notespanel, body.fp-open #figurespanel { transform: none; }
 /* 面板左边缘的拖动把手（side-resize.js）；窄屏面板是固定宽度，不显示 */
 .panel-grip { display: none; position: fixed; top: var(--bar-h); bottom: 0; right: calc(var(--side-w) - 3px); width: 6px; cursor: col-resize; z-index: 41; }
 @media (min-width: 1180px) { body.side-open .panel-grip { display: block; } }
@@ -68,7 +68,7 @@ body.pv-open .blk.pv-pair::before { background: rgba(214, 160, 40, .8); opacity:
 
 /* 笔记面板 */
 /* 笔记、问 AI 和原页一样宽（约占右侧 44%）；窄屏时盖在正文上 */
-@media (max-width: 1179px) { #notespanel, #chatpanel { width: min(600px, 100vw); } }
+@media (max-width: 1179px) { #notespanel, #chatpanel, #figurespanel { width: min(600px, 100vw); } }
 @media (max-width: 760px) { #pageview { width: 100vw; } .pv-follow { white-space: nowrap; } }
 .np-head { display: flex; align-items: center; gap: 6px; height: 50px; padding: 0 10px 0 14px; border-bottom: 1px solid var(--rule); flex: none; }
 .np-head .grow { flex: 1; }
@@ -102,6 +102,25 @@ body.pv-open .blk.pv-pair::before { background: rgba(214, 160, 40, .8); opacity:
 .np-tools .nh-btns { display: inline-flex; gap: 6px; }
 .np-preview { flex: 1; overflow-y: auto; font: 15px/1.9 var(--serif-zh); color: var(--ink); padding: 4px 4px 30px; }
 .np-preview p { margin: 0 0 .9em; }
+
+/* 图片面板：图片保持完整比例，图注和图内文字沿用正文的语言选择，列表自行滚动。 */
+.fp-title { font-size: 14px; font-weight: 600; }
+.fp-count { font-size: 12px; color: var(--ink-3); }
+.fp-list { flex: 1; min-height: 0; overflow-y: scroll; overscroll-behavior: contain; scrollbar-gutter: stable; padding: 0 20px 40px; }
+.fp-card { padding: 16px 0 24px; border-bottom: 1px solid var(--rule); overflow-wrap: anywhere; }
+.fp-card-head { display: flex; align-items: center; gap: 6px; margin-bottom: 12px; font-size: 13px; color: var(--ink-2); }
+.fp-card-head .grow { flex: 1; }
+.fp-card .media-image img { height: auto; max-width: 100%; }
+.fp-text { margin-top: 16px; font: 15px/1.85 var(--serif-zh); color: var(--ink); }
+.fp-text-label { margin-bottom: 5px; color: var(--ink-3); font: 12px/1.5 var(--ui); }
+.fp-pair { display: flex; flex-direction: column; gap: 10px; }
+.fp-original { font-family: var(--serif-en); }
+.fp-text .fp-bilingual .fp-original { color: var(--ink-2); }
+body:not(.mode-bi):not(.original-first) .fp-bilingual > .fp-original { display: none; }
+body:not(.mode-bi).original-first .fp-bilingual > .fp-translation { display: none; }
+body.original-first .fp-pair > .fp-original { order: -1; }
+.fp-text .katex-display { overflow-x: auto; overflow-y: hidden; }
+.fp-empty { padding: 30px 0; color: var(--ink-3); font-size: 14px; line-height: 1.8; }
 
 /* 阅读设置 */
 #settings { top: calc(var(--bar-h) + 6px); right: 12px; width: 300px; padding: 14px 16px; font-size: 13px; }

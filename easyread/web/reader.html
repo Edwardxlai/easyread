@@ -44,6 +44,7 @@
     <button class="order-caret" data-order-menu aria-haspopup="menu" aria-expanded="false"></button>
   </div>
   <button class="btn" data-act="pages" title="PDF 原页，跟随阅读位置（O）"></button>
+  <button class="btn" data-act="figures" title="图片面板" aria-controls="figurespanel" aria-pressed="false"></button>
   <button class="btn" data-act="notes" title="笔记面板（M）"></button>
   <button class="btn" data-act="chat" title="边读边问 AI（A）"></button>
   <button class="btn" data-act="settings" title="字号、版心、字体（=、- 调字号）">Aa</button>
@@ -66,6 +67,16 @@
   <article id="paper" lang="zh-CN"></article>
   <aside id="margin" aria-label="讨论与笔记"></aside>
 </main>
+
+<section id="figurespanel" class="side-panel" aria-label="图片面板" aria-hidden="true" inert>
+  <div class="np-head">
+    <strong class="fp-title">图片</strong>
+    <span class="fp-count" aria-live="polite"></span>
+    <span class="grow"></span>
+    <button class="btn icon" data-fp-close title="关闭">×</button>
+  </div>
+  <div class="fp-list" tabindex="0" aria-label="论文图片"></div>
+</section>
 
 <section id="pageview" class="side-panel" aria-label="PDF 原页">
   <div class="pv-head">
@@ -135,6 +146,7 @@
 <script src="/web/js/reader/reading-language.js"></script>
 <script src="/web/js/reader/page-zoom.js"></script>
 <script src="/web/js/reader/pageview.js"></script>
+<script src="/web/js/reader/figurespanel.js"></script>
 <script src="/web/js/reader/pdf-text.js"></script>
 <script src="/web/js/reader/side-resize.js"></script>
 <script src="/web/vendor/note-libraries.js"></script>

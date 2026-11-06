@@ -9,7 +9,7 @@
     (loc.boxes?.length ? loc.boxes : [loc.box]).map(box => ({ page: loc.page, box }));
   const boxesOf = (loc, page) => regionsOf(loc).filter(r => r.page === page).map(r => r.box);
 
-  /* 右侧面板开关：pages | notes | null */
+  /* 右侧面板开关：pages | figures | notes | chat | null */
   /* 面板滑出的同时正文就让位：重排只要几十毫秒（fitWide 不再重量公式），不必等面板滑完再跳一下。 */
   PR.side = null;
   PR.openSide = function (name) {
@@ -19,6 +19,13 @@
     body.classList.toggle("pv-open", name === "pages");
     body.classList.toggle("np-open", name === "notes");
     body.classList.toggle("ch-open", name === "chat");
+    body.classList.toggle("fp-open", name === "figures");
+    const figures = PR.$("#figurespanel"), figuresButton = PR.$('[data-act="figures"]');
+    if (figures) {
+      if (name !== "figures" && figures.contains(document.activeElement)) figuresButton?.focus({ preventScroll: true });
+      figures.inert = name !== "figures"; figures.setAttribute("aria-hidden", name !== "figures");
+    }
+    if (figuresButton) { figuresButton.classList.toggle("on", name === "figures"); figuresButton.setAttribute("aria-pressed", name === "figures"); }
     PR.$('[data-act="chat"]').classList.toggle("on", name === "chat");
     PR.$('[data-act="pages"]').classList.toggle("on", name === "pages");
     PR.$('[data-act="notes"]').classList.toggle("on", name === "notes");
