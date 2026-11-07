@@ -1,6 +1,6 @@
 # 更新记录
 
-## v1.4.7（未发布）
+## v1.4.7（2026-11-07）
 
 - **引用论文导航与导入**。从参考文献打开库里的论文，或通过 DOI、arXiv、链接、本地 PDF 导入被引论文。引用树显示库内已识别的引用关系，跨论文跳转后可以逐层返回原来的阅读位置。[PR #131](https://github.com/Edwardxlai/easyread/pull/131) · @wangwu-30
 - **全屏论文笔记**。选中原文可以把摘录插到笔记光标处，点击摘录可回到原文。支持全屏编辑、按 Esc 回到侧栏，以及导出带原文链接的 XMind 导图。[PR #142](https://github.com/Edwardxlai/easyread/pull/142) · @hyskr
