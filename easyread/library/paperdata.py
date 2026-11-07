@@ -7,6 +7,7 @@ import json
 from ..translate import codeblocks, sentences
 from ..app.i18n import tr
 from .glossary import merge_glossary
+from .reference_entries import merge_references
 from .store import Workspace, now_iso
 
 BLOCK_TYPES = {"heading", "para", "list", "math", "table", "figure", "references", "note"}
@@ -90,8 +91,7 @@ def merge_blocks(ws: Workspace, data: dict, done=None, replace_pages=None, en_on
             n_new += 1
         merge_glossary(paper, data.get("glossary"))
         if data.get("references"):
-            have = {str(x.get("id")) for x in paper.get("references", [])}
-            paper["references"] = paper.get("references", []) + [x for x in data["references"] if str(x.get("id")) not in have]
+            paper["references"] = merge_references(paper.get("references", []), data["references"])
         if data.get("meta"):
             meta = paper.setdefault("meta", {})
             for k, v in data["meta"].items():

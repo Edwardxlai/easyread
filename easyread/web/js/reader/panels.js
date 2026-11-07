@@ -156,18 +156,21 @@
   let tab = "toc";
   PR.toggleDrawer = function (force, which) {
     if (which) tab = which;
+    PR.$('[data-tab="citations"]').hidden = PR.store.mode !== "server";
+    PR.$('[data-tab="recent"]').hidden = PR.store.mode !== "server";
     const open = force != null ? force : !body.classList.contains("drawer-open");
     body.classList.toggle("drawer-open", open);
-    if (open) PR.renderDrawer();
+    if (open) PR.renderDrawer(true);
   };
   PR.$("#scrim").onclick = () => PR.toggleDrawer(false);
   if (PR.store.mode !== "server") PR.$('[data-tab="recent"]').hidden = true;  // 离线单文件版没有文献库
-  PR.$(".drawer-tabs").addEventListener("click", (e) => { const b = e.target.closest("[data-tab]"); if (b) { tab = b.dataset.tab; PR.renderDrawer(); } });
+  PR.$(".drawer-tabs").addEventListener("click", (e) => { const b = e.target.closest("[data-tab]"); if (b) { tab = b.dataset.tab; PR.renderDrawer(true); } });
 
-  PR.renderDrawer = function () {
+  PR.renderDrawer = function (reopened = false) {
     PR.$$(".drawer-tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab));
     const box = PR.$(".drawer-body");
-    box.innerHTML = ({ toc: tocHtml, terms: termsHtml, about: aboutHtml, recent: recentHtml })[tab]();
+    if (tab === "citations") PR.citationsDrawer(box, reopened);
+    else box.innerHTML = ({ toc: tocHtml, terms: termsHtml, about: aboutHtml, recent: recentHtml })[tab]();
     box.className = "drawer-body " + tab;
   };
   /* 最近读过的论文：不用回文献库就能换一篇 */

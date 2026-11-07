@@ -86,24 +86,41 @@
       try {
         const response = await fetch(url.href);
         if (!response.ok) throw new Error(t("没有这篇论文"));
-        return open(response.url);
+        const target = new URL(response.url);
+        const block = url.searchParams.get("block");
+        if (block) target.hash = block;
+        return open(target.href);
       } catch (error) { notify(error.message); return; }
     }
     const match = url.pathname.match(/^\/read\/([a-zA-Z0-9_-]+)$/);
     if (url.origin !== location.origin || !match) return;
     const id = match[1];
-    if (!tabs.has(id)) create(id, url.href, t("正在打开…"));
-    else if (url.hash) tabs.get(id).frame.contentWindow.location.hash = url.hash;
+    const existing = tabs.has(id);
+    if (!existing) create(id, url.href, t("正在打开…"));
     select(id);
+    if (!existing) return;
+    const frame = tabs.get(id).frame, win = frame.contentWindow;
+    if (url.searchParams.has("cite_from") || url.searchParams.has("cite_return")) {
+      if (!win.PR?.state?.paper) { frame.src = url.href; return; }
+      win.history.replaceState(win.history.state, "", url.href);
+      win.PR.citationNav.setup();
+      if (url.searchParams.has("cite_return")) win.PR.citationNav.restore();
+      else if (url.hash) win.PR.jumpTo(decodeURIComponent(url.hash.slice(1)), { noBack: true, instant: true });
+    } else if (url.hash) {
+      win.location.hash = url.hash;
+      if (win.PR?.jumpTo) requestAnimationFrame(() => win.PR.jumpTo(url.hash.slice(1), { instant: true }));
+    }
   }
   function bind(tab) {
     const win = tab.frame.contentWindow, doc = win.document;
     if (win.PR?.lib) win.PR.lib.openReader = id => open("/read/" + encodeURIComponent(id));
+    if (win.PR?.citationNav) win.PR.openPaperTab = open;
     doc.addEventListener("click", e => {
       const link = e.target.closest("a[href]");
-      if (!link) return;
+      if (!link || link.matches("[data-cite-paper], [data-cite-passage]")) return;
       const url = new URL(link.href);
       if (url.origin !== location.origin) return;
+      if (url.hash && url.pathname === win.location.pathname && url.search === win.location.search) return;
       if (url.pathname.startsWith("/read/")) {
         e.preventDefault(); e.stopImmediatePropagation(); open(url.href);
       } else if (url.pathname === "/" || url.pathname === "/index.html") {

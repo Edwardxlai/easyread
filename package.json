@@ -28,6 +28,7 @@
     "electron": "^44.5.1",
     "electron-builder": "^26.15.3",
     "esbuild": "^0.28.2",
+    "fflate": "^0.8.3",
     "markmap-lib": "^0.18.12",
     "markmap-view": "^0.18.12",
     "react": "^18.3.1",
@@ -35,10 +36,23 @@
     "sass": "^1.106.1"
   },
   "build": {
-    "publish": [{ "provider": "github", "owner": "Edwardxlai", "repo": "easyread" }],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Edwardxlai",
+        "repo": "easyread"
+      }
+    ],
     "appId": "com.edwardxlai.easyread",
     "productName": "EasyRead",
-    "protocols": [{ "name": "EasyRead", "schemes": ["easyread"] }],
+    "protocols": [
+      {
+        "name": "EasyRead",
+        "schemes": [
+          "easyread"
+        ]
+      }
+    ],
     "asar": true,
     "directories": {
       "output": "dist/electron"

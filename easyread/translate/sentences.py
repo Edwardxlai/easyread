@@ -38,7 +38,8 @@ def _pieces(text: str) -> list[str]:
     for i, c in enumerate(text):
         if c != MARK or any(a <= i < b for a, b in spans):
             continue
-        before, after = text[:i].rstrip(), text[i + 1:i + 2]
+        # **加粗的句子。**‖：句末标点在收尾的 ** / * 前面，越过它们再看
+        before, after = text[:i].rstrip().rstrip("*").rstrip(), text[i + 1:i + 2]
         spaced = i > 0 and text[i - 1].isspace() and (not after or after.isspace())
         if (before and (before[-1] in _BEFORE or before.endswith("$"))) or spaced:
             out.append(text[last:i])

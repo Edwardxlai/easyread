@@ -92,3 +92,11 @@ test('node positions move with inserted content, while atomic equations use one 
   assert.equal(changed.children[1].payload.from, 6);
   assert.equal(findMapNode(changed, 8).node.content, '内容');
 });
+
+test('multi-paragraph quotations form one map node with the full source range', () => {
+  const { toMindMap } = libraries();
+  const map = toMindMap({ content: [{ type: 'blockquote', content: [para('First paragraph'), para('Second paragraph')] }] }, 'Paper');
+  assert.equal(map.children.length, 1);
+  assert.equal(map.children[0].content, '<p>First paragraph</p><p>Second paragraph</p>');
+  assert.equal(map.children[0].payload.type, 'blockquote');
+});

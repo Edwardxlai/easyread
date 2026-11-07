@@ -36,6 +36,20 @@ class MissingPagesTest(unittest.TestCase):
         (self.ws.root / "extract" / "page-002.txt").write_text("Figure 3\n\n2\n", encoding="utf-8")
         self.assertEqual(page_check.missing_pages(self.ws, [1, 2], {"blocks": [block(1)]}), [])
 
+    def test_bibliography_page_without_entries_is_missing(self):
+        # The model gave the References heading block but forgot the entries: they would be lost for good.
+        (self.ws.root / "extract" / "page-002.txt").write_text(
+            "The end of the conclusion.\nReferences\n" + "Carlos E. Jimenez, John Yang, and Karthik Narasimhan. SWE-bench. In ICLR, 2024.\n" * 3,
+            encoding="utf-8")
+        heading = {"id": "refs", "type": "references", "page": 2, "en": "References", "zh": "参考文献"}
+        self.assertEqual(page_check.missing_pages(self.ws, [1, 2], {"blocks": [block(1), heading]}), [2])
+        self.assertEqual(page_check.missing_pages(self.ws, [2], {"blocks": [heading]}), [2])  # a one-page batch too
+        entries = [{"id": "Jimenez-2024", "text": "Carlos E. Jimenez …"}]
+        self.assertEqual(page_check.missing_pages(self.ws, [1, 2], {"blocks": [block(1), heading], "references": entries}), [])
+        # A heading alone at the foot of the page, entries starting on the next page: nothing is lost here.
+        (self.ws.root / "extract" / "page-002.txt").write_text(PAGE2 + "\nReferences\n", encoding="utf-8")
+        self.assertEqual(page_check.missing_pages(self.ws, [1, 2], {"blocks": [block(1), block(2, PAGE2), heading]}), [])
+
 
 class RepairOldPapersTest(unittest.TestCase):
     """旧版本按批记完成，漏掉的页也在 done_pages 里：文献库列表里查一次，改回没译。"""

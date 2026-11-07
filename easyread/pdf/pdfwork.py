@@ -184,12 +184,18 @@ def _boxes(chars, idx, a: int, b: int) -> list[list[float]]:
     return boxes
 
 
+_MD_LINK = re.compile(r"\[((?:\\.|[^\]\\\n])*)\]\([^)\s]*\)")
+
+
 def block_english(block: dict) -> str:
+    """The block's original text as printed: link targets ([words](#tab:3), [words](https://…)) are not on the page."""
     if block.get("type") == "list":
-        return " ".join(it.get("en", "") for it in block.get("items", []))
-    if block.get("type") in ("table", "figure"):
-        return block.get("caption_en", "")
-    return block.get("en", "")
+        text = " ".join(it.get("en", "") for it in block.get("items", []))
+    elif block.get("type") in ("table", "figure"):
+        text = block.get("caption_en", "")
+    else:
+        text = block.get("en", "")
+    return _MD_LINK.sub(lambda m: m.group(1), text or "")
 
 
 def locate(root: Path) -> dict:
