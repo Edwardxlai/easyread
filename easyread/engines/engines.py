@@ -18,6 +18,7 @@ import threading
 from pathlib import Path
 
 from ..app.i18n import tr
+from .timing import stage
 from . import agent_cli, codebuddy_cli, codex_lean, netcheck, usage, opencode_cli, zcode_cli, qoder_cli
 from ..app.log import log
 
@@ -49,7 +50,8 @@ def run(cfg: dict, prompt: str, cwd: Path, images: list[Path] | None = None, can
     if bad:
         raise EngineError(bad)
     try:
-        return _run(cfg, prompt, cwd, images, cancel, meter)
+        with stage(meter, "model"):
+            return _run(cfg, prompt, cwd, images, cancel, meter)
     except EngineError as e:
         raise EngineError(netcheck.explain(cfg, str(e))) from None
 
@@ -224,7 +226,10 @@ def _codex_once(exe: str, c: dict, prompt: str, cwd: Path, images: list[Path], c
             args += ["-c", key + "=" + json.dumps(c[field])]
     args += extra
     if c.get("_chat"):
-        args += ["-c", 'web_search="live"']
+        # Codex dispatches built-in web search through its code-mode host.
+        args += ["-c", "features.code_mode_host=true", "-c", 'web_search="live"']
+    elif extra:
+        args += ["-c", "features.code_mode_host=false"]
     args += ["-"]
     try:
         out = _communicate(_popen(args, cwd), prompt, int(c.get("timeout") or 1200), cancel)

@@ -119,6 +119,15 @@ test('regenerated images can use user-corrected labels without altering the tran
   assert.doesNotMatch(render([b]), /data-translated-figure/);
 });
 
+test("old single-cell notes render below the table while populated data rows stay inside", () => {
+  const block = {id: "t1", type: "table", page: 1, head: [["A", "B"]],
+    rows: [["Note: item", "21"], ["注：标准差。", ""], ["Notes: <source>"]]};
+  const html = render([block]);
+  assert.match(html, /<td>Note: item<\/td><td>21<\/td>/);
+  assert.match(html, /<\/table>[\s\S]*注：标准差。[\s\S]*Notes: &lt;source&gt;/);
+  assert.equal(block.rows.length, 3);
+});
+
 test("flat table head renders as one header row and does not hide later blocks", () => {
   const html = render([
     { id: "tab1", type: "table", page: 1, head: ["Method", "Score"], rows: [["A", "0.8"]] },

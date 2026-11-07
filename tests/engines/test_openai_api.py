@@ -80,6 +80,13 @@ class OpenAIApiTest(unittest.TestCase):
         self.assertEqual(body["input"][0]["content"][0], {"type": "input_text", "text": "问题"})
         self.assertEqual((meter.data["calls"], meter.data["input"], meter.data["output"]), (1, 9, 2))
 
+    def test_ollama_translation_leaves_temperature_to_the_model(self):
+        options = {"base_url": self.base, "model": "m", "preset": "ollama"}
+        self.assertEqual(openai_api.complete(options, "q", []), "chat-ok")
+        path, body = SEEN[0]
+        self.assertEqual(path, "/v1/chat/completions")
+        self.assertNotIn("temperature", body)
+
     def test_chat_complete_streams_and_counts_usage_once(self):
         # 一次性返回要等整批译完，推理模型常要几分钟，中转站前面的 Cloudflare 等不了（524）：翻译也走流式
         meter = usage.Meter()

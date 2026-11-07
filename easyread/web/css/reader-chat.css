@@ -149,3 +149,6 @@ body.ch-open #chatpanel { transform: none; }
 #chatInput::placeholder { color: var(--ink-3); opacity: 1; }
 .ch-attach-status { font-size: 12px; color: var(--ink-3); }
 .ch-attach-status[role="alert"] { color: var(--danger, #b43b3b); }
+
+.ch-document { display:inline-block; max-width:100%; overflow-wrap:anywhere; font-size:.85em; padding:2px 6px; margin:2px; border:1px solid var(--rule); border-radius:6px }
+.ch-document button { border:0; background:transparent; color:inherit; cursor:pointer }

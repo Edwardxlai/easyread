@@ -44,7 +44,7 @@ async function reader(threads = [], options = {}) {
     window: { PR }, katex: require("../../easyread/web/vendor/katex/katex.min.js"),
   });
   vm.runInNewContext(source("chat-effort"), { window: { PR } });
-  vm.runInNewContext(source("chat-images") + "\n" + source("chat"), {
+  vm.runInNewContext(source("chat-images") + "\n" + source("chat-documents") + "\n" + source("chat"), {
     window: { PR, addEventListener() {} },
     document: { addEventListener(name, fn) { if (!listeners.has(name)) listeners.set(name, []); listeners.get(name).push(fn); } },
     navigator: { clipboard: { async writeText(text) { copied.push(text); } } },
@@ -88,10 +88,26 @@ async function reader(threads = [], options = {}) {
     await click("style-pick", null, null, { s: value });          // 选一档
   };
   return { PR, panel, nodes, requests, copied, confirmations, dispatch, click, selectThread, setStyle,
+    drop: files => panelEvents.get("drop")({ dataTransfer: { files }, preventDefault() {} }),
+    choose: files => panelEvents.get("change")({ target: { id: "chatFileInput", files } }),
     finishImages: () => pendingReads.splice(0).forEach(done => done()),
     paste: files => { let prevented = false; return Promise.resolve(panelEvents.get("paste")({ target: { id: "chatInput" }, clipboardData: { items: files.map(file => ({ kind: "file", type: file.type, getAsFile: () => file })) }, preventDefault: () => { prevented = true; } })).then(() => prevented); },
     emit: async name => { await events.get(name)(); await settled(); }, finish: () => finish() };
 }
+
+test("dropped documents reach the request and a new thread clears picked attachments", async () => {
+  const r = await reader();
+  const file = { name: "notes.txt", size: 4, data: "data:text/plain;base64,bm90ZQ==" };
+  await r.drop([file]);
+  assert.match(r.panel.innerHTML, /notes\.txt/);
+  const sending = r.click("send");
+  await settled();
+  assert.deepEqual(r.requests[0].documents, [{ name: "notes.txt", data: "bm90ZQ==" }]);
+  r.finish(); await sending;
+  r.choose([file]); await settled();
+  await r.click("new");
+  assert.doesNotMatch(r.panel.innerHTML, /notes\.txt/);
+});
 
 test("the answer-style button opens a menu and every mode reaches the request", async () => {
   const r = await reader();

@@ -54,7 +54,7 @@ async function desktop(platform = "darwin", lock = true, ready = true, argv = []
   };
   const proc = new EventEmitter();
   Object.assign(proc, { platform, env: {}, resourcesPath: "/tmp/Resources", argv: ["EasyRead.exe", ...argv] });
-  const fakeRequire = name => name === "electron" ? { app, BrowserWindow: Window, Menu, ipcMain, dialog: { showErrorBox() {}, showOpenDialog: async () => ({ canceled: false, filePaths: ["/tmp/chosen"] }) }, shell: {} }
+  const fakeRequire = name => name === "electron" ? { app, BrowserWindow: Window, Menu, ipcMain, crashReporter: { start() {} }, dialog: { showErrorBox() {}, showMessageBox: async () => ({ response: 0 }), showOpenDialog: async () => ({ canceled: false, filePaths: ["/tmp/chosen"] }) }, shell: {} }
     : name === "child_process" ? childProcess : name === "fs" ? { existsSync: () => true }
     : name === "http" ? { request(url, options, callback) {
       requests.push(url.pathname);
@@ -85,6 +85,21 @@ test("startup survives a missing appData path instead of crashing the main proce
   const d = await desktop("win32", true, true, [], true);
   assert.ok(d.app.paths.userData.endsWith("EasyRead"));
   assert.equal(d.windows.length, 1);
+  d.app.quit();
+});
+
+test("a renderer crash restores the tab shell and a repeated crash can reopen the library", async () => {
+  const d = await desktop("win32");
+  const win = d.windows[0], wc = win.webContents, library = win.url;
+  const reading = library + "#paper=paper1&paper=paper2&active=paper2";
+  wc.emit("did-navigate-in-page", {}, reading, true);
+  wc.emit("did-navigate-in-page", {}, "http://127.0.0.1:9876/read/paper2#b-p2", false);
+  const crash = { reason: "crashed", exitCode: -2147483645 };
+  wc.emit("render-process-gone", {}, crash);
+  assert.equal(win.url, reading);
+  wc.emit("render-process-gone", {}, crash);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(win.url, library);
   d.app.quit();
 });
 

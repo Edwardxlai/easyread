@@ -52,14 +52,19 @@
   document.addEventListener("keydown", (e) => {
     if (e.target.closest("textarea, input, [contenteditable]") || e.ctrlKey || e.metaKey || e.altKey) return;
     const k = e.key.toLowerCase();
-    if (PR.hasPendingSelection() && PR.keysOn) {
+    if (PR.keysOn) {
       // An active IME can report "Process" outside editors. Resolve physical
       // keys only here; keep the selected pen and existing modifier behavior.
       const digit = !e.shiftKey && { Digit1: "1", Digit2: "2", Digit3: "3", Digit4: "4" }[e.code];
       const selectionKey = digit || { KeyN: "n", KeyQ: "q" }[e.code] || k;
       const m = { 1: "yellow", 2: "green", 3: "blue", 4: "pink" }[selectionKey];
-      if (m) { e.preventDefault(); return PR.selectionAction("highlight", m); }
-      if (selectionKey === "n" || selectionKey === "q") { e.preventDefault(); return PR.selectionAction(selectionKey === "n" ? "note" : "question"); }
+      if (PR.hasPendingSelection()) {
+        if (m) { e.preventDefault(); return PR.selectionAction("highlight", m); }
+        if (selectionKey === "n" || selectionKey === "q") { e.preventDefault(); return PR.selectionAction(selectionKey === "n" ? "note" : "question"); }
+      } else if (m && !e.repeat) {
+        const swatch = document.querySelector('#popover.open [data-hl-color="' + m + '"]');
+        if (swatch) { e.preventDefault(); swatch.click(); return; }
+      }
     }
     if (k === "escape") {
       if (e.defaultPrevented || e.repeat) return;
@@ -77,13 +82,28 @@
 
   /* ---------- 数据变化 ---------- */
   const busy = () => PR.editingKey || PR.editingNote || PR.noteMedia.isRenaming();
+  const highlightBlocks = new Set();
+  let refreshAllMarks = false;
   const refreshNotes = PR.debounce(() => {
     if (busy()) return refreshNotes();
-    PR.applyMarks(); PR.renderMargin();
+    if (refreshAllMarks) PR.applyMarks();
+    else highlightBlocks.forEach(id => PR.applyMarks(id));
+    highlightBlocks.clear();
+    refreshAllMarks = false;
+    PR.renderMargin();
     if (PR.notesPanelOpen()) PR.renderNotesPanel();
     if (body.classList.contains("drawer-open")) PR.renderDrawer();
   }, 80);
-  PR.on("reader", (op) => { if (op && op.op === "progress") return; if (!busy()) refreshNotes(); });
+  PR.on("reader", (op) => {
+    if (op?.op === "progress") return;
+    if (busy()) {
+      if (op?.highlightBlocks) setTimeout(() => op.highlightBlocks.forEach(id => PR.applyMarks(id)), 0);
+      return;
+    }
+    if (op?.highlightBlocks) op.highlightBlocks.forEach(id => highlightBlocks.add(id));
+    else refreshAllMarks = true;
+    refreshNotes();
+  });
 
   const seen = new Set();
   PR.on("remote", (changed) => {

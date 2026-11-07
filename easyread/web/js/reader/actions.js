@@ -3,6 +3,11 @@
 (function (PR) {
   "use strict";
   const S = PR.state;
+  // In Windows Electron a native text drag can hit a block while Chromium
+  // is unlocking its deferred layout. Keep selectable blocks laid out there.
+  const ua = window.navigator?.userAgent || "";
+  const stableLayout = ua.includes("Windows") && ua.includes("Electron/");
+  if (stableLayout) document.documentElement.classList.add("stable-text-layout");
   let current = null;
   const bar = () => PR.$("#blockbar");
 
@@ -197,7 +202,7 @@
   document.addEventListener("mouseout", (e) => { if (e.target.closest && e.target.closest("a.cite, a.xref")) { clearTimeout(hoverT); PR.hidePopoverSoon(); } });
   document.addEventListener("click", (e) => {
     const footnote = e.target.closest("a.footnote-ref");
-    if (footnote) { e.preventDefault(); PR.jumpTo(footnote.dataset.footnote); return; }
+    if (footnote) { e.preventDefault(); PR.jumpTo(footnote.dataset.footnote, { origin: footnote }); return; }
     const a = e.target.closest("a.cite, a.xref");
     if (!a) return;
     e.preventDefault();
@@ -222,9 +227,9 @@
     if (cancelCentering) cancelCentering();
     // Deferred blocks change height during a long scroll. Keep the destination
     // laid out and measure again after scrolling and late image/layout changes.
-    const host = el.closest("#paper .blk") || el;
-    const visibility = host.style.contentVisibility;
-    host.style.contentVisibility = "visible";
+    const host = stableLayout ? null : el.closest("#paper .blk") || el;
+    const visibility = host?.style.contentVisibility;
+    if (host) host.style.contentVisibility = "visible";
     let settled = !!instant, stopped = false, idleTimer, inputTimer;
     const destination = () => {
       const r = el.getBoundingClientRect(), bar = (PR.$("#bar") || {}).offsetHeight || 0;
@@ -257,7 +262,7 @@
       window.removeEventListener("scrollend", settle);
       ["wheel", "keydown"].forEach(type => window.removeEventListener(type, stop, true));
       ["pointerdown", "touchstart"].forEach(type => window.removeEventListener(type, stopAfterPointer, true));
-      host.style.contentVisibility = visibility;
+      if (host) host.style.contentVisibility = visibility;
       cancelCentering = null;
     }
     const fallback = setTimeout(settle, 1400);
@@ -278,7 +283,7 @@
     const el = document.getElementById(domId);
     if (!el) return;
     opts = opts || {};
-    if (!opts.noBack && PR.rememberSpot) PR.rememberSpot(el);  // 跳得远就记下原处，好回去
+    if (!opts.noBack && PR.rememberSpot) PR.rememberSpot(el, opts.origin);  // 跳得远就记下原处，好回去
     PR.centerOn(el, opts.instant);
     if (!opts.noFlash) { el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash"); }
     history.replaceState(history.state, "", "#" + domId);

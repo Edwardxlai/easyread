@@ -99,7 +99,15 @@ class ChatImagesTest(unittest.TestCase):
         with patch("easyread.server.server.config.load", return_value={}), \
                 patch("easyread.server.server.chat_models.engine_cfg", return_value=({"engine":"codex", "codex":{}}, model)), \
                 patch("easyread.server.server.chat.stream", side_effect=lambda *args, **kwargs: iter(["Image received"])) as stream:
-            events = post({"text":"Explain", "images":[self.data]})
+            from tests.pdf.test_blank_footnotes import pdf
+            extra = self.ws.root / "supplement.pdf"
+            pdf(extra)
+            documents = [{"name": "supplement.pdf", "data": base64.b64encode(extra.read_bytes()).decode()},
+                         {"name": "notes.txt", "data": base64.b64encode(b"experiment group B").decode()}]
+            events = post({"text":"Explain", "images":[self.data], "documents": documents})
+            self.assertEqual([d["name"] for d in events[0]["documents"]], ["supplement.pdf", "notes.txt"])
+            self.assertIn("Normal body paragraph", stream.call_args.args[1])
+            self.assertIn("experiment group B", stream.call_args.args[1])
             tid = events[0]["thread"]
             saved = chat_store.get(self.ws, tid)["messages"][0]
             self.assertEqual(stream.call_args.kwargs["images"], [self.ws.root / saved["images"][0]])
@@ -108,6 +116,9 @@ class ChatImagesTest(unittest.TestCase):
                 self.assertTrue(response.read().startswith(b"\x89PNG"))
             post({"text":"And its color?", "thread":tid})
             self.assertEqual(stream.call_args.kwargs["images"], [self.ws.root / saved["images"][0]])
+            self.assertIn("Normal body paragraph", stream.call_args.args[1])
+            with self.assertRaises(urllib.error.HTTPError):
+                post({"text": "Invalid PDF", "documents": [{"name":"x.pdf","data":"eA=="}]})
             before = stream.call_count
             with self.assertRaises(urllib.error.HTTPError) as error:
                 post({"text":"Invalid", "images":["data:image/png;base64,bm90LWFuLWltYWdl"]})

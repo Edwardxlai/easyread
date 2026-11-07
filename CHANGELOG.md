@@ -1,5 +1,18 @@
 # 更新记录
 
+## v1.4.7（未发布）
+
+- **引用论文导航与导入**。从参考文献打开库里的论文，或通过 DOI、arXiv、链接、本地 PDF 导入被引论文。引用树显示库内已识别的引用关系，跨论文跳转后可以逐层返回原来的阅读位置。[PR #131](https://github.com/Edwardxlai/easyread/pull/131) · @wangwu-30
+- **全屏论文笔记**。选中原文可以把摘录插到笔记光标处，点击摘录可回到原文。支持全屏编辑、按 Esc 回到侧栏，以及导出带原文链接的 XMind 导图。[PR #142](https://github.com/Edwardxlai/easyread/pull/142) · @hyskr
+- **保留 PDF 排版与文内链接**。新整理和翻译的正文保留原文粗体、斜体，图、表、章节和公式按论文编号跳转。改善作者年份引用匹配，修复无编号的参考文献在并行翻译时丢失的问题。[PR #144](https://github.com/Edwardxlai/easyread/pull/144) · @ShiratsuYudachi
+- **划线与 Windows 阅读器**。正文和行内公式的荧光笔、下划线对齐。同色同笔型的重叠划线会合并，重新选中可以取消或转换笔型，笔记和回复随标记保留，支持整次撤销。修复拖选文字触发白屏的一条路径；渲染进程退出后可恢复论文标签，反复退出时可返回文献库。[#124](https://github.com/Edwardxlai/easyread/issues/124) · [#126](https://github.com/Edwardxlai/easyread/issues/126)
+- **问 AI 支持文件附件**。选择或拖入 PDF、TXT、Markdown 后，可对照当前论文提问并继续追问。每次最多两个文件，每个上限 8 MiB；PDF 提取文字，长文件使用节选。修复 Codex 已开启联网搜索却无法调用网页工具的问题。[#152](https://github.com/Edwardxlai/easyread/issues/152)
+- **翻译中断后只续译缺页**。重启后跳过已保存的页；手动指定重译时，仅继续所选范围内尚未完成的部分。模型返回缺少原文或译名的术语时会跳过该条，旧论文可以直接重试、重译单段或继续问 AI。[#146](https://github.com/Edwardxlai/easyread/issues/146) · [PR #147](https://github.com/Edwardxlai/easyread/pull/147) · @pratyu2h
+- **跨页段落与局部格式修复**。同一批次内，翻译和原文整理都要求将相邻页的同一自然段归到起始页，续文只输出一次；反馈者的原 PDF 仍待复测。可定位的公式和格式问题只送回相关块修正，PDF 原文定位会复用已匹配的文字。[#140](https://github.com/Edwardxlai/easyread/issues/140)
+- **金额、脚注、表注和代码**。修复美元金额被识别为公式的情况；旧译文中能唯一对应同页脚注的上标可以跳转并返回。末行单元格中的表注移到表格下方。能从原 PDF 核对的 SQL 代码恢复换行。[#136](https://github.com/Edwardxlai/easyread/issues/136) · [#137](https://github.com/Edwardxlai/easyread/issues/137) · [#138](https://github.com/Edwardxlai/easyread/issues/138) · [#139](https://github.com/Edwardxlai/easyread/issues/139)
+- **模型设置与翻译诊断**。Ollama 沿用模型自身的温度设置。兼容 API 的流式响应提前中断时会重试，失败输出按次保留，可按需开启本地诊断。任务记录 PDF 准备、模型调用、校验、定位和保存的耗时。[#132](https://github.com/Edwardxlai/easyread/issues/132) · [#150](https://github.com/Edwardxlai/easyread/issues/150)
+- **主题设置**。保存阅读排版时会保留当前选择的主题，避免深浅色被旧设置改回去。[#148](https://github.com/Edwardxlai/easyread/issues/148)
+
 ## v1.4.6（2026-11-01）
 
 - **论文笔记与导图**：可用富文本编辑笔记，切换到 Markdown，或把标题层级展开为导图。修复中文输入法组合输入，支持粘贴、拖入和缩放图片；桌面退出时等待大笔记保存，浏览器存储空间不足时提示导出。每张新增图片上限为 2 MiB。[PR #113](https://github.com/Edwardxlai/easyread/pull/113) · [PR #127](https://github.com/Edwardxlai/easyread/pull/127)

@@ -4,6 +4,19 @@
   const tabs = new Map();
   const strip = document.querySelector("#tabs");
   let active = "library";
+  const saved = new URLSearchParams(location.hash.slice(1));
+  const initial = new URLSearchParams(location.search).get("open");
+  let restoring = true;
+  function rememberTabs() {
+    if (restoring) return;
+    const state = new URLSearchParams();
+    for (const id of tabs.keys()) if (id !== "library") state.append("paper", id);
+    if (active !== "library") state.set("active", active);
+    const url = new URL(location.href);
+    url.searchParams.delete("open");
+    url.hash = state.toString();
+    if (url.href !== location.href) history.replaceState(null, "", url);
+  }
   const t = text => window.PR?.t(text) || text;
   function syncTheme(tab) {
     const theme = tab.frame.contentDocument?.documentElement.dataset.theme;
@@ -33,6 +46,7 @@
     document.title = tab.button.textContent + " · EasyRead";
     tab.node.scrollIntoView({ block: "nearest", inline: "nearest" });
     tab.frame.contentWindow.focus();
+    rememberTabs();
   }
   async function save(tab) {
     const pr = tab.frame.contentWindow.PR;
@@ -51,6 +65,7 @@
       if (active === id) select(ids[index - 1] || "library");
       tab.observer?.disconnect(); tab.themeObserver?.disconnect();
       tab.frame.remove(); tab.node.remove(); tabs.delete(id);
+      rememberTabs();
     } catch (_) { notify(t("尚未保存成功，请保持标签打开，稍后重试")); }
     finally { tab.closing = false; }
   }
@@ -158,6 +173,10 @@
   window.easyreadTabs = { open, select, close, saveAll: () => Promise.all([...tabs.values()].map(save)), keyboard };
   window.easyreadDesktop?.onBeforeQuit(() => window.easyreadTabs.saveAll());
   create("library", "/", t("文献库")); select("library");
-  const initial = new URLSearchParams(location.search).get("open");
+  for (const id of new Set(saved.getAll("paper"))) {
+    if (/^[a-zA-Z0-9_-]+$/.test(id) && id !== "library") create(id, "/read/" + id, t("正在打开…"));
+  }
+  if (tabs.has(saved.get("active"))) select(saved.get("active"));
+  restoring = false;
   if (initial) void open(initial);
 })();

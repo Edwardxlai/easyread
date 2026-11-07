@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from difflib import SequenceMatcher
+from difflib import Match, SequenceMatcher
+from functools import lru_cache
 from statistics import median
 
 
@@ -14,6 +15,19 @@ def _norm(text):
 def _bounds(boxes):
     return [min(b[0] for b in boxes), min(b[1] for b in boxes),
             max(b[2] for b in boxes), max(b[3] for b in boxes)]
+
+
+def _matching_runs(target, text):
+    start = text.find(target)
+    if start >= 0:
+        return (Match(0, start, len(target)),)
+    return tuple(m for m in SequenceMatcher(None, target, text, autojunk=False).get_matching_blocks()
+                 if m.size >= 24)
+
+
+# A later translation batch locates earlier paragraphs again. Reuse offsets
+# only when both normalized strings still agree. Always read current geometry.
+_cached_runs = lru_cache(maxsize=512)(_matching_runs)
 
 
 def _regions(chars, positions):
@@ -76,8 +90,9 @@ def locate_prose(english, page, stream):
         if not data:
             break
         text, idx, chars = data
-        matches = [m for m in SequenceMatcher(None, target, text, autojunk=False).get_matching_blocks()
-                   if m.size >= 24 and m.a + m.size > progress]
+        # Avoid retaining unusually large page streams in the process cache.
+        runs = _cached_runs if len(target) + len(text) <= 24_000 else _matching_runs
+        matches = [m for m in runs(target, text) if m.a + m.size > progress]
         if not matches or (sum(m.size for m in matches) < 48 and
                            not any(m.a == 0 or m.a + m.size >= len(target) - 4 for m in matches)):
             if pn == page:

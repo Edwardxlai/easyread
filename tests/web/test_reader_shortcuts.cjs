@@ -7,18 +7,20 @@ const { test } = require("node:test");
 function reader() {
   let keydown;
   const actions = [];
+  const events = {};
   const PR = {
     state: {}, keysOn: true, hasPendingSelection: () => true,
     selectionAction: (...args) => actions.push(args),
-    throttle: fn => fn, debounce: fn => fn, on() {},
+    throttle: fn => fn, debounce: fn => fn, on(name, listener) { events[name] = listener; },
     libraryNav: { readerBack() {} }, applyPrefs() {},
     load: () => new Promise(() => {}), // Boot data is irrelevant to keyboard handling.
     keyAction: () => null,
   };
-  const document = { body: {}, addEventListener: (type, fn) => { if (type === "keydown") keydown = fn; } };
+  const document = { body: { classList: { contains: () => false } }, querySelector: () => null,
+    addEventListener: (type, fn) => { if (type === "keydown") keydown = fn; } };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../../easyread/web/js/reader/main.js"), "utf8"), { window: { PR }, document });
   return {
-    PR, actions,
+    PR, actions, events,
     press(overrides = {}) {
       const event = { key: "Process", code: "Digit1", isComposing: true, target: { closest: () => null }, preventDefault() { this.prevented = true; }, ...overrides };
       keydown(event);
@@ -26,6 +28,20 @@ function reader() {
     },
   };
 }
+
+test("adding four single-block highlights never rebuilds the marks in other blocks", () => {
+  const { PR, events } = reader();
+  const painted = [];
+  Object.assign(PR, {
+    noteMedia: { isRenaming: () => false },
+    applyMarks: block => painted.push(block),
+    renderMargin() {}, notesPanelOpen: () => false,
+  });
+  for (const anchor of ["p5-8", "p5-9", "p6-1", "p6-2"]) {
+    events.reader({ op: "note", highlightBlocks: [anchor], note: { anchor } });
+  }
+  assert.deepEqual(painted, ["p5-8", "p5-9", "p6-1", "p6-2"]);
+});
 
 test("selection shortcuts recognize physical keys when an IME reports Process", () => {
   const r = reader();

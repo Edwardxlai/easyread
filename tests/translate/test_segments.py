@@ -205,6 +205,12 @@ class SkipHeadTest(unittest.TestCase):
         merge_blocks(self.ws, {"references": refs})
         self.assertEqual(self.ws.load("paper")["references"], saved)
 
+    def test_page_seams_inside_one_batch_get_paragraph_instructions(self):
+        instruction = "按原文段落合成一个 para"
+        self.assertIn(instruction, prompts._context(self.ws, [19, 20], skip_head=True))
+        self.assertNotIn(instruction, prompts._context(self.ws, [20]))
+        self.assertNotIn(instruction, prompts._context(self.ws, [19, 20], new_blocks=False))
+
     def test_prev_paragraph_skips_footnote_and_flags_unfinished(self):
         def add(*blocks):
             self.ws.update("paper", lambda p: p["blocks"].extend(blocks))

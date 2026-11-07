@@ -66,11 +66,15 @@ class MathRepairTest(unittest.TestCase):
                 fixed["blocks"][0]["en"] = r"Let $\alpha = \frac{1}{n}$."
                 if not read:
                     fixed["blocks"][0]["zh"] = r"令 $\alpha = \frac{1}{n}$。"
+                clean = {"id": "p2", "type": "para", "page": 1, "en": "Already correct."}
+                original["blocks"].append(clean)
                 with mock.patch.object(translate.engines, "run", side_effect=[json.dumps(original), json.dumps(fixed)]) as run, \
                         mock.patch.object(translate.pdfwork, "locate"):
                     translate._one_batch(self.ws, self.cfg, [1], 1, threading.Event(), lambda *a: None, read=read)
                 self.assertEqual(run.call_count, 2)
                 self.assertIn("$TeX$", run.call_args.args[1])
+                self.assertNotIn(clean["en"], run.call_args.args[1])
+                self.assertEqual(self.ws.load("paper")["blocks"][1]["en"], clean["en"])
                 self.assertEqual(self.ws.load("paper")["blocks"][0]["en"], fixed["blocks"][0]["en"])
                 if not read:
                     self.assertEqual(self.ws.load("paper")["blocks"][0]["zh"], fixed["blocks"][0]["zh"])
@@ -84,10 +88,12 @@ class MathRepairTest(unittest.TestCase):
         original = {"zh": {"p1": r"令 $\alpha$。", "tab1#caption": "结果。", "tab1#head": [[r"\alpha"]]}}
         fixed = copy.deepcopy(original)
         fixed["zh"]["tab1#head"] = [[r"$\alpha$"]]
+        fixed["zh"]["p1"] = "unsolicited replacement"
         with mock.patch.object(translate.engines, "run", side_effect=[json.dumps(original), json.dumps(fixed)]) as run:
             translate._fill_batch(self.ws, self.cfg, [1], threading.Event(), lambda *a: None)
         self.assertEqual(run.call_count, 2)
-        self.assertEqual(self.ws.load("paper")["blocks"][0]["zh"], fixed["zh"]["p1"])
+        self.assertNotIn("tab1#caption", run.call_args.args[1])
+        self.assertEqual(self.ws.load("paper")["blocks"][0]["zh"], original["zh"]["p1"])
         self.assertEqual(self.ws.load("paper")["blocks"][1]["head"], fixed["zh"]["tab1#head"])
 
     def test_fill_keeps_original_when_repair_is_not_better_or_loses_keys(self):

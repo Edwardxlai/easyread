@@ -26,6 +26,13 @@ test("title formulas render with real KaTeX while citations and HTML stay inert"
   assert.ok(body.includes('class="katex"'));
 });
 
+test("prices remain literal next to prose, other amounts and numeric formulas", () => {
+  const PR = markup();
+  const prices = "基准价格为 $100（回归截距）。最终价格：-$50、$0 或 $50。";
+  for (const render of [PR.md, PR.titleHtml, PR.plain]) assert.equal(render(prices), prices);
+  assert.equal(PR.md("From $1,000.50 to $2,000, with $2x+1$ or $3$."), "From $1,000.50 to $2,000, with <math>2x+1</math> or <math>3</math>.");
+});
+
 test("footnotes and same-number references have separate destinations", () => {
   const PR = markup();
   const blocks = [{id:"p2", page:2}, {id:"p3", page:3},
@@ -68,6 +75,20 @@ test("author-year citations link by the key of their printed label, whatever the
   assert.equal(PR.md("[Jimenez et al., 2024](#cite:Jimenez-2024)", { cite: false }), "Jimenez et al., 2024");
   // Only numbered and alphabetic lists print a label in front of entries.
   assert.deepEqual(["13", "JYW+24", "Jimenez-2024", "r0a1b2c3d"].map(PR.refLabel), ["[13]", "[JYW+24]", "", ""]);
+});
+
+test("legacy footnote labels link only to an unambiguous note on the same page", () => {
+  const PR = markup(), body = {id: "b", page: 3};
+  const note = {id: "fn3-1", type: "para", page: 3, en: "³We use the term core ..."};
+  PR.blockById = {b: body};
+  PR.buildFootnoteIndex([body, note]);
+  const md = text => PR.md(text, PR.footnoteOptions("b"));
+  for (const text of ["a core³ set", "计算 HHI。$^{3}$随后", "A sentence. $^3$ Next."]) {
+    assert.match(md(text), /data-footnote="b-fn3-1"/);
+  }
+  for (const text of ["$x^3$", "cm³", "a core⁴ set", "code \x60core³\x60"]) assert.doesNotMatch(md(text), /data-footnote/);
+  PR.buildFootnoteIndex([note, {...note, id: "fn3-2"}]);
+  assert.doesNotMatch(md("a core³ set"), /data-footnote/);
 });
 
 test("inline external links preserve labels and URLs without linking code or unsafe schemes", () => {

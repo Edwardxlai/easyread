@@ -21,6 +21,7 @@ class FakeAPI(BaseHTTPRequestHandler):
         self.end_headers()
         for p in PIECES:
             self.wfile.write(b"data: " + json.dumps({"choices": [{"delta": {"content": p}}]}).encode() + b"\n\n")
+        self.wfile.write(b'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n')
         self.wfile.write(b"data: [DONE]\n\n")
 
 

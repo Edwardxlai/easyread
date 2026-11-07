@@ -16,7 +16,8 @@ fs.writeFileSync(fixture, `<!doctype html><meta charset="utf-8">
 <style>body{display:block;margin:32px;background:white;color:#222}#paper{font-size:24px;width:850px}
 .blk{margin:28px 0}.zh{font-size:24px;line-height:1.7}h2{font:20px sans-serif}</style>
 <main id="paper"><h2>行内公式</h2><div class="blk" id="b-inline" data-id="inline"><div class="zh" data-key="inline"></div></div>
-<h2>独立公式</h2><div class="blk" id="b-display" data-id="display"><div class="math-body"></div></div></main>
+<h2>独立公式</h2><div class="blk" id="b-display" data-id="display"><div class="math-body"></div></div>
+<div class="blk" id="b-mixed" data-id="mixed"><div class="zh" data-key="mixed"></div></div></main>
 <div id="selbar"></div><script src="${url('vendor/katex/katex.min.js')}"></script>`);
 const timeout = setTimeout(() => { console.error('Math rendering check timed out'); app.exit(1); }, 30000);
 app.whenReady().then(async () => {
@@ -29,6 +30,7 @@ app.whenReady().then(async () => {
         debounce:fn=>fn, myNotes:()=>Object.values(PR.state.reader.notes), noteEl:el=>el};
       document.querySelector('#b-inline .zh').innerHTML = '选中的公式 ' + katex.renderToString(String.raw\`x_i^2 + \\frac{a+b}{c}\`) + ' 与正文一致';
       document.querySelector('.math-body').innerHTML = katex.renderToString(String.raw\`E = \\sum_{i=1}^{n} x_i^2\`,{displayMode:true});
+      document.querySelector('#b-mixed .zh').innerHTML = '运行时，' + katex.renderToString('C') + ' 编排模块 (language module)，其中 ' + katex.renderToString('M_{i}') + ' 是模型。';
     `);
     await win.webContents.executeJavaScript(fs.readFileSync(path.join(root, 'easyread/web/js/reader/anchor.js'), 'utf8'));
     await win.webContents.executeJavaScript(`
@@ -36,6 +38,7 @@ app.whenReady().then(async () => {
         const el=document.querySelector('#b-'+id+' .katex');
         PR.state.reader.notes[id]={id,anchor:id,key:id,quote:PR.fullText(el),kind:'highlight',color:'yellow'};
       }
+      PR.state.reader.notes.mixed={id:'mixed',anchor:'mixed',key:'mixed',quote:PR.fullText(document.querySelector('#b-mixed .zh')),kind:'highlight',color:'yellow'};
       PR.applyMarks();
       window.originalText=PR.fullText(document.querySelector('#paper'));
       document.fonts.ready;
@@ -47,6 +50,27 @@ app.whenReady().then(async () => {
     const result = await win.webContents.executeJavaScript(`(async () => {
       const check=(ok,msg)=>{if(!ok)throw Error(msg)};
       const paper=document.querySelector('#paper');
+      function mixedEdges() {
+        const host=document.querySelector('#b-mixed .zh');
+        const bands=[...host.querySelectorAll('.math-band')];
+        check(bands.length===2,'Expected a band on C and on subscripted M');
+        let maxError=0;
+        for (const band of bands) {
+          const box=band.getBoundingClientRect();
+          const before=band.closest('.katex').previousElementSibling;
+          check(before?.matches('mark.hl'), 'Missing prose before formula');
+          const neighbors=[...before.getClientRects()];
+          const rect=neighbors.find(r=>r.top<(box.top+box.bottom)/2 && (box.top+box.bottom)/2<r.bottom);
+          check(rect,'No prose on formula line');
+          maxError=Math.max(maxError,Math.abs(rect.top-box.top),Math.abs(rect.bottom-box.bottom));
+        }
+        check(maxError<=1,'Mixed prose/formula band edge mismatch: '+maxError+'px');
+        return maxError;
+      }
+      const highlightError=mixedEdges();
+      document.querySelector('#b-mixed .zh').style.fontSize='30px';
+      PR.state.reader.notes.mixed.style='underline'; PR.applyMarks('mixed');
+      const underlineError=mixedEdges();
       check(PR.fullText(paper)===originalText,'Annotations changed copied text');
       for(const id of ['inline','display']) {
         const host=document.querySelector('#b-'+id);
@@ -72,7 +96,7 @@ app.whenReady().then(async () => {
       PR.state.reader.notes={}; PR.applyMarks();
       check(!paper.querySelector('mark.hl'),'Deleting annotations left bands behind');
       check(PR.fullText(paper)===originalText,'Deleting annotations changed text');
-      return {inline:true,display:true,resize:true,underline:true,partial:true,delete:true};
+      return {inline:true,display:true,resize:true,underline:true,partial:true,delete:true,highlightError,underlineError};
     })()`);
     console.log(JSON.stringify(result));
     fs.writeFileSync(path.join(output, 'result.json'), JSON.stringify({ passed: true, ...result }));

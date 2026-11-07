@@ -65,7 +65,7 @@ body.font-sans #paper { font-family: var(--sans-zh); letter-spacing: .01em; }
 .blk { position: relative; margin: 0 0 .95em; border-radius: 4px; }
 /* 长论文切换原文 / 译文 / 双语时整篇重排很慢（上千段要几百毫秒）：屏幕外的段落先不排版，滚到附近再排。
    页边色条、页码、笔记角标画在段落框外，clip-margin 留出位置免得被裁掉 */
-#paper .blk { content-visibility: auto; contain-intrinsic-size: auto 120px; overflow-clip-margin: 80px; }
+html:not(.stable-text-layout) #paper .blk { content-visibility: auto; contain-intrinsic-size: auto 120px; overflow-clip-margin: 80px; }
 .blk::before { content: ""; position: absolute; left: -16px; top: .3em; bottom: .3em; width: 3px; border-radius: 2px; background: transparent; transition: background .15s; }
 .blk.current::before { background: var(--accent); opacity: .55; }
 .blk.flash { animation: flash 1.6s ease; }

@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .fs_retry import retry_write
+from .glossary import valid_entries
 
 SCHEMA = 2
 
@@ -224,9 +225,12 @@ class Workspace:
         defaults = {"reader": empty_reader(), "discussion": empty_discussion(), "layout": {}, "item": {}, "job": {}, "chat": {"messages": []}}
         path = self.root / f"{name}.json"
         try:
-            return read_json(path, defaults.get(name))
+            data = read_json(path, defaults.get(name))
         except (UnicodeError, json.JSONDecodeError) as e:
             raise DataReadError(path) from e
+        if name == "paper" and isinstance(data, dict) and "glossary" in data:
+            data["glossary"] = valid_entries(data["glossary"])
+        return data
 
     def versions(self) -> dict:
         v = {n: file_version(self.root / f"{n}.json") for n in self.PARTS}

@@ -24,7 +24,7 @@ from typing import Iterator
 
 from .. import __version__
 from ..server import http
-from . import usage
+from . import api_diagnostics, usage
 from .engines import Cancelled, EngineError
 from .stream_recovery import StreamInterrupted, non_stream_body, unsupported_stream
 from ..app.i18n import tr
@@ -93,9 +93,10 @@ def _open(o: dict, body: dict, stream: bool):
     for _ in range(3):
         req = urllib.request.Request(_base(o) + path, data=json.dumps(body).encode(), headers=_headers(o, stream))
         try:
-            return http.urlopen(req, timeout=int(o.get("timeout") or 600))
+            return api_diagnostics.capture(http.urlopen(req, timeout=int(o.get("timeout") or 600)), o)
         except urllib.error.HTTPError as e:
             detail = e.read(300).decode("utf-8", "replace")
+            api_diagnostics.http_error(e, o, detail)
             e.close()
             drop = next((k for k in ("temperature", "stream_options") if k in detail and k in body), None)
             if e.code == 400 and drop:
@@ -118,7 +119,9 @@ _BACKOFF = (10, 20, 40, 60, 60)
 def complete(o: dict, prompt: str, images: list[Path], cancel=None, meter=None) -> str:
     # 也用流式请求，收齐了再整段交出去：一次性返回要等整批译完才有第一个字节，推理模型一批常要好几分钟，
     # 持续收到片段可减少网关的空闲超时；首包迟到或网关总时限仍可能导致超时。
-    body = _body(o, prompt, images, True, None if kind(o) == "responses" else 0.2)
+    # Let Ollama use the sampling parameters saved with the model.
+    temperature = 0.2 if kind(o) == "chat" and o.get("preset") != "ollama" else None
+    body = _body(o, prompt, images, True, temperature)
     text, used = "", {}
     for attempt in range(len(_BACKOFF) + 1):  # 限流、服务端错误、网络抖动：等一会儿再试
         if cancel is not None and cancel.is_set():
@@ -313,25 +316,28 @@ def _events(r, cancel) -> Iterator[dict | None]:
             if not (ev is _PARTIAL and is_data):  # 还不完整又来了 data 行：一条事件拆成了多行，接着攒
                 data.clear()
                 if ev is _DONE:
+                    api_diagnostics.observe(r, None)
                     yield None
                     return
                 if ev is not _EMPTY:
-                    yield _check_event(ev)
+                    yield _check_event(ev, r)
         if is_data:
             data.append(line.partition(":")[2].removeprefix(" "))
     if data:
         ev = _payload(data)
         if ev is _DONE:
+            api_diagnostics.observe(r, None)
             yield None
         elif ev is not _EMPTY:
-            yield _check_event(ev)
+            yield _check_event(ev, r)
 
 
-def _check_event(ev) -> dict:
+def _check_event(ev, response=None) -> dict:
     if ev is _PARTIAL:
         raise EngineError(tr("接口返回的流数据不是有效 JSON"))
     if not isinstance(ev, dict):
         raise EngineError(tr("接口返回的流数据格式不对"))
+    api_diagnostics.observe(response, ev)
     return ev
 
 
@@ -339,7 +345,7 @@ def _chat_pieces(r, cancel, meter=None) -> Iterator[str]:
     finished = False
     for ev in _events(r, cancel):
         if ev is None:
-            return
+            break  # [DONE] closes transport; finish_reason completes the answer.
         if ev.get("error"):
             raise EngineError(tr("接口返回出错：{err}", err=ev["error"]))
         if ev.get("usage") and meter is not None:
@@ -356,7 +362,7 @@ def _responses_pieces(r, cancel, meter=None) -> Iterator[str]:
     for ev in _events(r, cancel):
         t = (ev or {}).get("type", "")
         if ev is None:
-            return
+            break  # Responses requires a response.completed event.
         if t in ("response.completed", "response.incomplete", "response.failed"):
             res = ev.get("response") or {}
             _check_response_status({**res, "status": res.get("status") or t.split(".")[1]})

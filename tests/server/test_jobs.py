@@ -65,6 +65,9 @@ class JobsTest(unittest.TestCase):
                 patch("easyread.server.jobs.translate.prepare", side_effect=lambda ws: self.jobs.cancel(ws.id)):
             self.drain()
         self.assertEqual(self.ws.load("job")["state"], "cancelled")
+        timing = self.ws.load("job")["timing"]
+        self.assertEqual([e["stage"] for e in timing["events"]], ["prepare"])
+        self.assertGreaterEqual(timing["elapsed_s"], timing["events"][0]["end_s"])
 
     def test_cancelled_queue_entry_is_skipped_and_can_be_retried(self):
         self.jobs.enqueue(self.ws, translate_after=False)
@@ -85,6 +88,35 @@ class JobsTest(unittest.TestCase):
             resumed = Jobs(self.lib)
         self.assertEqual(states, ["queued"] * 3)
         self.assertEqual(resumed.bulk.qsize(), 1)
+
+    def test_restart_of_legacy_job_only_schedules_untranslated_pages(self):
+        pages = list(range(1, 97))
+        saved = list(range(1, 61))
+        write_json_atomic(self.ws.paper_path, {"meta": {"pages": [{"n": n} for n in pages]},
+                          "translation": {"done_pages": saved}, "blocks": [{"id": "p1", "zh": "译文"}]})
+        write_json_atomic(self.ws.root / "job.json", {"state": "running", "translate": True, "pages": pages})
+        self.jobs._resume()
+        before = self.ws.load("paper")
+        with patch("easyread.server.jobs.config.load", return_value={"engine": "codex"}), \
+                patch("easyread.server.jobs.translate.translate_pages", return_value={}) as translate:
+            self.drain()
+        self.assertEqual(translate.call_args.args[2], pages[60:])
+        self.assertEqual(self.ws.load("paper"), before)
+
+    def test_retranslate_after_restart_keeps_explicit_pages_until_their_new_result_is_saved(self):
+        from easyread.library.paperdata import merge_blocks
+        pages = [1, 2, 3]
+        write_json_atomic(self.ws.paper_path, {"meta": {"pages": [{"n": n} for n in pages]},
+                          "translation": {"done_pages": pages, "en_pages": [3]}})
+        self.jobs.enqueue(self.ws, pages=pages)
+        merge_blocks(self.ws, {"blocks": []}, done=[1])
+        self.jobs.bulk.get_nowait()
+        self.jobs._write(self.ws, state="running")
+        self.jobs._resume()
+        with patch("easyread.server.jobs.config.load", return_value={"engine": "codex"}), \
+                patch("easyread.server.jobs.translate.translate_pages", return_value={}) as translate:
+            self.drain()
+        self.assertEqual(translate.call_args.args[2], [2, 3])
 
     def test_small_job_ids_are_unique_with_frozen_clock(self):
         with patch("time.time", return_value=1):
