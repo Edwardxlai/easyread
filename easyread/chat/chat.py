@@ -24,7 +24,7 @@ from ..engines import chat_tools
 from ..translate import langs
 from ..app.i18n import tr
 from ..app.log import log
-from ..translate.prompts import _block_text
+from ..translate.prompts import _block_text, _glossary_items
 from ..library.store import Workspace
 
 HISTORY = 12  # 带上最近几轮对话
@@ -62,9 +62,9 @@ def _context(ws: Workspace, anchor: str | None, quote: str, refs: list[dict] | N
             q = (r.get("quote") or "").strip()
             parts.append(f"[{r.get('anchor')}] " + (f"读者选中：「{q[:800]}」\n  所在段落：" if q else "") + _block_text(b)[:1200])  # i18n-ok
         lines.append("读者引用了这几处（问题可能是在问它们之间的关系）：\n" + "\n".join(parts))  # i18n-ok
-    gl = paper.get("glossary", [])
+    gl = _glossary_items(paper)
     if gl:
-        lines.append("术语表：" + "；".join(f"{g['en']} = {g['zh']}" for g in gl[:80]))  # i18n-ok
+        lines.append("术语表：" + "；".join(gl[:80]))  # i18n-ok
     return "\n\n".join(lines)
 
 

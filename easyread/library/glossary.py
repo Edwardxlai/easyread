@@ -9,12 +9,12 @@ def valid_entries(value) -> list[dict]:
 
 
 def merge_glossary(paper: dict, incoming) -> None:
-    new = valid_entries(incoming)
-    if not new:
+    if "glossary" not in paper and not incoming:
         return
-    glossary = paper.setdefault("glossary", [])
-    have = {entry["en"] for entry in glossary}
-    for entry in new:
+    have = set()
+    glossary = []
+    for entry in valid_entries(paper.get("glossary")) + valid_entries(incoming):
         if entry["en"] not in have:
             glossary.append(entry)
             have.add(entry["en"])
+    paper["glossary"] = glossary

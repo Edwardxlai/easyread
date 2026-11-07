@@ -6,8 +6,9 @@ import unittest
 from unittest import mock
 
 from easyread.app import config
+from easyread.chat import chat
 from easyread.engines import engines
-from easyread.library.paperdata import merge_blocks
+from easyread.library.paperdata import fill_zh, merge_blocks
 from easyread.translate import prompts, segments, terms, translate
 from tests.translate.test_translate import make_ws
 
@@ -243,6 +244,44 @@ class SkipHeadTest(unittest.TestCase):
         self.ws.update("paper", lambda p: p["blocks"].append({"id": "p1-1", "type": "para", "page": 1, "en": "far away"}))
         self.assertNotIn("far away", prompts._context(self.ws, [5, 6]))
         self.assertIn("far away", prompts._context(self.ws, [2, 3]))
+
+    def test_malformed_glossary_entries_are_filtered_and_do_not_break_prompts(self):
+        self.ws.update("paper", lambda p: p.update(
+            blocks=[{"id": "p1-1", "type": "para", "page": 1, "en": "Librium and standard error.", "zh": "利眠宁与标准误差。"}],
+            glossary=[{"en": "Librium", "s": "利眠宁"}, {"en": "only_en"}, "bad"],
+        ))
+        self.assertNotIn("已有术语表", prompts._context(self.ws, [2]))
+        self.assertNotIn("术语表：", chat._context(self.ws, "p1-1", ""))
+        retrans_prompt, _ = prompts.retranslate(self.ws, "p1-1", "")
+        self.assertIn("术语表：\n", retrans_prompt)
+
+        merge_blocks(self.ws, {"glossary": [
+            {"en": "Librium", "s": "利眠宁"},
+            {"en": "some term"},
+            {"en": " ", "zh": "空白"},
+            {"en": "empty_zh", "zh": " "},
+            "not-a-dict",
+            {"en": "Librium", "zh": "利眠宁"},
+            {"en": "standard error", "zh": "标准误差"},
+        ]})
+        self.assertEqual(self.ws.load("paper")["glossary"], [
+            {"en": "Librium", "zh": "利眠宁"},
+            {"en": "standard error", "zh": "标准误差"},
+        ])
+
+        fill_zh(self.ws, {"zh": {"p1-1": "利眠宁与标准误差。"}, "glossary": [
+            {"en": "bad_fill", "s": "坏"},
+            {"en": "bias", "zh": "偏差"},
+        ]}, [1], {"p1-1"})
+        self.assertEqual(self.ws.load("paper")["glossary"], [
+            {"en": "Librium", "zh": "利眠宁"},
+            {"en": "standard error", "zh": "标准误差"},
+            {"en": "bias", "zh": "偏差"},
+        ])
+        self.assertIn("已有术语表（必须沿用）：Librium = 利眠宁；standard error = 标准误差；bias = 偏差", prompts._context(self.ws, [2]))
+        self.assertIn("术语表：Librium = 利眠宁；standard error = 标准误差；bias = 偏差", chat._context(self.ws, "p1-1", ""))
+        retrans_prompt, _ = prompts.retranslate(self.ws, "p1-1", "")
+        self.assertIn("术语表：Librium = 利眠宁；standard error = 标准误差；bias = 偏差", retrans_prompt)
 
 
 class ConfigMigrationTest(unittest.TestCase):
