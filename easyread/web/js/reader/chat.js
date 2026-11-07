@@ -20,6 +20,8 @@
   Object.assign(st, { chatOptions: {}, effortOpen: false, catalog: null });
   const imageDraft = PR.createChatImages(st, panel, render, () => focusInput());
   const imagesHtml = imageDraft.html;
+  const fileDraft = PR.createChatDocuments(st, panel, render);
+  function resetAttachments() { imageDraft.reset(); fileDraft.reset(); }
 
   PR.canChat = () => PR.store.mode === "server";
   /* 在线演示 / 离线版：带着对话记录时可以看，不能问 */
@@ -124,7 +126,7 @@
   }
   function msgHtml(m) {
     if (m.role === "user") {
-      return '<div class="cm user"><div class="bubble">' + PR.md(m.content, { cite: false, xref: false }) + "</div>" + imagesHtml(m.images || [], false) +
+      return '<div class="cm user"><div class="bubble">' + PR.md(m.content, { cite: false, xref: false }) + "</div>" + imagesHtml(m.images || [], false) + fileDraft.html(m.documents || [], false) +
         ((m.refs && m.refs.length ? m.refs : m.anchor ? [m] : []).filter((r) => PR.blockById[r.anchor])
           .map((r) => '<button class="cm-ctx" data-c="go" data-anchor="' + PR.esc(r.anchor) + '">' + PR.icon("link", "sm") + "<span>" + PR.esc(ctxLabel(r)) + "</span></button>").join("")) + "</div>";
     }
@@ -162,10 +164,15 @@
     const styleMenu = st.styleOpen ? '<div class="ch-menu">' + STYLES.map((s) => '<button data-c="style-pick" data-s="' + s + '" class="' + (s === st.answerStyle ? "on" : "") + '">' +
       "<b>" + styleLabel(s) + (s === st.answerStyle ? '<span class="ch-model-check">✓</span>' : "") + "</b><small>" + PR.esc(styleHint(s)) + "</small></button>").join("") + "</div>" : "";
     const imageStatus = st.imageError || (st.imageLoading ? PR.t("正在读取图片…") : "");
+    const fileStatus = st.fileError || (st.fileLoading ? PR.t("正在读取文件…") : "");
+    const attach = '<input id="chatFileInput" type="file" accept=".pdf,.txt,.md" multiple hidden>' +
+      '<button type="button" class="ch-pill" data-c="attach" title="' + PR.t("添加 PDF 或文本附件") + '"' +
+      (st.streaming || st.fileLoading ? ' disabled' : '') + '>' + PR.t("附件") + '</button>';
     return '<div class="ch-compose">' + (chips ? '<div class="ch-chips">' + chips + "</div>" : "") +
+      fileDraft.html(st.documents, true) + (fileStatus ? '<div class="ch-attach-status" role="status">' + PR.esc(fileStatus) + '</div>' : '') +
       imagesHtml(st.images, true) + (imageStatus ? '<div class="ch-attach-status" role="' + (st.imageError ? 'alert' : 'status') + '">' + PR.esc(imageStatus) + '</div>' : '') +
       '<textarea id="chatInput" rows="1" aria-label="' + PR.t("提问，可粘贴图片") + '" placeholder="' + (st.images.length ? PR.t("补充问题，或直接发送图片…") : PR.t("输入问题，或粘贴截图…")) + '">' + PR.esc(st.draft) + "</textarea>" +
-      '<div class="ch-bar"><button class="ch-model" data-c="menu" title="' + PR.t("换模型和思考强度") + '"' + (st.streaming ? ' disabled' : '') + '>' + PR.esc(m.label) + PR.chatEffort.suffix(st, m) + PR.icon("chevron", "sm") + "</button>" + style + styleMenu + menu +
+      '<div class="ch-bar"><button class="ch-model" data-c="menu" title="' + PR.t("换模型和思考强度") + '"' + (st.streaming ? ' disabled' : '') + '>' + PR.esc(m.label) + PR.chatEffort.suffix(st, m) + PR.icon("chevron", "sm") + "</button>" + style + attach + styleMenu + menu +
       '<span class="grow"></span>' + PR.usageChip(st.limits, thread() && thread().messages, st.usageOpen) +
       (st.usageOpen ? PR.usagePop(st.limits, thread() && thread().messages) : "") + (st.streaming ? '<button class="ch-send stop" data-c="stop" title="' + PR.t("停止") + '">' + PR.icon("stop", "sm") + "</button>"
         : '<button class="ch-send" data-c="send" title="' + PR.t("发送（Enter）；换行用 Shift+Enter") + '">' + PR.icon("arrowUp", "sm") + "</button>") + "</div></div>";
@@ -195,7 +202,9 @@
   /* ---------- 发送 ---------- */
   async function send(text, noteId, only) {
     text = (text || "").trim();
-    if (st.imageLoading || st.streaming || (!text && !st.images.length)) return;
+    if (st.imageLoading || st.fileLoading || st.streaming || (!text && !st.images.length && !st.documents.length)) return;
+    const documents = only ? [] : st.documents.slice();
+    if (!text && documents.length) text = PR.t("请解释附件的内容。");
     const images = only ? [] : st.images.map(image => image.data);
     if (!text && images.length) text = PR.t("请解释这张图片。");
     const refs = only || sendRefs();
@@ -208,12 +217,12 @@
     t.answer_style = answerStyle;
     t.model = modelId;
     t.chat_options = chatOptions;
-    const user = { role: "user", content: text, anchor: c ? c.anchor : null, quote: c ? c.quote : "", note: noteId || null, refs, answer_style: answerStyle, images };
+    const user = { role: "user", content: text, anchor: c ? c.anchor : null, quote: c ? c.quote : "", note: noteId || null, refs, answer_style: answerStyle, images, documents: documents.map(file => ({ name: file.name })) };
     const msg = { role: "assistant", content: "", model: modelOf(modelId).label, answer_style: answerStyle };
     t.messages.push(user, msg);
     const ctrl = new AbortController();
     st.streaming = { ctrl, msg };
-    if (!only) { st.images = []; st.imageError = ""; }
+    if (!only) resetAttachments();
     st.draft = ""; st.listOpen = false; st.menuOpen = false; st.effortOpen = false;
     if (PR.$("#chatInput")) PR.$("#chatInput").value = "";
     if (noteId) { PR.asking.add(noteId); PR.renderMargin(); }
@@ -221,7 +230,7 @@
     try {
       const res = await fetch("/api/p/" + PR.pid + "/chat", {
         method: "POST", signal: ctrl.signal, headers: { "Content-Type": "application/json", "X-Token": PR.token || "" },
-        body: JSON.stringify({ thread: t.local ? null : t.id, text, anchor: user.anchor, quote: user.quote, refs, note: noteId || null, model: modelId, answer_style: answerStyle, chat_options: chatOptions, images }),
+        body: JSON.stringify({ thread: t.local ? null : t.id, text, anchor: user.anchor, quote: user.quote, refs, note: noteId || null, model: modelId, answer_style: answerStyle, chat_options: chatOptions, images, documents }),
       });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "HTTP " + res.status);
       const reader = res.body.getReader(), dec = new TextDecoder();
@@ -236,6 +245,7 @@
           if (!line.trim()) continue;
           const ev = JSON.parse(line);
           if (ev.thread && (!t.id || t.local)) { t.id = ev.thread; delete t.local; st.cur = ev.thread; }
+          if (ev.documents) user.documents = ev.documents;
           if (ev.model) msg.model = ev.model;
           if (ev.answer_style) msg.answer_style = t.answer_style = ev.answer_style;
           if (ev.t) { msg.content += ev.t; renderLiveSoon(); }
@@ -249,6 +259,7 @@
     }
     st.streaming = null;
     if (msg.error && !only) {
+      st.documents = documents;
       st.images = images.map(data => ({data})).concat(st.images).slice(0, 4);
       st.draft = PR.$("#chatInput")?.value || text;
       if (PR.$("#chatInput")) PR.$("#chatInput").value = st.draft;
@@ -274,9 +285,11 @@
     const c = b.dataset.c;
     const row = b.closest(".ch-thread[data-t]");
     if (c === "close") return PR.toggleChat(false);
+    if (c === "attach") return PR.$("#chatFileInput")?.click();
+    if (c === "unfile") { st.documents.splice(Number(b.dataset.i), 1); st.fileError = ""; return render(); }
     if (c === "unimage") { st.images.splice(Number(b.dataset.i), 1); st.imageError = ""; render(); return focusInput(); }
     if (c === "list") { st.listOpen = !st.listOpen; st.menuOpen = st.styleOpen = false; return render(); }
-    if (c === "new") { if (st.streaming) return; st.chatOptions = {}; st.effortOpen = false; st.cur = null; st.listOpen = false; st.model = st.def; st.answerStyle = "standard"; st.styleOpen = false; st.refs = []; st.noAuto = false; imageDraft.reset(); st.draft = ""; if (PR.$("#chatInput")) PR.$("#chatInput").value = ""; autoContext(); render(); return focusInput(); }
+    if (c === "new") { if (st.streaming) return; st.chatOptions = {}; st.effortOpen = false; st.cur = null; st.listOpen = false; st.model = st.def; st.answerStyle = "standard"; st.styleOpen = false; st.refs = []; st.noAuto = false; resetAttachments(); st.draft = ""; if (PR.$("#chatInput")) PR.$("#chatInput").value = ""; autoContext(); render(); return focusInput(); }
     if (c === "style") { if (st.streaming) return; st.styleOpen = !st.styleOpen; st.menuOpen = st.listOpen = st.usageOpen = false; return render(); }
     if (c === "style-pick") {
       if (st.streaming) return;
@@ -311,7 +324,7 @@
       if (!(await PR.confirm({ title: PR.t("删除这个对话？"), body: PR.t("「{title}」。已经放到页边的讨论不受影响。", { title: t.title }), ok: PR.t("删除"), danger: true, at: row }))) return;
       if (!t.local) await PR.api("/api/p/" + PR.pid + "/chat/delete", { method: "POST", body: { thread: t.id } });
       st.threads = st.threads.filter((x) => x !== t);
-      if (st.cur === t.id) { imageDraft.reset(); st.cur = null; st.answerStyle = "standard"; }
+      if (st.cur === t.id) { resetAttachments(); st.cur = null; st.answerStyle = "standard"; }
       return render();
     }
     const card = b.closest(".cm.ai");
@@ -328,7 +341,7 @@
   document.addEventListener("click", (e) => {  // 点对话列表里的一行：切过去
     const row = e.target.closest("#chatpanel .ch-thread[data-t]");
     if (!row || e.target.closest("[data-c]") || st.streaming) return;
-    if (st.cur !== row.dataset.t) imageDraft.reset();
+    if (st.cur !== row.dataset.t) resetAttachments();
     st.cur = row.dataset.t; st.listOpen = false;
     const t = thread();
     if (t && t.model && st.models.some((m) => m.id === t.model)) st.model = t.model;
@@ -354,9 +367,15 @@
     if (dragRef && PR.chatOpen()) panel().classList.add("drop-ok");
   });
   document.addEventListener("dragend", () => { dragRef = null; panel().classList.remove("drop-ok", "drop-on"); });
-  panel().addEventListener("dragover", (e) => { if (!dragRef) return; e.preventDefault(); e.dataTransfer.dropEffect = "copy"; panel().classList.add("drop-on"); });
+  panel().addEventListener("dragover", (e) => { if (!dragRef && !Array.from(e.dataTransfer.types || []).includes("Files")) return; e.preventDefault(); e.dataTransfer.dropEffect = "copy"; panel().classList.add("drop-on"); });
   panel().addEventListener("dragleave", (e) => { if (!panel().contains(e.relatedTarget)) panel().classList.remove("drop-on"); });
   panel().addEventListener("drop", (e) => {
+    if (e.dataTransfer.files?.length) {
+      e.preventDefault();
+      panel().classList.remove("drop-ok", "drop-on");
+      dragRef = null;
+      return fileDraft.add(Array.from(e.dataTransfer.files));
+    }
     if (!dragRef) return;
     e.preventDefault();
     panel().classList.remove("drop-ok", "drop-on");

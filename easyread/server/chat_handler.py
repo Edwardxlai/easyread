@@ -1,7 +1,7 @@
 """HTTP streaming for the reader chat, including attachment lifecycle."""
 import json
 import threading
-from ..chat import answer_styles, chat, chat_models, chat_store
+from ..chat import answer_styles, chat, chat_models, chat_store, documents
 from ..app import config
 from ..app.i18n import tr
 from ..app.log import log
@@ -26,9 +26,11 @@ def handle(self, ws, body: dict):
     first = refs[0] if refs else {}
     user = {"content": text, "anchor": body.get("anchor") or first.get("anchor"), "quote": (body.get("quote") or first.get("quote") or "")[:1000],
             "note": body.get("note"), "refs": refs, "answer_style": style, "chat_options": options, "images": images}
+    user["documents"] = documents.extract(body.get("documents"))
     past = (thread or {}).get("messages", [])
     convo = [{"role": x["role"], "content": x["content"]} for x in past] + [{"role": "user", "content": text}]
     prompt_text = chat.prompt(ws, convo, user["anchor"], user["quote"], ecfg["engine"], refs, answer_style=style)
+    prompt_text += documents.context((past + [user])[-chat.HISTORY:])
     images = chat.receive_images(ws, body.get("images"), ecfg)
     user["images"] = images
     self.send_response(200)
@@ -45,7 +47,8 @@ def handle(self, ws, body: dict):
         self.wfile.write((json.dumps(obj, ensure_ascii=False) + "\n").encode("utf-8"))
         self.wfile.flush()
     try:
-        send({"model": model, "thread": tid, "answer_style": style})
+        send({"model": model, "thread": tid, "answer_style": style,
+              "documents": [{k: f[k] for k in ("name", "truncated")} for f in user["documents"]]})
         def seen(actual):
             chat_models.remember(m.get("model", ""), actual)
             if m.get("engine") == "claude":

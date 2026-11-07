@@ -7,16 +7,17 @@ from __future__ import annotations
 
 import threading
 import time
+from .timing import Timeline
 
-from ..app import config
 from ..library.store import read_json, write_json_atomic
 
 
 class Meter:
     """一次翻译任务的累计用量。并发翻译时多个线程一起往里加。"""
 
-    def __init__(self, engine: str = ""):
+    def __init__(self, engine: str = "", *, timed=False):
         self._lock = threading.Lock()
+        self.timing = Timeline() if timed else None
         self.data: dict = {"engine": engine, "calls": 0, "input": 0, "cached": 0, "output": 0}
 
     def add(self, input: int = 0, cached: int = 0, output: int = 0, cost_usd: float | None = None, limits: dict | None = None,
@@ -45,6 +46,7 @@ class Meter:
 
 # ---------- 最近一次看到的订阅额度（全局，新对话也能显示） ----------
 def _limits_path():
+    from ..app import config
     return config.library_dir() / ".limits.json" if config.temp_library() else config.HOME / "limits.json"
 
 

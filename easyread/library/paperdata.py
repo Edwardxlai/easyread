@@ -102,6 +102,7 @@ def merge_blocks(ws: Workspace, data: dict, done=None, replace_pages=None, en_on
             tr.update(data["translation"])
         if done:
             pages = set(parse_pages(done))
+            _record_page_saves(tr, pages)
             tr["done_pages"] = sorted(set(tr.get("done_pages", [])) | pages)
             en = set(tr.get("en_pages", []))
             tr["en_pages"] = sorted(en | pages if en_only else en - pages)
@@ -109,6 +110,13 @@ def merge_blocks(ws: Workspace, data: dict, done=None, replace_pages=None, en_on
         return {"new": n_new, "updated": n_upd, "done_pages": tr.get("done_pages", [])}
 
     return ws.update("paper", apply)
+
+
+def _record_page_saves(translation, pages):
+    revisions = translation.setdefault("page_revisions", {})
+    for page in pages:
+        key = str(page)
+        revisions[key] = revisions.get(key, 0) + 1
 
 
 def _scope(paper: dict) -> None:
@@ -154,7 +162,9 @@ def fill_zh(ws: Workspace, data: dict, pages: list[int], keys: set[str], sents: 
         missing = [k for k in keys if k not in got and not k.endswith("#head")]  # 表头没译不算漏
         left = {by_id[k.partition("#")[0]].get("page") for k in missing if k.partition("#")[0] in by_id}
         translation = paper.setdefault("translation", {})
-        translation["en_pages"] = sorted(set(translation.get("en_pages", [])) - (set(pages) - left))
+        completed = set(pages) - left
+        _record_page_saves(translation, completed)
+        translation["en_pages"] = sorted(set(translation.get("en_pages", [])) - completed)
         _scope(paper)
         return missing
 

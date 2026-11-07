@@ -138,6 +138,9 @@ def _context(ws: Workspace, pages: list[int], new_blocks: bool = True, skip_head
         lines.append("已有的章节：" + " / ".join(heads))
     if not new_blocks:
         return "\n".join(lines)
+    if len(pages) > 1:
+        lines.append("本批相邻两页之间，如果页首接着上一页同一自然段，按原文合成一个 para，page 填起始页。"
+                     "续文只出现一次；新段落、列表、图表和脚注仍各自成块。")
     ids = [b["id"] for b in blocks]
     if ids:
         lines.append("已用过的块 id（不要重复）：" + ", ".join(ids[-60:]))

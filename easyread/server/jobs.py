@@ -73,7 +73,18 @@ class Jobs:
                        state="queued", message=tr("排队中"), pages=pages, scope=scope or "all", translate=translate_after, read=read, model=model or "",
                        confirmed=confirmed is True, target=target, cap_check=cap_check is True, translation_extra=translation_extra,
                        done=0, total=0, error="", failed={}, updated=now_iso(), usage={})
+            # Explicit page requests can intentionally retranslate a completed page.
+            # Its revision changes in the same paper.json write as the new translation.
+            job.pop("retranslate_revisions", None)
+            if pages is not None and not cap_check:
+                tl = (ws.load("paper") or {}).get("translation", {})
+                done = set(tl.get("done_pages", []))
+                if not read:
+                    done.difference_update(tl.get("en_pages", []))
+                revisions = tl.get("page_revisions", {})
+                job["retranslate_revisions"] = {str(n): revisions.get(str(n), 0) for n in pages if n in done}
             job.pop("page_cap", None)
+            job.pop("timing", None)
         with self.lock:
             ws.update("job", apply)
             self.bulk.put(ws.id)
@@ -103,6 +114,7 @@ class Jobs:
                        figure_ids=ids, force=body.get("force", False), translate=True, read=False,
                        model="", target="", translation_extra="", done=0, total=len(ids),
                        error="", failed={}, image_failed={}, updated=now_iso(), usage={})
+            job.pop("timing", None)
         with self.lock:
             ws.update("job", apply)
             self.bulk.put(ws.id)
@@ -146,6 +158,9 @@ class Jobs:
                 if job.get("type") == "figure-images" and job.get("state") == "running":
                     self._write(ws, state="cancelled", message=tr("译图任务因服务重启而中断，已保存的图片保留；可手动补齐"))
                     continue  # An in-flight generation may have consumed quota; never blindly repeat it.
+                # Legacy running tasks persisted their original page list without a checkpoint.
+                if job.get("state") == "running" and "retranslate_revisions" not in job:
+                    self._write(ws, retranslate_revisions={})
                 self._write(ws, state="queued", message=tr("排队中（服务重启后继续）"))
                 self.bulk.put(ws.id)
 
@@ -198,6 +213,7 @@ class Jobs:
             from . import figure_jobs
             return figure_jobs.run(self, ws, job, config.load(), cancel)
         cfg = engine_for(config.load(), job.get("model"))
+        meter = usage.Meter(cfg.get("engine") or "", timed=True)
         cfg = {**cfg, "translation_extra": job.get("translation_extra", "")}
         if job.get("target"):
             cfg = {**cfg, "target": langs.valid(job["target"])}
@@ -205,7 +221,11 @@ class Jobs:
             raise Cancelled()
         if not ws.load("paper").get("meta", {}).get("pages"):
             self._write(ws, state="running", message=tr("正在渲染原页、抽取文字"))
-            translate.prepare(ws)
+            try:
+                with meter.timing.stage("prepare"):
+                    translate.prepare(ws)
+            finally:
+                self._write(ws, timing=meter.timing.snapshot())
         if cancel.is_set():
             raise Cancelled()
         read = bool(job.get("read"))
@@ -219,7 +239,14 @@ class Jobs:
         skip = set(tl.get("done_pages", [])) if read else set(tl.get("done_pages", [])) - set(tl.get("en_pages", []))
         planned = job.get("pages") is not None
         wanted = job["pages"] if planned else translate.scope_pages(ws, job.get("scope")) or all_pages
-        pages = wanted if planned and not job.get("cap_check") else [n for n in wanted if n not in skip]
+        baseline = job.get("retranslate_revisions")
+        if planned and baseline is not None:
+            revisions = tl.get("page_revisions", {})
+            pages = [n for n in wanted if n not in skip or
+                     (str(n) in baseline and baseline[str(n)] == revisions.get(str(n), 0))]
+        else:
+            # Legacy queued explicit requests may not have started yet.
+            pages = wanted if planned and not job.get("cap_check") else [n for n in wanted if n not in skip]
         if not pages:
             self._write(ws, state="done", message=tr("选定范围已整理完") if read else tr("选定范围已译完"))
             return
@@ -237,8 +264,6 @@ class Jobs:
                             else tr("这篇要译 {n} 页，超过了你设的 {cap} 页，确认后再开始", n=len(pages), cap=cap))
             return
 
-        meter = usage.Meter(cfg.get("engine") or "")
-
         def report(done, total, message):
             if cancel.is_set():
                 raise Cancelled()
@@ -249,6 +274,7 @@ class Jobs:
             failed = translate.translate_pages(ws, cfg, pages, cancel, report, meter, read)
         finally:  # 取消、出错也把已经花掉的记上
             run = meter.snapshot()
+            self._write(ws, timing=meter.timing.snapshot())
             if run["calls"]:
                 ws.update("job", lambda j: j.update(usage=run, usage_total=usage.merge(j.get("usage_total"), run)))
         minutes = max(1, round((time.time() - started) / 60))

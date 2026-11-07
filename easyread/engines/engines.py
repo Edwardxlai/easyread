@@ -18,6 +18,7 @@ import threading
 from pathlib import Path
 
 from ..app.i18n import tr
+from .timing import stage
 from . import agent_cli, codebuddy_cli, codex_lean, netcheck, usage, opencode_cli, zcode_cli, qoder_cli
 from ..app.log import log
 
@@ -49,7 +50,8 @@ def run(cfg: dict, prompt: str, cwd: Path, images: list[Path] | None = None, can
     if bad:
         raise EngineError(bad)
     try:
-        return _run(cfg, prompt, cwd, images, cancel, meter)
+        with stage(meter, "model"):
+            return _run(cfg, prompt, cwd, images, cancel, meter)
     except EngineError as e:
         raise EngineError(netcheck.explain(cfg, str(e))) from None
 

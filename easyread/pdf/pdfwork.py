@@ -27,10 +27,10 @@ _LAYOUT_LOCK = threading.RLock()
 
 
 @contextmanager
-def open_pdf(pdf: Path):
+def open_pdf(pdf: Path | bytes):
     """所有 PDFium 调用与资源释放共用一把锁，包括操作不同文档的线程。"""
     import pypdfium2 as pdfium
-    with _PDFIUM_LOCK, closing(pdfium.PdfDocument(str(pdf))) as doc:
+    with _PDFIUM_LOCK, closing(pdfium.PdfDocument(pdf if isinstance(pdf, bytes) else str(pdf))) as doc:
         yield doc
 
 
