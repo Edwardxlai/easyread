@@ -104,6 +104,7 @@
   PR.$('[data-act="drawer"]').innerHTML = PR.icon("menu");
   PR.$('[data-act="pages"]').innerHTML = PR.icon("page", "sm") + "<span>PDF</span>";
   PR.$('[data-act="pages"]').addEventListener("mouseenter", () => PR.preloadPage && PR.preloadPage());  // 鼠标移过去就开始加载
+  PR.$('[data-act="figures"]').innerHTML = PR.icon("image", "sm") + "<span>" + PR.t("图片") + "</span>";
   PR.$('[data-act="notes"]').innerHTML = PR.icon("note", "sm") + "<span>" + PR.t("笔记") + "</span>";
   PR.$('[data-act="chat"]').innerHTML = PR.icon("sparkle", "sm") + "<span>" + PR.t("问 AI") + "</span>";
   /* 设置里关掉的功能：顶栏按钮也藏起来 */
@@ -124,6 +125,7 @@
     const act = a.dataset.act;
     if (act === "drawer") PR.toggleDrawer();
     if (act === "pages") PR.togglePages();
+    if (act === "figures") PR.toggleFiguresPanel();
     if (act === "notes") PR.toggleNotesPanel();
     if (act === "chat") PR.toggleChat();
     if (act === "settings") { PR.renderSettings(); PR.$("#settings").classList.toggle("open"); }

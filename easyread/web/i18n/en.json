@@ -1663,5 +1663,10 @@
  "关联笔记 {n}": "Linked notes {n}",
  "点击查看关联笔记，再次点击切换下一处": "View linked notes; click again for the next reference",
  "展开引用": "Expand quote",
- "收起引用": "Collapse quote"
+ "收起引用": "Collapse quote",
+  "图片面板": "Figures panel",
+  "论文图片": "Paper figures",
+  "图注": "Caption",
+  "共 {n} 张": "{n} figures",
+  "这篇论文还没有整理好的图片。": "This paper has no processed figures yet."
 }

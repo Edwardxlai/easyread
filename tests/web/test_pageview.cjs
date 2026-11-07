@@ -17,7 +17,7 @@ function reader(mode = "server") {
       return selector === ".pv-page" ? page : page.children[selector === ".pv-hl" ? 1 : 0];
     }
     if (!nodes.has(selector)) nodes.set(selector, {
-      classList: { toggle() {}, add() {}, remove() {}, contains: () => false },
+      classList: { toggle() {}, add() {}, remove() {}, contains: () => false }, contains: () => false,
       dataset: {}, scrollTop: 0, listeners: {}, children: [], style: {}, checked: true, complete: true, clientWidth: 480, clientHeight: 480, offsetHeight: 1000,
       addEventListener(name, fn) { this.listeners[name] = fn; },
       replaceChildren(...children) { this.children = children; },
