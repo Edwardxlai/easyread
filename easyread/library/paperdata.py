@@ -44,6 +44,28 @@ def parse_pages(spec) -> list[int]:
     return out
 
 
+def _valid_glossary_entry(entry) -> bool:
+    return (isinstance(entry, dict)
+            and bool(str(entry.get("en") or "").strip())
+            and bool(str(entry.get("zh") or "").strip()))
+
+
+def _merge_glossary(existing, incoming) -> list[dict]:
+    merged = []
+    have = set()
+    for items in (existing, incoming):
+        if not isinstance(items, list):
+            continue
+        for x in items:
+            if not _valid_glossary_entry(x):
+                continue
+            en = str(x.get("en"))
+            if en not in have:
+                merged.append(x)
+                have.add(en)
+    return merged
+
+
 def merge_blocks(ws: Workspace, data: dict, done=None, replace_pages=None, en_only: bool = False, drop_ids=None) -> dict:
     """并入一批块。同 id 整块替换；新块按 _after 或页码顺序插入。
     replace_pages：先删掉这些页上已有的块（重新翻译某几页时用）。
@@ -88,9 +110,8 @@ def merge_blocks(ws: Workspace, data: dict, done=None, replace_pages=None, en_on
             blocks.insert(pos, b)
             last = b["id"]
             n_new += 1
-        if data.get("glossary"):
-            have = {str(x.get("en")) for x in paper.get("glossary", [])}
-            paper["glossary"] = paper.get("glossary", []) + [x for x in data["glossary"] if str(x.get("en")) not in have]
+        if paper.get("glossary") or data.get("glossary"):
+            paper["glossary"] = _merge_glossary(paper.get("glossary"), data.get("glossary"))
         if data.get("references"):
             paper["references"] = merge_references(paper.get("references", []), data["references"])
         if data.get("meta"):
@@ -151,9 +172,8 @@ def fill_zh(ws: Workspace, data: dict, pages: list[int], keys: set[str], sents: 
         for k in ("title_zh", "short_zh"):
             if (data.get("meta") or {}).get(k):
                 meta[k] = data["meta"][k]
-        if data.get("glossary"):
-            have = {str(x.get("en")) for x in paper.get("glossary", [])}
-            paper["glossary"] = paper.get("glossary", []) + [x for x in data["glossary"] if isinstance(x, dict) and str(x.get("en")) not in have]
+        if paper.get("glossary") or data.get("glossary"):
+            paper["glossary"] = _merge_glossary(paper.get("glossary"), data.get("glossary"))
         missing = [k for k in keys if k not in got and not k.endswith("#head")]  # 表头没译不算漏
         left = {by_id[k.partition("#")[0]].get("page") for k in missing if k.partition("#")[0] in by_id}
         translation = paper.setdefault("translation", {})
