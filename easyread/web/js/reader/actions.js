@@ -202,7 +202,7 @@
   document.addEventListener("mouseout", (e) => { if (e.target.closest && e.target.closest("a.cite, a.xref")) { clearTimeout(hoverT); PR.hidePopoverSoon(); } });
   document.addEventListener("click", (e) => {
     const footnote = e.target.closest("a.footnote-ref");
-    if (footnote) { e.preventDefault(); PR.jumpTo(footnote.dataset.footnote); return; }
+    if (footnote) { e.preventDefault(); PR.jumpTo(footnote.dataset.footnote, { origin: footnote }); return; }
     const a = e.target.closest("a.cite, a.xref");
     if (!a) return;
     e.preventDefault();
@@ -283,7 +283,7 @@
     const el = document.getElementById(domId);
     if (!el) return;
     opts = opts || {};
-    if (!opts.noBack && PR.rememberSpot) PR.rememberSpot(el);  // 跳得远就记下原处，好回去
+    if (!opts.noBack && PR.rememberSpot) PR.rememberSpot(el, opts.origin);  // 跳得远就记下原处，好回去
     PR.centerOn(el, opts.instant);
     if (!opts.noFlash) { el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash"); }
     history.replaceState(history.state, "", "#" + domId);

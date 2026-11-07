@@ -100,7 +100,25 @@
     if (value.every((row) => !Array.isArray(row))) return [value];
     return value.map((row) => Array.isArray(row) ? row : [row]);
   }
-  function cell(c) { return PR.md(String(c), { xref: false, cite: false }).replace(/<br>(\([^<]*\))/g, '<br><span class="sub">$1</span>'); }
+  // Older translations sometimes store a whole table note in the last row's first cell.
+  PR.tableParts = function (b) {
+    const head = tableRows(b.head), rows = tableRows(b.rows);
+    const notes = [];
+    let end = rows.length;
+    if (head.some(r => r.length > 1) || rows.some(r => r.length > 1)) {
+      while (end) {
+        const row = rows[end - 1], note = String(row[0] ?? "").trim();
+        if (!/^(?:\*{1,2})?(?:notes?|注[释釋]?|備註|备注)\s*[:：.]/i.test(note) ||
+            row.slice(1).some(c => String(c ?? "").trim())) break;
+        notes.unshift(note);
+        end--;
+      }
+    }
+    return {head, rows: rows.slice(0, end), notes};
+  };
+  PR.tableNotesHtml = (notes, b) => notes.map(note => '<div class="caption table-note">' +
+    PR.md(note, PR.footnoteOptions(b.id)) + "</div>").join("");
+  function cell(c, b) { return PR.md(String(c), { ...PR.footnoteOptions(b.id), xref: false, cite: false }).replace(/<br>(\([^<]*\))/g, '<br><span class="sub">$1</span>'); }
   function linkify(t) { return PR.esc(t).replace(/(https?:\/\/[^\s<]+[^\s<.,;)])/g, '<a href="$1" target="_blank" rel="noopener">$1</a>'); }
 
   /* 图块的归一化裁剪框 [x0,y0,x1,y1]；不合格式就返回 null（渲染时按默认处理）。 */
@@ -117,7 +135,7 @@
       const en = PR.isEnKey(b.id);
       return "<" + tag + ' class="zh' + (en ? ' en-main" lang="en"' : '"') + ' data-key="' + b.id + '">' + (b.num ? '<span class="num">' + PR.esc(b.num) + "</span>" : "") +
         "<span>" + PR.md(PR.textFor(b.id), PR.footnoteOptions(b.id)) + "</span>" + staleTag(b.id) +
-        (b.en && !en ? '<span class="en-title" lang="en">' + PR.md(b.en, { cite: false, xref: false }) + "</span>" : "") + "</" + tag + ">";
+        (b.en && !en ? '<span class="en-title" lang="en">' + PR.md(b.en, { ...PR.footnoteOptions(b.id), cite: false, xref: false }) + "</span>" : "") + "</" + tag + ">";
     },
     para: (b) => (b.role === "footnote" ? '<span class="footnote-label"><sup>' + PR.esc(b.num || "") + "</sup></span>" : "") + zhDiv(b.id) + enIfZh(b.id, b.en),
     list(b) {
@@ -127,12 +145,13 @@
     },
     math: (b) => '<div class="math-row"><div class="math-body">' + PR.tex(b.tex, true) + "</div>" + (b.tag ? '<div class="math-tag">(' + PR.esc(b.tag) + ")</div>" : "") + "</div>",
     table(b) {
+      const parts = PR.tableParts(b);
       const al = (b.align || "").split("");
       const style = (i) => (al[i] ? ' style="text-align:' + ({ l: "left", r: "right", c: "center" }[al[i]] || "left") + '"' : "");
-      const head = tableRows(b.head).map((r) => "<tr>" + r.map((c, i) => "<th" + style(i) + ">" + cell(c) + "</th>").join("") + "</tr>").join("");
-      const rows = tableRows(b.rows).map((r) => "<tr>" + r.map((c, i) => "<td" + style(i) + ">" + cell(c) + "</td>").join("") + "</tr>").join("");
+      const head = parts.head.map((r) => "<tr>" + r.map((c, i) => "<th" + style(i) + ">" + cell(c, b) + "</th>").join("") + "</tr>").join("");
+      const rows = parts.rows.map((r) => "<tr>" + r.map((c, i) => "<td" + style(i) + ">" + cell(c, b) + "</td>").join("") + "</tr>").join("");
       const table = '<div class="tbl-wrap"><table class="tbl"><thead>' + head + "</thead><tbody>" + rows + "</tbody></table></div>";
-      return b.caption_pos === "above" ? captionHtml(b) + table : table + captionHtml(b);
+      return (b.caption_pos === "above" ? captionHtml(b) + table : table + captionHtml(b)) + PR.tableNotesHtml(parts.notes, b);
     },
     figure(b) {
       // 图按原 PDF 的物理尺寸（1pt = 4/3 CSS px）显示，和原页一致；版心放不下时 max-width:100% 兜底。

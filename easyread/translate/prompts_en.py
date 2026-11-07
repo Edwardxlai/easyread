@@ -6,7 +6,7 @@ from __future__ import annotations
 import json
 
 from . import langs
-from .prompts import MATH_RULES, _context, _page_texts, peek_note, rules
+from .prompts import MATH_RULES, TABLE_NOTES, _context, _page_texts, peek_note, rules
 from ..library.store import Workspace
 from ..pdf import links
 
@@ -17,7 +17,7 @@ RULES_EN = """整理要求（不翻译）：
 - 本文内部引用写成链接：提到本文有编号的图、表、公式、章节、附录、算法、代码清单时，en 把指代它的文字写成 [文字](#类型:编号)。类型：fig 图，tab 表，eq 公式，sec 章节和附录，alg 算法，lst 代码清单；编号照原文（3、A1、2.1、C.1）。例如 [Figure 3](#fig:3)、Section [3.1](#sec:3.1)、Eqs. [(4)](#eq:4) and [(5)](#eq:5)、[Listing 3](#lst:3)。材料里的 [文字](#) 是 PDF 自己的内部链接，按它指的对象补上类型和编号；没标出的引用也照样写。引用别的论文里的图表不写链接；标题、作者、单位、参考文献条目、题注开头的编号（Figure 1:）里不写。
 - 保留粗体和斜体：抽取的文字里 **…** 是原文的粗体，*…* 是斜体，由程序按 PDF 字体标出。en 照录这些标记，成对出现，不放进 $公式$ 和代码；整行加粗的标题、题注开头的编号（Figure 1:）不用标，原文没有的不要自己加。有原页图时以原页为准，补上抽取文字里漏标的。
 - 保留原文的阅读顺序、章节编号、引用号 [n]。双栏论文按栏读，断在行尾的连字符单词拼回去。
-""" + MATH_RULES + """
+""" + MATH_RULES + TABLE_NOTES + """
 - 表格重排成 table 块，表头和单元格照原文。图用 figure 块，给出归一化裁剪框 box:[x0,y0,x1,y1]（0 到 1，框住图本身、不含题注），图内可读的标题、坐标轴、图例和标签原文放 image_en。没有原页图或看不清时不猜框和文字；src 留空由程序裁图。
 - 参考文献列表：输出一个 references 块，条目放进 references 数组（text 是原文）。id 是这条的引用键：编号式列表写编号（"13"）；作者-年份式写作者的姓和年份，用连字符连起来，一两位作者写全部的姓，三位及以上只写第一作者的姓，姓里的空格去掉，年份带原文的 a/b 后缀，例如 Jimenez-2024、Chen-Jiang-2025、Chen-2026a、DaSilva-2025、Anthropic-2025；字母标签式写标签（JYW+24）。
 - 作者-年份式、字母标签式的文献引用写成链接 [文字](#cite:键)，键和参考文献条目的 id 同一个写法，例如 [Jimenez et al. (2024)](#cite:Jimenez-2024)；括号里有几条就各写一个链接，方括号留在链接外：[[Jimenez et al., 2024](#cite:Jimenez-2024), [Chen and Jiang, 2025](#cite:Chen-Jiang-2025)]。材料里指向参考文献的 [文字](#) 也这样补上键；一处引用被拆成几个 [文字](#)（作者和年份分开链）时合成一个链接。编号式引用照旧写 [13]，不写链接。

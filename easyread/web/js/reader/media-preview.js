@@ -17,9 +17,9 @@
     return matches.length === 1 ? matches[0] : null;
   }
   function tableHtml(b, compact = false) {
-    const rows = (v) => !Array.isArray(v) ? [] : v.every((r) => !Array.isArray(r)) ? [v] : v;
-    const cells = (rs, tag) => rows(rs).map((r) => "<tr>" + (Array.isArray(r) ? r : [r]).map((c) => "<" + tag + ">" + PR.md(String(c ?? ""), { cite: false, xref: false }) + "</" + tag + ">").join("") + "</tr>").join("");
-    return '<div class="media-table-scroll"' + (compact ? '' : ' tabindex="0"') + '><table><thead>' + cells(b.head || [], "th") + '</thead><tbody>' + cells(compact ? (b.rows || []).slice(0, 4) : b.rows || [], "td") + "</tbody></table></div>";
+    const {head, rows, notes} = PR.tableParts(b);
+    const cells = (rs, tag) => rs.map((r) => "<tr>" + r.map((c) => "<" + tag + ">" + PR.md(String(c ?? ""), { cite: false, xref: false }) + "</" + tag + ">").join("") + "</tr>").join("");
+    return '<div class="media-table-scroll"' + (compact ? '' : ' tabindex="0"') + '><table><thead>' + cells(head, "th") + '</thead><tbody>' + cells(compact ? rows.slice(0, 4) : rows, "td") + "</tbody></table></div>" + (compact ? "" : PR.tableNotesHtml(notes, b));
   }
   function thumbnail(b) {
     if (!b) return '<span class="media-empty">' + PR.t("图表已变化或移除") + '</span>';

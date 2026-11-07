@@ -118,7 +118,9 @@ _BACKOFF = (10, 20, 40, 60, 60)
 def complete(o: dict, prompt: str, images: list[Path], cancel=None, meter=None) -> str:
     # 也用流式请求，收齐了再整段交出去：一次性返回要等整批译完才有第一个字节，推理模型一批常要好几分钟，
     # 持续收到片段可减少网关的空闲超时；首包迟到或网关总时限仍可能导致超时。
-    body = _body(o, prompt, images, True, None if kind(o) == "responses" else 0.2)
+    # Let Ollama use the sampling parameters saved with the model.
+    temperature = 0.2 if kind(o) == "chat" and o.get("preset") != "ollama" else None
+    body = _body(o, prompt, images, True, temperature)
     text, used = "", {}
     for attempt in range(len(_BACKOFF) + 1):  # 限流、服务端错误、网络抖动：等一会儿再试
         if cancel is not None and cancel.is_set():

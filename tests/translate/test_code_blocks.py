@@ -7,7 +7,7 @@ import unittest
 from unittest import mock
 
 from easyread.library import checks, paperdata
-from easyread.translate import sentences, terms, translate
+from easyread.translate import codeblocks, sentences, terms, translate
 from tests.translate.test_translate import make_ws
 
 
@@ -15,6 +15,18 @@ class CodeBlockTest(unittest.TestCase):
     def setUp(self):
         self.ws = make_ws(2)
         self.cfg = {"engine": "openai", "openai": {"vision": False}}
+
+    def test_recover_sql_only_when_pdf_lines_confirm_the_separators(self):
+        raw = "use master\ngo\n  select @@version\ngo"
+        extract = self.ws.root / "extract"
+        (extract / "page-001.txt").write_text(raw, encoding="utf-8")
+        b = {"type": "para", "page": 1, "en": "use master||go||select @@version||go",
+             "zh": "use master‖go‖select @@version‖go"}
+        ambiguous = dict(b, en="use master||go||select a||b||go")
+        codeblocks.restore_sql_lines([b, ambiguous], extract)
+        self.assertTrue(codeblocks.has_fence(b["en"]))
+        self.assertIn(raw, b["zh"])
+        self.assertFalse(codeblocks.has_fence(ambiguous["en"]))
 
     def tearDown(self):
         shutil.rmtree(self.ws.root)

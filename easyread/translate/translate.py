@@ -21,8 +21,7 @@ from ..library.paperdata import add_discussion, fill_zh, merge_blocks, set_block
 from ..library.store import Workspace
 from .page_scope import references_page, scope_pages
 from .translator_checks import journal, save_checks as _save_checks
-from . import batch_repair
-from . import instructions, figure_images
+from . import batch_repair, instructions, figure_images, footnotes
 
 _merge_lock = threading.Lock()  # 并发翻译时，并入 paper.json 和重算原页定位一次只做一个
 # 用量到顶、余额不足这类错误，后面的批次也一定失败：直接停，剩下的页记为没译，等额度恢复后一键重试
@@ -106,12 +105,15 @@ def _problems(data: dict) -> list[str]:
     return problems + tex_problems(tex)
 
 
-def _fill_problems(zh: dict) -> list[str]:
+def _fill_problems(zh: dict, source=None) -> list[str]:
     # Fill responses use keys instead of blocks; table heads still need math checks.
     blocks = [{"id": k, "type": "table", "head": v} if k.endswith("#head") else
               {"id": k, "type": "para", "zh": v}
               for k, v in zh.items() if isinstance(v, str) or k.endswith("#head")]
-    return _problems({"blocks": blocks})
+    problems = _problems({"blocks": blocks})
+    for key, value in (source or {}).items():
+        problems.extend(footnotes.missing(key, zh.get(key), footnotes.markers(value)))
+    return problems
 
 
 def _fill_batch(ws: Workspace, cfg: dict, batch: list[int], cancel, say, meter=None, wait=False) -> None:
@@ -133,13 +135,13 @@ def _fill_batch(ws: Workspace, cfg: dict, batch: list[int], cancel, say, meter=N
     if not isinstance(data, dict) or not isinstance(data.get("zh"), dict):
         raise engines.EngineError(tr("模型输出的格式不对（缺 zh）"))
     with stage(meter, "validate"):
-        problems = _fill_problems(data["zh"])
+        problems = _fill_problems(data["zh"], items)
     if problems:
         say(tr("第 {page} 页起有 {n} 处公式或格式问题，正在让模型修正", page=batch[0], n=len(problems)))
         try:
             data = batch_repair.repair(data, "zh", problems,
                 lambda p: engines.run(cfg, instructions.apply(p, cfg), ws.root, None, cancel, meter),
-                lambda d: _fill_problems(d["zh"]))
+                lambda d: _fill_problems(d["zh"], items))
         except engines.EngineError as e:
             journal(ws, tr("第 {pages} 页修正失败，保留原译：{err}", pages=batch, err=e))
     instructions.filter_figure_text(data, cfg)
@@ -175,14 +177,20 @@ def _one_batch(ws: Workspace, cfg: dict, batch: list[int], total_pages: int, can
         (ws.root / "extract" / f"failed-{batch[0]:03d}.txt").write_text(text, encoding="utf-8")
         raise
     data = _normalize(data, batch, _taken(ws, batch))
+    expected_notes = footnotes.expected(ws, data["blocks"])
+
+    def validate(candidate):
+        codeblocks.restore_sql_lines(candidate["blocks"], ws.root / "extract")
+        return _problems(candidate) + footnotes.problems(candidate["blocks"], expected_notes, read)
+
     with stage(meter, "validate"):
-        problems = _problems(data)
+        problems = validate(data)
     if problems:  # 给一次修的机会
         say(tr("第 {page} 页起有 {n} 处公式或格式问题，正在让模型修正", page=batch[0], n=len(problems)))
         try:
             data = batch_repair.repair(data, "blocks", problems,
                 lambda p: engines.run(cfg, p if read else instructions.apply(p, cfg), ws.root, None, cancel, meter),
-                _problems)
+                validate, normalize=lambda result: _normalize(result, batch, _taken(ws, batch)))
         except engines.EngineError as e:
             journal(ws, tr("第 {pages} 页修正失败，保留原译：{err}", pages=batch, err=e))
     with merge_lock(meter, _merge_lock):

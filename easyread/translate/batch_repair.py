@@ -9,7 +9,7 @@ from . import prompts
 from .repair_guard import retains_content
 
 
-def repair(data: dict, field: str, problems: list[str], run, validate) -> dict:
+def repair(data: dict, field: str, problems: list[str], run, validate, normalize=None) -> dict:
     blocks = field == "blocks"
     items = {b["id"]: b for b in data[field]} if blocks else data[field]
     ids = {re.split(r"[:：]", problem, maxsplit=1)[0] for problem in problems}
@@ -31,6 +31,9 @@ def repair(data: dict, field: str, problems: list[str], run, validate) -> dict:
         by_id = fixed
     else:
         return data
+    if normalize and blocks:
+        normalized = normalize({"blocks": list(by_id.values())})
+        by_id = {b["id"]: b for b in normalized["blocks"]}
     if not selected.keys() <= by_id.keys():
         return data
     replacements = {k: by_id[k] for k in selected}

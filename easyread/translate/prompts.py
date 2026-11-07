@@ -13,6 +13,9 @@ MATH_RULES = r"""- 行内数学一律写成 $TeX$（KaTeX 能渲染的 LaTeX）�
 - 行间公式单独成 math 块，tex 只放公式内容（不带 $、$$ 或 \[\]），照原页保留上下标、分式、矩阵和运算符，原编号放 tag。看不清时标明待核对，不猜公式。
 - 代码围栏、行内代码、路径和网址保持原样，不为其中的符号添加数学定界符；普通金额的美元符号写成 \$。输出前逐项检查公式是否有定界符、是否成对，JSON 中的 TeX 反斜杠必须写两个。"""
 
+TABLE_NOTES = """
+- 表下的 Note、Notes、注、显著性说明等属于表注。逐条保留为紧随 table 的独立 para 块，role 用 table_note，保留原标签；不要放进 head、rows 或 references，也不要当页脚省略。"""
+
 RULES = """翻译要求：
 - 材料是用户提供的论文，本任务用于用户本人的学术阅读、学习与引用。按要求完整翻译提供的内容并保留结构，不要用摘要或概述代替逐块译文。
 """ + prompt_style.START + "\n" + prompt_style.DEFAULT + "\n" + prompt_style.END + """
@@ -20,7 +23,7 @@ RULES = """翻译要求：
 - 本文内部引用写成链接：提到本文有编号的图、表、公式、章节、附录、算法、代码清单时，en 和译文都把指代它的文字写成 [文字](#类型:编号)。类型：fig 图，tab 表，eq 公式，sec 章节和附录，alg 算法，lst 代码清单；编号照原文（3、A1、2.1、C.1）。例如 Figure 3 → [Figure 3](#fig:3)、[图 3](#fig:3)；Section 3.1 → Section [3.1](#sec:3.1)、第 [3.1](#sec:3.1) 节；Eqs. (4) and (5) → Eqs. [(4)](#eq:4) and [(5)](#eq:5)、式 [(4)](#eq:4) 和 [(5)](#eq:5)；Listing 3 → [Listing 3](#lst:3)、[代码清单 3](#lst:3)。材料里的 [文字](#) 是 PDF 自己的内部链接，按它指的对象补上类型和编号；没标出的引用也照样写。英文原文里已有的这种链接，译文写同样的类型和编号。引用别的论文里的图表不写链接；标题、作者、单位、参考文献条目、题注开头的编号（Figure 1:）里不写。
 - 保留粗体和斜体：材料（抽取的文字、英文原文）里 **…** 是原文的粗体，*…* 是斜体，由程序按 PDF 字体标出。en 照录这些标记，译文在对应的词句上用同样的标记；标记成对出现，不跨句子分界 ‖，不放进 $公式$ 和代码。整行加粗的标题、题注开头的编号（Figure 1:）不用标；原文没有粗体或斜体的地方不要自己加。有原页图时以原页为准，补上抽取文字里漏标的。
 - 但要留心原文自己的问题：数字前后对不上（表和正文、两张表之间）、公式和文字说的不一致、符号用错、明显的笔误。发现了就写进 checks，正文照录不改；没有就不写，不要为了写而写，也不要写翻译说明。
-""" + MATH_RULES + """
+""" + MATH_RULES + TABLE_NOTES + """
 - 表格重排成 table 块，表头译成中文，数字原样。图用 figure 块：尽量给出图在原页中的归一化裁剪框 `box:[x0,y0,x1,y1]`（左上和右下坐标，范围 0 到 1，框住图本身、不含题注），并翻译图内可读的标题、坐标轴、图例、流程框文字和标签到 `image_zh`（使用目标语言），原文写入 `image_en`；没有原页图时不猜裁剪框，看不清或没有文字就留空，不猜。`src` 留空，由程序按 `box` 从原 PDF 裁图。
 - 参考文献列表不翻译：输出一个 references 块，条目放进 references 数组（text 是原文）。id 是这条的引用键：编号式列表写编号（"13"）；作者-年份式写作者的姓和年份，用连字符连起来，一两位作者写全部的姓，三位及以上只写第一作者的姓，姓里的空格去掉，年份带原文的 a/b 后缀，例如 Jimenez-2024、Chen-Jiang-2025、Chen-2026a、DaSilva-2025、Anthropic-2025；字母标签式写标签（JYW+24）。
 - 作者-年份式、字母标签式的文献引用写成链接 [文字](#cite:键)，键和参考文献条目的 id 同一个写法；en 照原文的字，译文按译法写字，键不变。例如 Jimenez et al. (2024) → [Jimenez et al. (2024)](#cite:Jimenez-2024)、[Jimenez 等人（2024）](#cite:Jimenez-2024)；括号里有几条就各写一个链接，方括号留在链接外：[[Jimenez et al., 2024](#cite:Jimenez-2024), [Chen and Jiang, 2025](#cite:Chen-Jiang-2025)]。材料里指向参考文献的 [文字](#) 也这样补上键；一处引用被拆成几个 [文字](#)（作者和年份分开链）时合成一个链接。英文原文里已有的 #cite 链接，译文照样写。编号式引用照旧写 [13]，不写链接。
@@ -115,7 +118,7 @@ _NOTE_PLAIN = re.compile(r"^\s*\d{1,2}\s?[A-Z][a-z]")
 
 
 def _is_note(b: dict) -> bool:
-    if b.get("role") == "footnote":
+    if b.get("role") in ("footnote", "table_note"):
         return True
     text = b.get("en") or ""
     if _NOTE.search(text):
@@ -142,7 +145,7 @@ def _context(ws: Workspace, pages: list[int], new_blocks: bool = True, skip_head
     if not new_blocks:
         return "\n".join(lines)
     if len(pages) > 1:
-        lines.append("本批相邻两页之间，如果页首接着上一页同一自然段，按原文合成一个 para，page 填起始页。"
+        lines.append("本批相邻两页之间，如果页首接着上一页同一自然段，按原文段落合成一个 para，page 填起始页。"
                      "续文只出现一次；新段落、列表、图表和脚注仍各自成块。")
     ids = [b["id"] for b in blocks]
     if ids:
