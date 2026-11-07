@@ -21,7 +21,7 @@ from ..library.store import Workspace
 from .page_scope import references_page, scope_pages
 from .translator_checks import journal, save_checks as _save_checks
 from .repair_guard import retains_content
-from . import instructions, figure_images
+from . import instructions, figure_images, footnotes
 
 _merge_lock = threading.Lock()  # 并发翻译时，并入 paper.json 和重算原页定位一次只做一个
 # 用量到顶、余额不足这类错误，后面的批次也一定失败：直接停，剩下的页记为没译，等额度恢复后一键重试
@@ -95,12 +95,15 @@ def _problems(data: dict) -> list[str]:
     return problems + tex_problems(tex)
 
 
-def _fill_problems(zh: dict) -> list[str]:
+def _fill_problems(zh: dict, source=None) -> list[str]:
     # Fill responses use keys instead of blocks; table heads still need math checks.
     blocks = [{"id": k, "type": "table", "head": v} if k.endswith("#head") else
               {"id": k, "type": "para", "zh": v}
               for k, v in zh.items() if isinstance(v, str) or k.endswith("#head")]
-    return _problems({"blocks": blocks})
+    problems = _problems({"blocks": blocks})
+    for key, value in (source or {}).items():
+        problems.extend(footnotes.missing(key, zh.get(key), footnotes.markers(value)))
+    return problems
 
 
 def _fill_batch(ws: Workspace, cfg: dict, batch: list[int], cancel, say, meter=None, wait=False) -> None:
@@ -121,7 +124,7 @@ def _fill_batch(ws: Workspace, cfg: dict, batch: list[int], cancel, say, meter=N
     data = engines.parse_json(text)
     if not isinstance(data, dict) or not isinstance(data.get("zh"), dict):
         raise engines.EngineError(tr("模型输出的格式不对（缺 zh）"))
-    problems = _fill_problems(data["zh"])
+    problems = _fill_problems(data["zh"], items)
     if problems:
         say(tr("第 {page} 页起有 {n} 处公式或格式问题，正在让模型修正", page=batch[0], n=len(problems)))
         try:
@@ -129,7 +132,7 @@ def _fill_batch(ws: Workspace, cfg: dict, batch: list[int], cancel, say, meter=N
             if (isinstance(fixed, dict) and isinstance(fixed.get("zh"), dict)
                     and data["zh"].keys() <= fixed["zh"].keys()
                     and retains_content(data, fixed)
-                    and len(_fill_problems(fixed["zh"])) < len(problems)):
+                    and len(_fill_problems(fixed["zh"], items)) < len(problems)):
                 data = fixed
         except engines.EngineError as e:
             journal(ws, tr("第 {pages} 页修正失败，保留原译：{err}", pages=batch, err=e))
@@ -165,15 +168,20 @@ def _one_batch(ws: Workspace, cfg: dict, batch: list[int], total_pages: int, can
         (ws.root / "extract" / f"failed-{batch[0]:03d}.txt").write_text(text, encoding="utf-8")
         raise
     data = _normalize(data, batch, _taken(ws, batch))
-    problems = _problems(data)
+    codeblocks.restore_sql_lines(data["blocks"], ws.root / "extract")
+    expected_notes = footnotes.expected(ws, data["blocks"])
+    problems = _problems(data) + footnotes.problems(data["blocks"], expected_notes, read)
     if problems:  # 给一次修的机会
         say(tr("第 {page} 页起有 {n} 处公式或格式问题，正在让模型修正", page=batch[0], n=len(problems)))
         try:
             repair = prompts.repair(prompts.dump(data), problems)
             fixed = engines.parse_json(engines.run(cfg, repair if read else instructions.apply(repair, cfg), ws.root, None, cancel, meter))
             fixed = _normalize(fixed, batch, _taken(ws, batch))
-            if fixed["blocks"] and retains_content(data, fixed) and len(_problems(fixed)) < len(problems):
-                data = fixed
+            if fixed["blocks"] and retains_content(data, fixed):
+                codeblocks.restore_sql_lines(fixed["blocks"], ws.root / "extract")
+                remaining_notes = footnotes.problems(fixed["blocks"], expected_notes, read)
+                if len(_problems(fixed) + remaining_notes) < len(problems):
+                    data = fixed
         except engines.EngineError as e:
             journal(ws, tr("第 {pages} 页修正失败，保留原译：{err}", pages=batch, err=e))
     with _merge_lock:

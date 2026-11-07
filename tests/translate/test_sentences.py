@@ -36,6 +36,15 @@ class UnmarkTest(unittest.TestCase):
         self.assertIn("‖$", b["en"])
         self.assertEqual(len(b["sents"]), 2)
 
+    def test_currency_does_not_mask_alignment_or_trigger_math_repair(self):
+        from easyread.library.checks import block_problems
+
+        text = "Base $100 (intercept). ‖ Adjust by -$50, $0 or $50 using $2x+1$."
+        self.assertEqual(sentences.unmark(text), (text.replace(" ‖ ", " "), [22]))
+        problems, formulas = block_problems([{"id": "p", "type": "para", "en": text + " One more $5."}])
+        self.assertEqual(problems, [])
+        self.assertEqual(formulas, [("p", "2x+1", False)])
+
     def test_norm_bars_in_text_are_not_boundaries(self):
         self.assertEqual(sentences.unmark("‖w‖ bound"), ("‖w‖ bound", None))
         self.assertEqual(sentences.unmark("norm ‖x‖. ‖ Next one."), ("norm ‖x‖. Next one.", [9]))

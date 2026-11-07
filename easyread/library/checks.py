@@ -9,17 +9,11 @@ from pathlib import Path
 
 from ..app.config import WEB
 from ..translate.codeblocks import prose
+from ..translate.sentences import MATH_SPANS
 from .paperdata import BLOCK_TYPES, block_shape_problem
 from .store import Workspace
 
 _CITE = re.compile(r"\[(\d+(?:\s*[,–-]\s*\d+)*)\]")
-# Match the same four delimiters as web/js/common/markup.js, display first.
-_MATH = re.compile(
-    r"(?<!\\)\$\$([\s\S]+?)(?<!\\)\$\$"
-    r"|(?<![\\$])\$(?!\$)((?:\\\$|[^$])+?)(?<!\\)\$(?!\$)"
-    r"|(?<!\\)\\\[([\s\S]+?)(?<!\\)\\\]"
-    r"|(?<!\\)\\\(([\s\S]+?)(?<!\\)\\\)"
-)
 # Only strong TeX signals: do not guess whether ordinary words, prices or x/y
 # are formulas. Report the problem to the model; never guess formula boundaries.
 _BARE_TEX = re.compile(
@@ -39,7 +33,7 @@ KATEX = WEB / "vendor" / "katex" / "katex.min.js"
 
 def _math_items(bid: str, text: str) -> list:
     return [(bid, next(g for g in m.groups() if g is not None),
-             m.group(1) is not None or m.group(3) is not None) for m in _MATH.finditer(text)]
+             m.group(1) is not None or m.group(3) is not None) for m in MATH_SPANS.finditer(text)]
 
 
 def texts(block: dict):
@@ -89,8 +83,8 @@ def block_problems(blocks: list[dict], refs: set[str] | None = None) -> tuple[li
                 problems.append(f"{bid}：含控制字符，多半是 JSON 里 TeX 命令（frac、text、bar、nu 这类）前的反斜杠只写了一个")  # i18n-ok
         for t in texts(b):
             t = prose(t)
-            outside = _MATH.sub(" ", t)
-            if (outside.count("$") - outside.count("\\$")) % 2:
+            outside = MATH_SPANS.sub(" ", t)
+            if len(re.findall(r"(?<!\\)\$(?![0-9])", outside)) % 2:
                 problems.append(f"{bid}：$ 不成对")  # i18n-ok
             bare = _BARE_TEX.search(outside)
             if bare:

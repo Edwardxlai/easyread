@@ -10,7 +10,13 @@ import re
 from .codeblocks import CODE, has_fence
 
 MARK = "‖"
-_MATH = re.compile(r"\$\$.+?\$\$|(?<!\\)\$(?:\\\$|[^$])+?(?<!\\)\$", re.S)
+# Match the same four delimiters as web/js/common/markup.js, display first.
+MATH_SPANS = re.compile(
+    r"(?<!\\)\$\$([\s\S]+?)(?<!\\)\$\$"
+    r"|(?<![\\$])\$(?!\$)((?![0-9])(?:\\\$|[^$])+?|[0-9](?:\\\$|[^$])*?(?<![\s，。；、：（(\u3400-\u9fff])(?=\$(?![0-9])))(?<!\\)\$(?!\$)"
+    r"|(?<!\\)\\\[([\s\S]+?)(?<!\\)\\\]"
+    r"|(?<!\\)\\\(([\s\S]+?)(?<!\\)\\\)"
+)
 # 句号后面跟着这些缩写不算断句（Fig. 3、et al. (2020)、e.g. the …）
 _ABBR = {"e.g", "i.e", "al", "fig", "figs", "eq", "eqs", "sec", "secs", "tab", "ref", "refs", "vs", "cf", "etc", "resp",
          "approx", "no", "dr", "mr", "ms", "prof", "st", "app", "ch", "thm", "lem", "def", "prop", "cor", "viz", "ca"}
@@ -34,7 +40,7 @@ _BEFORE = set("‖.?!:;,)]\"'”’。？！：；，、）】」』")  # i18n-o
 def _pieces(text: str) -> list[str]:
     """按句界 ‖ 切开：公式外、前面是标点或两边都是空白的才算；公式里的和贴着字母的是范数符号，不动。"""
     out, last = [], 0
-    spans = [m.span() for pattern in (CODE, _MATH) for m in pattern.finditer(text)]
+    spans = [m.span() for pattern in (CODE, MATH_SPANS) for m in pattern.finditer(text)]
     for i, c in enumerate(text):
         if c != MARK or any(a <= i < b for a, b in spans):
             continue
@@ -130,7 +136,7 @@ def split_en(text: str) -> list[int]:
     """英文按句切，返回除最后一句外每句的句尾（Python 下标，不含后面的空格）。公式里、缩写和人名首字母后不切。"""
     if not text:
         return []
-    math = [m.span() for pattern in (CODE, _MATH) for m in pattern.finditer(text)]
+    math = [m.span() for pattern in (CODE, MATH_SPANS) for m in pattern.finditer(text)]
     ends = []
     for m in _END.finditer(text):
         i = m.start()

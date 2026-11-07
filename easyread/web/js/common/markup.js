@@ -3,7 +3,15 @@
 (function (PR) {
   "use strict";
   // 先识别代码和完整公式，避免分段、Markdown 和表格的 | 拆坏 TeX。
-  const TOKENS = /(?<!\\)(`+)([\s\S]*?)\1|(?<!\\)\$\$([\s\S]+?)(?<!\\)\$\$|(?<![\\$])\$(?!\$)((?:\\\$|[^$])+?)(?<!\\)\$(?!\$)|(?<!\\)\\\[([\s\S]+?)(?<!\\)\\\]|(?<!\\)\\\(([\s\S]+?)(?<!\\)\\\)|(?<!\\)\[((?:\\.|[^\]\\\n])+)\]\(((?:[^\s()<>]|\([^\s()<>]*\))+)\)/g;  // i18n-ok regex, not UI text
+  // For numeric openers, a dollar introducing another price or following prose is not a close.
+  const TOKENS = new RegExp([
+    /(?<!\\)(`+)([\s\S]*?)\1/.source,
+    /(?<!\\)\$\$([\s\S]+?)(?<!\\)\$\$/.source,
+    /(?<![\\$])\$(?!\$)((?![0-9])(?:\\\$|[^$])+?|[0-9](?:\\\$|[^$])*?(?<![\s，。；、：（(\u3400-\u9fff])(?=\$(?![0-9])))(?<!\\)\$(?!\$)/.source,
+    /(?<!\\)\\\[([\s\S]+?)(?<!\\)\\\]/.source,
+    /(?<!\\)\\\(([\s\S]+?)(?<!\\)\\\)/.source,
+    /(?<!\\)\[((?:\\.|[^\]\\\n])+)\]\(((?:[^\s()<>]|\([^\s()<>]*\))+)\)/.source,
+  ].join("|"), "g");
   const mathCache = new Map();
 
   function tokens(text, blocks) {
@@ -63,13 +71,24 @@
     });
   };
 
+  const superscriptNumber = /^[⁰¹²³⁴⁵⁶⁷⁸⁹]{1,3}/;
+  function noteNumber(b) {
+    if (b.type !== "para") return "";
+    if (b.role === "footnote" && /^\d{1,3}$/.test(String(b.num))) return String(b.num);
+    // Older papers used ids such as fn3-1 (the suffix is a sequence, not the note number).
+    if (!/^fn(?:\d|[-_])/.test(b.id) && b.role !== "footnote") return "";
+    const text = String(b.en || b.zh || "").trimStart();
+    return text.match(superscriptNumber)?.[0].normalize("NFKC") ||
+      text.match(/^\$\^\{?(\d{1,3})\}?\$/)?.[1] || text.match(/^(\d{1,3})(?!\d)/)?.[1] || "";
+  }
   PR.buildFootnoteIndex = function (blocks) {
     const index = { pages: new Map(), all: new Map() };
     const add = (map, key, id) => map.set(key, map.has(key) ? null : id);
     for (const b of blocks || []) {
-      if (b.type !== "para" || b.role !== "footnote" || !/^\d{1,3}$/.test(String(b.num || ""))) continue;
-      add(index.pages, b.page + ":" + b.num, b.id);
-      add(index.all, String(b.num), b.id);
+      const n = noteNumber(b);
+      if (!n) continue;
+      add(index.pages, b.page + ":" + n, b.id);
+      add(index.all, n, b.id);
     }
     PR.footnoteIndex = index;
   };
@@ -142,6 +161,22 @@
     opts = opts || {};
     text = String(text == null ? "" : text);
     const saved = tokens(text, false);
+    // Some older translations have literal superscripts instead of [^n]. Only use a
+    // same-page note after prose. Keep standalone powers, units, code and full TeX intact.
+    const noteHere = n => PR.footnoteIndex?.pages.get(opts.footnotePage + ":" + n);
+    if (opts.footnotePage != null && PR.footnoteIndex) {
+      const proseEnd = /(?:[.。！？!?，,；;：:][ \t]*|(?:^|[\s(])[A-Za-z]{3,}|[\u3400-\u9fff]{2,})$/;
+      const inProse = (s, i) => proseEnd.test(s.slice(Math.max(0, i - 80), i));
+      saved.text = saved.text.replace(saved.inline, (raw, i, at, str) => {
+        const token = saved.values[i];
+        const n = !token.code && !token.link && !token.display && token.text.match(/^\^(?:\{(\d{1,3})\}|(\d))$/);
+        const num = n && (n[1] || n[2]);
+        return num && noteHere(num) && inProse(str, at) ? "[^" + num + "]" : raw;
+      }).replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]+/g, (raw, at, str) => {
+        const num = raw.normalize("NFKC");
+        return noteHere(num) && inProse(str, at) ? "[^" + num + "]" : raw;
+      });
+    }
     return restore(inline(saved.text, opts), saved);
   };
 

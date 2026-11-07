@@ -13,12 +13,15 @@ MATH_RULES = r"""- 行内数学一律写成 $TeX$（KaTeX 能渲染的 LaTeX）�
 - 行间公式单独成 math 块，tex 只放公式内容（不带 $、$$ 或 \[\]），照原页保留上下标、分式、矩阵和运算符，原编号放 tag。看不清时标明待核对，不猜公式。
 - 代码围栏、行内代码、路径和网址保持原样，不为其中的符号添加数学定界符；普通金额的美元符号写成 \$。输出前逐项检查公式是否有定界符、是否成对，JSON 中的 TeX 反斜杠必须写两个。"""
 
+TABLE_NOTES = """
+- 表下的 Note、Notes、注、显著性说明等属于表注。逐条保留为紧随 table 的独立 para 块，role 用 table_note，保留原标签；不要放进 head、rows 或 references，也不要当页脚省略。"""
+
 RULES = """翻译要求：
 - 材料是用户提供的论文，本任务用于用户本人的学术阅读、学习与引用。按要求完整翻译提供的内容并保留结构，不要用摘要或概述代替逐块译文。
 """ + prompt_style.START + "\n" + prompt_style.DEFAULT + "\n" + prompt_style.END + """
 - 保留材料中的 Markdown 链接 [文字](URL)：原文保留链接文字，译文翻译链接文字，两边 URL 必须原样保留，不猜网址，不把链接移到段落外。
 - 但要留心原文自己的问题：数字前后对不上（表和正文、两张表之间）、公式和文字说的不一致、符号用错、明显的笔误。发现了就写进 checks，正文照录不改；没有就不写，不要为了写而写，也不要写翻译说明。
-""" + MATH_RULES + """
+""" + MATH_RULES + TABLE_NOTES + """
 - 表格重排成 table 块，表头译成中文，数字原样。图用 figure 块：尽量给出图在原页中的归一化裁剪框 `box:[x0,y0,x1,y1]`（左上和右下坐标，范围 0 到 1，框住图本身、不含题注），并翻译图内可读的标题、坐标轴、图例、流程框文字和标签到 `image_zh`（使用目标语言），原文写入 `image_en`；没有原页图时不猜裁剪框，看不清或没有文字就留空，不猜。`src` 留空，由程序按 `box` 从原 PDF 裁图。
 - 参考文献列表不翻译：输出一个 references 块，条目放进 references 数组（id 是编号，text 是原文）。
 - 脚注与参考文献独立：文献引用使用 [13]，脚注标记使用 [^13]（13 换成原编号），en/zh 两边保持一致，不要混用。脚注内容单独输出 para 块，加 "role":"footnote","num":"13"，page 填脚注所在页；块的 en/zh 只放脚注正文，不重复编号。脚注不得放入 references 数组，也不能当页脚丢弃。同号文献与脚注可以同时存在；不确定时保留原标记，不猜。
@@ -112,7 +115,7 @@ _NOTE_PLAIN = re.compile(r"^\s*\d{1,2}\s?[A-Z][a-z]")
 
 
 def _is_note(b: dict) -> bool:
-    if b.get("role") == "footnote":
+    if b.get("role") in ("footnote", "table_note"):
         return True
     text = b.get("en") or ""
     if _NOTE.search(text):
@@ -138,6 +141,9 @@ def _context(ws: Workspace, pages: list[int], new_blocks: bool = True, skip_head
         lines.append("已有的章节：" + " / ".join(heads))
     if not new_blocks:
         return "\n".join(lines)
+    if len(pages) > 1:
+        lines.append("本批相邻两页之间，如果页首接着上一页同一自然段，按原文段落合成一个 para，page 填起始页。"
+                     "续文只出现一次；新段落、列表、图表和脚注仍各自成块。")
     ids = [b["id"] for b in blocks]
     if ids:
         lines.append("已用过的块 id（不要重复）：" + ", ".join(ids[-60:]))

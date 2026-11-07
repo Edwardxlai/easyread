@@ -6,7 +6,7 @@ from __future__ import annotations
 import json
 
 from . import langs
-from .prompts import MATH_RULES, _context, _page_texts, peek_note, rules
+from .prompts import MATH_RULES, TABLE_NOTES, _context, _page_texts, peek_note, rules
 from ..library.store import Workspace
 from ..pdf import links
 
@@ -15,7 +15,7 @@ RULES_EN = """整理要求（不翻译）：
 - 只把原文整理好，不翻译、不解释、不总结，不加原文没有的内容。原文的笔误照录。
 - 保留材料中的 Markdown 链接 [文字](URL)，文字和 URL 原样保留，不猜网址，不把链接移到段落外。
 - 保留原文的阅读顺序、章节编号、引用号 [n]。双栏论文按栏读，断在行尾的连字符单词拼回去。
-""" + MATH_RULES + """
+""" + MATH_RULES + TABLE_NOTES + """
 - 表格重排成 table 块，表头和单元格照原文。图用 figure 块，给出归一化裁剪框 box:[x0,y0,x1,y1]（0 到 1，框住图本身、不含题注），图内可读的标题、坐标轴、图例和标签原文放 image_en。没有原页图或看不清时不猜框和文字；src 留空由程序裁图。
 - 参考文献列表：输出一个 references 块，条目放进 references 数组（id 是编号，text 是原文）。
 - 脚注与参考文献独立：文献引用使用 [13]，脚注标记使用 [^13]（13 换成原编号），en/zh 两边保持一致，不要混用。脚注内容单独输出 para 块，加 "role":"footnote","num":"13"，page 填脚注所在页；块的 en/zh 只放脚注正文，不重复编号。脚注不得放入 references 数组，也不能当页脚丢弃。同号文献与脚注可以同时存在；不确定时保留原标记，不猜。

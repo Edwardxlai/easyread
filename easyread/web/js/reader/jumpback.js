@@ -12,14 +12,15 @@
   }, true);
 
   /* 在跳转前调用：目标就在眼前（一屏以内）就不记 */
-  PR.rememberSpot = function (target) {
+  PR.rememberSpot = function (target, origin) {
     const r = target.getBoundingClientRect();
-    if (r.top > -innerHeight * 0.5 && r.bottom < innerHeight * 1.5) return;
-    const from = hit && Date.now() - hit.t < 3000 && hit.el.isConnected ? hit.el : null;  // 从目录、笔记卡片跳的就没有
+    if (!origin && r.top > -innerHeight * 0.5 && r.bottom < innerHeight * 1.5) return;
+    const from = origin?.closest('#paper [id^="b-"]') ||
+      (hit && Date.now() - hit.t < 3000 && hit.el.isConnected ? hit.el : null);  // 从目录、笔记卡片跳的就没有
     hit = null;
     const id = from ? from.id.slice(2) : PR.readingBlock();
     const el = document.getElementById("b-" + id) || document.getElementById("b-head");
-    stack.push({ id, off: el ? el.getBoundingClientRect().top : 0, y: scrollY, exact: !!from });
+    stack.push({ id, off: el ? el.getBoundingClientRect().top : 0, y: scrollY, exact: !!from, origin });
     if (stack.length > 30) stack.shift();
     try { history.pushState({ easyreadBack: stack.length }, "", location.href); } catch (e) { /* file:// 下可能不让改历史 */ }
     dismissed = false;
@@ -50,7 +51,7 @@
     if (!s) return;
     const el = document.getElementById("b-" + s.id);
     if (el && s.exact) {  // 知道是从哪段跳走的：把那段放回屏幕中间并高亮
-      PR.centerOn(el);
+      PR.centerOn(s.origin?.isConnected && s.origin.getClientRects().length ? s.origin : el);
       el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
     } else if (el) window.scrollTo({ top: scrollY + el.getBoundingClientRect().top - s.off, behavior: "smooth" });  // 不知道：回到原来的位置，不乱高亮
     else window.scrollTo({ top: s.y, behavior: "smooth" });
@@ -61,7 +62,7 @@
   /* 自己滚回原处了，按钮就收起来 */
   window.addEventListener("scroll", PR.debounce(() => {
     const s = stack[stack.length - 1];
-    if (!s || !group || group.hidden) return;
+    if (!s || s.origin || !group || group.hidden) return;
     const el = document.getElementById("b-" + s.id);
     if (el && Math.abs(el.getBoundingClientRect().top - s.off) < innerHeight * 0.4) { stack.pop(); if (stack.length) show(); else group.hidden = true; }
   }, 300), { passive: true });
