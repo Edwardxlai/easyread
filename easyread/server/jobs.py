@@ -11,6 +11,7 @@ from ..chat import chat_models
 from ..app import config
 from ..translate import langs, translate, instructions
 from ..engines import usage
+from ..engines.timing import Timeline
 from ..engines.engines import Cancelled, EngineError
 from ..app.i18n import tr
 from ..library.library import Library
@@ -213,7 +214,7 @@ class Jobs:
             from . import figure_jobs
             return figure_jobs.run(self, ws, job, config.load(), cancel)
         cfg = engine_for(config.load(), job.get("model"))
-        meter = usage.Meter(cfg.get("engine") or "", timed=True)
+        timeline = Timeline()
         cfg = {**cfg, "translation_extra": job.get("translation_extra", "")}
         if job.get("target"):
             cfg = {**cfg, "target": langs.valid(job["target"])}
@@ -222,10 +223,10 @@ class Jobs:
         if not ws.load("paper").get("meta", {}).get("pages"):
             self._write(ws, state="running", message=tr("正在渲染原页、抽取文字"))
             try:
-                with meter.timing.stage("prepare"):
+                with timeline.stage("prepare"):
                     translate.prepare(ws)
             finally:
-                self._write(ws, timing=meter.timing.snapshot())
+                self._write(ws, timing=timeline.snapshot())
         if cancel.is_set():
             raise Cancelled()
         read = bool(job.get("read"))
@@ -264,6 +265,9 @@ class Jobs:
                             else tr("这篇要译 {n} 页，超过了你设的 {cap} 页，确认后再开始", n=len(pages), cap=cap))
             return
 
+        meter = usage.Meter(cfg.get("engine") or "")
+        meter.timing = timeline
+
         def report(done, total, message):
             if cancel.is_set():
                 raise Cancelled()
@@ -274,7 +278,7 @@ class Jobs:
             failed = translate.translate_pages(ws, cfg, pages, cancel, report, meter, read)
         finally:  # 取消、出错也把已经花掉的记上
             run = meter.snapshot()
-            self._write(ws, timing=meter.timing.snapshot())
+            self._write(ws, timing=timeline.snapshot())
             if run["calls"]:
                 ws.update("job", lambda j: j.update(usage=run, usage_total=usage.merge(j.get("usage_total"), run)))
         minutes = max(1, round((time.time() - started) / 60))

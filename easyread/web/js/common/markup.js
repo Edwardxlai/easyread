@@ -5,7 +5,7 @@
   // 先识别代码和完整公式，避免分段、Markdown 和表格的 | 拆坏 TeX。
   // For numeric openers, a dollar introducing another price or following prose is not a close.
   const TOKENS = new RegExp([
-    /(?<!\\)(`+)([\s\S]*?)\1/.source,
+    /(?<!\\)(`+)([\s\S]*?)\1/.source,  // i18n-ok: code span pattern
     /(?<!\\)\$\$([\s\S]+?)(?<!\\)\$\$/.source,
     /(?<![\\$])\$(?!\$)((?![0-9])(?:\\\$|[^$])+?|[0-9](?:\\\$|[^$])*?(?<![\s，。；、：（(\u3400-\u9fff])(?=\$(?![0-9])))(?<!\\)\$(?!\$)/.source,
     /(?<!\\)\\\[([\s\S]+?)(?<!\\)\\\]/.source,

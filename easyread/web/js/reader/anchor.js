@@ -230,7 +230,7 @@
   function paintHighlight(note, intent) {
     const result = PR.toggleHighlight(note, resolveHighlight, intent);
     void PR.flush();
-    PR.toast(PR.t(result.erased ? "已取消划线" : "已划线　点划线可以写笔记或改颜色"), { label: PR.t("撤销"), fn: () => PR.undoAnnotation(result.id) }, 2600);
+    PR.toast(result.erased ? PR.t("已取消划线") : PR.t("已划线　点划线可以写笔记或改颜色"), { label: PR.t("撤销"), fn: () => PR.undoAnnotation(result.id) }, 2600);
   }
 
   function rememberPen(pen, color) {
