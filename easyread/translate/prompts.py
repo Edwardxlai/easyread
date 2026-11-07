@@ -26,7 +26,7 @@ RULES = """翻译要求：
 - 看不清的地方写“此处识别不清，请核对原文第 N 页”，不要猜。
 - 页眉、页脚、页码、arXiv 侧边水印不要输出。"""
 
-SCHEMA = """输出格式：只输出一个 JSON 对象，不要任何别的文字。
+SCHEMA = """只输出紧凑 JSON，不加缩进。没有新术语、参考文献或核对项时省略对应的可选数组。
 {
   "meta": {"title_zh": "", "short_zh": "不超过 12 字的短标题", "title_en": "", "authors": "作者, 用逗号分隔", "affiliation": "", "date": "", "venue": ""},   // 只有包含第 1 页时才写
   "glossary": [{"en": "standard error", "zh": "标准误差"}],   // 本批新出现的核心术语
@@ -236,7 +236,7 @@ def consistency(items: list[dict], agree: dict[str, int], target_name: str) -> s
 
 
 def repair(original_json: str, problems: list[str]) -> str:
-    return ("下面这份论文翻译 JSON 有问题，请修好后输出完整的 JSON（格式不变，只输出 JSON）：\n"
+    return ("下面只列出待修的块或译文键。修好后按相同结构返回这些项，只输出紧凑 JSON。\n"
             "只修列出的问题，保留所有块、键、正文和公式含义。缺公式定界符时给完整公式补上 $TeX$，不要删除公式或把整句正文包进去；JSON 中 TeX 反斜杠写两个。\n"
             + "\n".join(f"- {p}" for p in problems[:30]) + "\n\nJSON：\n" + original_json)
 
@@ -302,7 +302,3 @@ def retranslate(ws: Workspace, key: str, hint: str) -> tuple[str, tuple | None]:
             + (f"读者觉得不好的地方：{hint}\n\n" if hint else "")
             + ("英文里的 ‖ 是句子分界：新译文在对应的句子交界处也插 ‖，个数和英文的一样。\n\n" if ends else "")
             + '只输出 JSON：{"zh": "新译文"}'), ends
-
-
-def dump(obj) -> str:
-    return json.dumps(obj, ensure_ascii=False, indent=1)

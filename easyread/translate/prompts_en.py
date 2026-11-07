@@ -23,7 +23,7 @@ RULES_EN = """整理要求（不翻译）：
 - 看不清的地方写“[unclear, see page N]”，不要猜。
 - 页眉、页脚、页码、arXiv 侧边水印不要输出。"""
 
-SCHEMA_EN = """输出格式：只输出一个 JSON 对象，不要任何别的文字。
+SCHEMA_EN = """只输出紧凑 JSON，不加缩进。没有参考文献时省略对应的可选数组。
 {
   "meta": {"title_en": "", "authors": "作者, 用逗号分隔", "affiliation": "", "date": "", "venue": ""},   // 只有包含第 1 页时才写
   "references": [{"id": "1", "text": "原文条目"}],             // 本批出现参考文献列表时才写
@@ -89,7 +89,7 @@ def fill(ws: Workspace, pages: list[int], items: dict[str, object]) -> str:
             f"- 表头（键以 #head 结尾）是二维数组：保持行列数不变，把文字译成{name}，数字和符号原样。\n"
             + (f"- 英文里的 ‖ 是句子分界：译文在对应的句子交界处也插 ‖，个数和这条英文的一样。两句英文在{name}里要合成一句时，也在合并后最接近的位置插上。\n"
                if any(isinstance(v, str) and "‖" in v for v in items.values()) else "") + "\n"
-            "输出格式：只输出一个 JSON 对象，不要任何别的文字。\n{\n" + meta +
+            "只输出紧凑 JSON，不加缩进。没有新术语或核对项时省略对应的可选数组。\n{\n" + meta +
             ('  "glossary": [{"en": "原文术语", "zh": "English term"}],' if target == "en" else
              '  "glossary": [{"en": "standard error", "zh": "' + ("标准误差" if langs.chinese(target) else name + "译名") + '"}],') + '   // 本批新出现的核心术语\n'
             '  "checks": [{"anchor": "块 id", "quote": "译文里相关的几个字（可空）", "title": "一句话：哪里不对", "body": "具体说明和依据"}],   // 原文有问题时才写\n'

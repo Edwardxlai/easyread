@@ -21,7 +21,7 @@ from ..library.paperdata import add_discussion, fill_zh, merge_blocks, set_block
 from ..library.store import Workspace
 from .page_scope import references_page, scope_pages
 from .translator_checks import journal, save_checks as _save_checks
-from .repair_guard import retains_content
+from . import batch_repair
 from . import instructions, figure_images
 
 _merge_lock = threading.Lock()  # 并发翻译时，并入 paper.json 和重算原页定位一次只做一个
@@ -127,12 +127,9 @@ def _fill_batch(ws: Workspace, cfg: dict, batch: list[int], cancel, say, meter=N
     if problems:
         say(tr("第 {page} 页起有 {n} 处公式或格式问题，正在让模型修正", page=batch[0], n=len(problems)))
         try:
-            fixed = engines.parse_json(engines.run(cfg, instructions.apply(prompts.repair(prompts.dump(data), problems), cfg), ws.root, None, cancel, meter))
-            if (isinstance(fixed, dict) and isinstance(fixed.get("zh"), dict)
-                    and data["zh"].keys() <= fixed["zh"].keys()
-                    and retains_content(data, fixed)
-                    and len(_fill_problems(fixed["zh"])) < len(problems)):
-                data = fixed
+            data = batch_repair.repair(data, "zh", problems,
+                lambda p: engines.run(cfg, instructions.apply(p, cfg), ws.root, None, cancel, meter),
+                lambda d: _fill_problems(d["zh"]))
         except engines.EngineError as e:
             journal(ws, tr("第 {pages} 页修正失败，保留原译：{err}", pages=batch, err=e))
     instructions.filter_figure_text(data, cfg)
@@ -173,11 +170,9 @@ def _one_batch(ws: Workspace, cfg: dict, batch: list[int], total_pages: int, can
     if problems:  # 给一次修的机会
         say(tr("第 {page} 页起有 {n} 处公式或格式问题，正在让模型修正", page=batch[0], n=len(problems)))
         try:
-            repair = prompts.repair(prompts.dump(data), problems)
-            fixed = engines.parse_json(engines.run(cfg, repair if read else instructions.apply(repair, cfg), ws.root, None, cancel, meter))
-            fixed = _normalize(fixed, batch, _taken(ws, batch))
-            if fixed["blocks"] and retains_content(data, fixed) and len(_problems(fixed)) < len(problems):
-                data = fixed
+            data = batch_repair.repair(data, "blocks", problems,
+                lambda p: engines.run(cfg, p if read else instructions.apply(p, cfg), ws.root, None, cancel, meter),
+                _problems)
         except engines.EngineError as e:
             journal(ws, tr("第 {pages} 页修正失败，保留原译：{err}", pages=batch, err=e))
     with merge_lock(meter, _merge_lock):
