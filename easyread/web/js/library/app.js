@@ -4,6 +4,7 @@
   const L = (PR.lib = { items: [], loadStatus: "loading", loadError: "", view: "all", tag: null, q: "", sort: PR.ls.get("easyread-sort", "opened"), selected: null, engine: "claude", picked: new Set(), picking: false });
   const prefs = PR.ls.get("easyread-prefs", {});
   PR.applyTheme(prefs.theme);
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => PR.applyTheme(PR.ls.get("easyread-prefs", {}).theme));
 
 
   PR.$("#importBtn").innerHTML = PR.icon("plus", "sm") + "<span>" + PR.t("导入论文") + "</span>";

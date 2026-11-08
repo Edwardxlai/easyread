@@ -18,7 +18,7 @@ body { display: flex; flex-direction: column; font-family: var(--ui); color: var
 .tab-close:hover, #newTab:hover { background: var(--accent-soft); color: var(--ink); }
 #newTab { align-self: center; border-radius: 4px; font-size: 18px; line-height: 24px; width: 26px; padding: 0; flex-shrink: 0; color: var(--ink-3); }
 #panes { position: relative; flex: 1; min-height: 0; }
-.paper-pane { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: var(--bg); }
+.paper-pane { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: var(--bg); color-scheme: light dark; }
 /* Keep inactive readers laid out so their scroll anchors remain valid. */
 .paper-pane.inactive { visibility: hidden; pointer-events: none; }
 button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
