@@ -21,7 +21,7 @@ _BARE_TEX = re.compile(
     r"alpha|beta|gamma|delta|epsilon|varepsilon|zeta|eta|theta|vartheta|"
     r"iota|kappa|lambda|mu|nu|xi|pi|rho|sigma|tau|upsilon|phi|varphi|chi|psi|omega|"
     r"Gamma|Delta|Theta|Lambda|Xi|Pi|Sigma|Upsilon|Phi|Psi|Omega|"
-    r"mathbb|mathcal|mathbf|mathrm|mathit|operatorname|boldsymbol|"
+    r"mathbb|mathcal|mathbf|mathrm|mathit|operatorname|boldsymbol|textbf(?=\{)|q?quad(?=\s|$)|"
     r"left|right|begin|end|hat|widehat|bar|overline|vec|dot|ddot|"
     r"infty|partial|nabla|times|cdot|leq|geq|neq|approx|in|notin|subset|subseteq)(?![A-Za-z/\\])"
     r"|(?<![A-Za-z0-9_\\/:])[A-Za-z][_\^]\{[^{}\n]+\}"
