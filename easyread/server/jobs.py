@@ -230,6 +230,9 @@ class Jobs:
         if cancel.is_set():
             raise Cancelled()
         read = bool(job.get("read"))
+        if read and ws.load("paper").get("meta", {}).get("source_type") == "web":
+            self._write(ws, state="done", message=tr("已导入"))
+            return
         if not job.get("translate") or cfg.get("engine") == "none":
             self._write(ws, state="done", message=tr("已导入（没有可用的模型，先放原页）") if read else tr("已导入（未开启自动翻译）") if job.get("translate") else tr("已导入"))
             return

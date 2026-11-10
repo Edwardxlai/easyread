@@ -3,6 +3,8 @@
 (function (PR) {
   "use strict";
   const S = PR.state;
+  const blockHost = id => PR.webBlockHost?.(id) || document.getElementById("b-" + id);
+  const rectOf = el => PR.webRect?.(el) || el.getBoundingClientRect();
   // In Windows Electron a native text drag can hit a block while Chromium
   // is unlocking its deferred layout. Keep selectable blocks laid out there.
   const ua = window.navigator?.userAgent || "";
@@ -13,7 +15,7 @@
 
   PR.currentBlock = () => current;
   PR.toggleEn = function (id, force) {
-    const host = document.getElementById("b-" + id);
+    const host = blockHost(id);
     if (!host) return;
     host.classList.toggle("show-en", force);
     PR.layoutMargin();
@@ -31,19 +33,20 @@
     ];
     if (PR.canChat() && PR.feature("chat")) list.push({ k: "chat", label: PR.chatOpen && PR.chatOpen() ? PR.t("引用到对话") : PR.t("问 AI"), icon: "sparkle", fn: () => PR.chatAsk({ anchor: id }) });
     if (hasEn && PR.feature("en")) list.push({ k: "en", label: (PR.originalFirst() && PR.prefs.mode !== "bi" ? PR.t("译文") : PR.t("原文")), icon: "en", fn: () => PR.toggleEn(id) });
-    if (keys.length && PR.feature("edit")) list.push({ k: "edit", label: PR.t("改译文"), icon: "edit", fn: () => { if (PR.originalFirst()) PR.toggleEn(id, true); const zh = PR.$("#b-" + CSS.escape(id) + " .zh[data-key]"); zh && PR.editZh(zh); } });
-    if (b.page && PR.feature("pages")) list.push({ k: "page", label: PR.t("查看 PDF 第 {page} 页", { page: b.page }), icon: "page", fn: () => PR.openPage(b.page, id) });
+    if (keys.length && (S.paper.meta?.source_type !== "web" || b.web_runs?.length) && PR.feature("edit")) list.push({ k: "edit", label: PR.t("改译文"), icon: "edit", fn: () => { if (PR.originalFirst()) PR.toggleEn(id, true); const zh = PR.$("#b-" + CSS.escape(id) + " .zh[data-key]"); zh && PR.editZh(zh); } });
+    if (b.page && S.paper.meta?.source_type !== "web" && PR.feature("pages")) list.push({ k: "page", label: PR.t("查看 PDF 第 {page} 页", { page: b.page }), icon: "page", fn: () => PR.openPage(b.page, id) });
     // 重译花 token、容易误点：默认关，开了也只放在“⋯”菜单里
-    if (keys.length && PR.canAsk() && PR.feature("retranslate")) list.push({ k: "redo", label: PR.t("让模型重译这段…"), icon: "redo", menuOnly: true, fn: () => retranslate(id) });
+    if (keys.length && (S.paper.meta?.source_type !== "web" || b.web_runs?.length) && PR.canAsk() && PR.feature("retranslate")) list.push({ k: "redo", label: PR.t("让模型重译这段…"), icon: "redo", menuOnly: true, fn: () => retranslate(id) });
     list.forEach((a) => { a.kbd = PR.keyOf ? PR.keyOf(a.k) : ""; });
     return list;
   }
 
   PR.setCurrent = function (id, opts) {
+    PR.webClearCurrent?.();
     PR.$$("#paper .blk.current").forEach((x) => x.classList.remove("current"));
     current = id && PR.blockById[id] ? id : null;
     if (!current) { PR.hideBlockbar(); return; }
-    const el = document.getElementById("b-" + current);
+    const el = blockHost(current);
     el.classList.add("current");
     if (opts && opts.scroll) PR.centerOn(el);  // J/K：放到屏幕中间
     if (!opts || opts.bar !== false) showBar();
@@ -66,9 +69,9 @@
   }
   function placeBar() {
     if (!current || !bar().classList.contains("open")) return;
-    const el = document.getElementById("b-" + current);
+    const el = blockHost(current);
     if (!el) return PR.hideBlockbar();
-    const r = el.getBoundingClientRect(), w = bar().offsetWidth;
+    const r = rectOf(el), w = bar().offsetWidth;
     const top = r.top - bar().offsetHeight - 6;
     if (r.bottom < 60 || r.top > innerHeight) { bar().classList.remove("open"); return; }
     bar().style.left = Math.max(8, Math.min(innerWidth - w - 8, r.right - w + 8)) + "px";
@@ -95,6 +98,7 @@
     if (b && PR.blockKeys(b).some((k) => PR.editOf(k))) items.push("-", { label: PR.t("恢复译者稿"), icon: "redo", fn: () => { PR.blockKeys(b).forEach((k) => PR.editOf(k) && PR.commit({ op: "edit", block: k, zh: null })); PR.renderBlock(id); PR.applyMarks(id); } });
     PR.menu(where, items);
   }
+  PR.showBlockMenu = blockMenu;
   function copyBlock(id, lang) {
     const b = PR.blockById[id];
     const t = lang === "en" ? ([b.en, b.caption_en, b.image_en, ...(b.items || []).map((i) => i.en)].filter(Boolean).join("\n")) : PR.blockKeys(b).map(PR.textFor).join("\n");
@@ -160,7 +164,7 @@
   };
 
   function retranslate(id) {
-    const el = document.getElementById("b-" + id);
+    const el = blockHost(id);
     PR.popover(el.querySelector(".zh") || el, '<div class="hd">' + PR.t("让模型重译这段") + '</div>' +
       '<textarea class="input" id="rtHint" rows="3" placeholder="' + PR.esc(PR.t("哪里译得不好？比如“standard error 应译标准误差”“太生硬”（可留空）")) + '"></textarea>' +
       '<div style="display:flex;justify-content:flex-end;gap:6px;margin-top:8px"><button class="btn sm" data-rt="cancel">' + PR.t("取消") + '</button><button class="btn sm accent" data-rt="go">' + PR.t("重译") + '</button></div>', { sticky: true, wide: true });
@@ -181,10 +185,10 @@
   PR.on("job-finished", (j) => {
     if (j.kind !== "retranslate") return;
     const id = (j.key || "").split("#")[0];
-    const el = document.getElementById("b-" + id);
+    const el = blockHost(id);
     el && el.classList.remove("busy");
     if (j.state === "error") PR.toast(PR.t("重译失败：{msg}", { msg: PR.esc(j.message) }));
-    else { PR.toast(PR.t("这段已重译")); setTimeout(() => { const n = document.getElementById("b-" + id); n && n.classList.add("flash"); }, 300); }
+    else { PR.toast(PR.t("这段已重译")); setTimeout(() => { const n = blockHost(id); n && n.classList.add("flash"); }, 300); }
   });
 
   /* ---------- 引用、交叉引用悬停 ---------- */
@@ -232,7 +236,7 @@
     if (host) host.style.contentVisibility = "visible";
     let settled = !!instant, stopped = false, idleTimer, inputTimer;
     const destination = () => {
-      const r = el.getBoundingClientRect(), bar = (PR.$("#bar") || {}).offsetHeight || 0;
+      const r = rectOf(el), bar = (PR.$("#bar") || {}).offsetHeight || 0;
       const room = innerHeight - bar;
       const delta = r.height > room * 0.85 ? r.top - bar - 16 : r.top - bar - (room - r.height) / 2;
       return Math.max(0, Math.min(document.documentElement.scrollHeight - innerHeight, scrollY + delta));
@@ -280,7 +284,7 @@
 
   /* opts：noBack 不记返回点；instant 不要动画；noFlash 不闪 */
   PR.jumpTo = function (domId, opts) {
-    const el = document.getElementById(domId);
+    const el = (domId.startsWith("b-") && PR.webBlockHost?.(domId.slice(2))) || document.getElementById(domId);
     if (!el) return;
     opts = opts || {};
     if (!opts.noBack && PR.rememberSpot) PR.rememberSpot(el, opts.origin);  // 跳得远就记下原处，好回去

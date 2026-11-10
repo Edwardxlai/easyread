@@ -9,9 +9,11 @@
   function paint() {
     count.textContent = hits.length ? (active + 1) + " / " + hits.length : "0 / 0";
     panel.querySelector("[data-prev]").disabled = panel.querySelector("[data-next]").disabled = !hits.length;
-    if (window.CSS && CSS.highlights && window.Highlight) {
-      CSS.highlights.set("reader-find", new Highlight(...hits.map((h) => h.range)));
-      CSS.highlights.set("reader-find-active", new Highlight(...(hits[active] ? [hits[active].range] : [])));
+    for (const win of [window, PR.webContentWindow?.()].filter(Boolean)) {
+      if (!win.CSS?.highlights || !win.Highlight) continue;
+      const own = hit => hit.range.startContainer.ownerDocument === win.document;
+      win.CSS.highlights.set("reader-find", new win.Highlight(...hits.filter(own).map(h => h.range)));
+      win.CSS.highlights.set("reader-find-active", new win.Highlight(...(hits[active] && own(hits[active]) ? [hits[active].range] : [])));
     }
   }
   function search() {
@@ -19,20 +21,24 @@
     const query = input.value.trim().toLowerCase();
     if (query) {
       // Each block is searched as one stream, so queries can span inline formatting.
-      for (const block of PR.$$("#paper > .blk, #paper > .paper-head")) {
-        const nodes = [], walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT, {
+      const groups = PR.webSearchGroups?.() || PR.$$("#paper > .blk, #paper > .paper-head").map(block => ({ block, roots: [block] }));
+      for (const { block, roots, domId } of groups) {
+        const nodes = [];
+        let text = "";
+        for (const root of roots) {
+          const walker = (root.ownerDocument || document).createTreeWalker(root, NodeFilter.SHOW_TEXT, {
           acceptNode: (n) => n.parentElement.closest("button, .katex-mathml, .stale-tag, .inline-notes, script, style") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
         });
-        let text = "";
-        for (let node; (node = walker.nextNode());) { nodes.push({ node, start: text.length }); text += node.data; }
+          for (let node; (node = walker.nextNode());) { nodes.push({ node, start: text.length }); text += node.data; }
+        }
         const lower = text.toLowerCase();
         for (let pos = lower.indexOf(query); pos >= 0; pos = lower.indexOf(query, pos + query.length)) {
           const first = nodes.find((n) => n.start + n.node.length > pos);
           const last = nodes.find((n) => n.start + n.node.length >= pos + query.length);
           if (!first || !last) continue;
-          const range = document.createRange();
+          const range = (first.node.ownerDocument || document).createRange();
           range.setStart(first.node, pos - first.start); range.setEnd(last.node, pos + query.length - last.start);
-          hits.push({ range, block });
+          hits.push({ range, block, domId });
         }
       }
     }
@@ -41,15 +47,24 @@
   function move(step) {
     if (!hits.length) return;
     active = active < 0 ? (step < 0 ? hits.length - 1 : 0) : (active + step + hits.length) % hits.length;
-    const hit = hits[active];
-    if (!hit.range.getClientRects().length && PR.readingView() !== "both") PR.setView("both");
+    let hit = hits[active];
+    if (!hit.range.getClientRects().length && PR.readingView() !== "both") {
+      const index = active;
+      PR.setView("both");
+      if (PR.webSearchGroups?.()) {
+        search(); active = Math.min(index, hits.length - 1); hit = hits[active];
+        if (!hit) return;
+      }
+    }
     PR.$$("#paper .flash").forEach((el) => el.classList.remove("flash"));
-    PR.jumpTo(hit.block.id, { noFlash: true, instant: true });
+    PR.jumpTo(hit.domId || hit.block.id, { noFlash: true, instant: true });
     paint();
   }
   function close() {
     panel.hidden = true;
-    if (window.CSS && CSS.highlights) { CSS.highlights.delete("reader-find"); CSS.highlights.delete("reader-find-active"); }
+    for (const win of [window, PR.webContentWindow?.()].filter(Boolean)) {
+      if (win.CSS?.highlights) { win.CSS.highlights.delete("reader-find"); win.CSS.highlights.delete("reader-find-active"); }
+    }
     if (returnFocus?.isConnected) returnFocus.focus();
     else input.blur();
   }

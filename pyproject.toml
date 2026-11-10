@@ -11,6 +11,7 @@ dependencies = [
   "pdfplumber>=0.11",
   "pillow>=10",
   "pypdf>=4",
+  "beautifulsoup4>=4.12",
   "truststore>=0.10",
   "certifi>=2024.8.30",
 ]

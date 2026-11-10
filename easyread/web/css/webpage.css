@@ -1,0 +1,10 @@
+#webSnapshot { display:block; border:0; width:100%; min-height:calc(100vh - 70px); margin-top:var(--bar-h); background:white; }
+#webSnapshot[hidden] { display:none; }
+.web-native #stage { display:none; }
+.web-article #bar [data-act="pages"], .web-article .pgmark { display:none; }
+@media (min-width:1180px) {
+  .web-article.side-open #webSnapshot { width:calc(100% - var(--side-w)); }
+}
+@media print {
+  .web-article #webSnapshot { margin:0; width:100%; }
+}
