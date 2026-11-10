@@ -21,7 +21,8 @@
       '<span class="grow"></span>' + (edited ? '<button data-e="revert">' + PR.t("恢复译者稿") + "</button>" : "") +
       '<button data-e="cancel">' + PR.t("取消") + '</button><button data-e="save" class="primary">' + PR.t("保存") + "</button>");
     wrapEl.append(ta, bar);
-    zh.replaceChildren(wrapEl);
+    const webMount = PR.webEditorMount?.(key);
+    (webMount || zh).replaceChildren(wrapEl);
     PR.autosize(ta);
     ta.focus();
     const saveDraft = PR.debounce(() => PR.ls.set(draftKey(key), ta.value), 400);
@@ -37,6 +38,7 @@
         if (text === agent) { if (edited) PR.commit({ op: "edit", block: key, zh: null }); }
         else if (text !== current || PR.isStale(key)) PR.commit({ op: "edit", block: key, zh: text, base: PR.hashText(agent) });
       } else if (action === "revert") PR.commit({ op: "edit", block: key, zh: null });
+      PR.webEditorFinish?.(key);
       PR.renderBlock(blockId);
       PR.applyMarks(blockId);
       PR.renderMargin();

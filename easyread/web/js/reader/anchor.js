@@ -5,8 +5,9 @@
   const SKIP = ".katex-mathml, .stale-tag, button, .en-title, .num";
 
   function textNodes(root) {
+    if (Array.isArray(root)) return root.flatMap(textNodes);
     const out = [];
-    const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    const w = (root.ownerDocument || document).createTreeWalker(root, NodeFilter.SHOW_TEXT, {
       acceptNode: (n) => (n.parentElement && n.parentElement.closest(SKIP) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
     });
     for (let n; (n = w.nextNode());) out.push(n);
@@ -19,7 +20,7 @@
     let pos = 0;
     for (const t of textNodes(root)) {
       if (t === container) return pos + offset;
-      const r = document.createRange();
+      const r = (t.ownerDocument || document).createRange();
       r.selectNodeContents(t);
       if (r.comparePoint(container, offset) < 0) return pos;
       pos += t.data.length;
@@ -50,7 +51,7 @@
       const s = Math.max(start, a) - a, e = Math.min(end, b) - a;
       if (e < node.data.length) node.splitText(e);
       if (s > 0) node = node.splitText(s);
-      const m = document.createElement("mark");
+      const m = (node.ownerDocument || document).createElement("mark");
       for (const [k, v] of Object.entries(attrs)) m.setAttribute(k, v);
       node.parentNode.insertBefore(m, node);
       m.appendChild(node);
@@ -69,6 +70,13 @@
   /* 标注挂在原文（side: "en"）还是译文上；找不到原话再到另一边找一次：
      只读原文时划在英文上的旧划线没有 side，翻译后英文挪到了 .en 里 */
   function locate(n) {
+    if (PR.webAnnotationRoots) {
+      for (const side of [n.side || "zh", n.side === "en" ? "zh" : "en"]) {
+        const roots = PR.webAnnotationRoots(n, side);
+        const i = roots?.length ? findQuote(fullText(roots), n.quote, n.prefix, n.suffix, n.start) : -1;
+        if (i >= 0) return { el: roots, i };
+      }
+    }
     const math = document.getElementById("b-" + n.anchor)?.querySelector(".math-body");
     if (math) {
       const i = findQuote(fullText(math), n.quote, n.prefix, n.suffix, n.start);
@@ -93,6 +101,7 @@
     if (!scope) return;
     PR.$$("mark.hl", scope).forEach((m) => m.replaceWith(...m.childNodes));
     scope.normalize();
+    PR.webClearMarks?.(onlyBlock);
     if (!onlyBlock) lost.clear();
     const items = [];
     for (const n of PR.myNotes()) {
@@ -111,6 +120,7 @@
     }
     seen.forEach((id) => (miss.has(id) ? lost.add(id) : lost.delete(id)));
     PR.applyMirrors && PR.applyMirrors(scope);
+    PR.webMirrorMarks?.(onlyBlock);
     PR.renderMathMarks && PR.renderMathMarks(scope);
   };
 
@@ -157,6 +167,8 @@
   }
 
   function readSelection() {
+    const web = PR.webReadSelection?.();
+    if (web) return web;
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed || !sel.rangeCount) return null;
     const range = sel.getRangeAt(0);
@@ -178,6 +190,18 @@
     if (parts.length === 1) return Object.assign(parts[0], { rect });
     return Object.assign({}, parts[0], { quote: parts.map((p) => p.quote.trim()).join("\n"), parts, rect });
   }
+  // Shared quote/offset handling for a logical paragraph split across DOM text runs.
+  PR.selectionPart = function (roots, range, anchor, key, side) {
+    const nodes = textNodes(roots), text = nodes.map(n => n.data).join("");
+    const selected = nodes.filter(n => range.intersectsNode(n));
+    if (!selected.length) return null;
+    const first = selected[0], last = selected[selected.length - 1];
+    const start = offsetOf(roots, first, range.startContainer === first ? range.startOffset : 0);
+    const end = offsetOf(roots, last, range.endContainer === last ? range.endOffset : last.length);
+    const quote = text.slice(start, end);
+    if (!quote.trim()) return null;
+    return { anchor, key, start, quote, prefix: text.slice(Math.max(0, start - 32), start), suffix: text.slice(end, end + 32), ...(side === "en" ? { side } : {}) };
+  };
   PR.hasPendingSelection = () => !!pendingSel && selbar().classList.contains("open");
 
   // Native copy includes KaTeX's positioned glyphs and hidden MathML, which
@@ -215,16 +239,17 @@
     const r = pendingSel.rect, w = bar.offsetWidth;
     const x = Math.min(innerWidth - w - 8, Math.max(8, r.left + r.width / 2 - w / 2));
     const above = r.top - bar.offsetHeight - 8;
-    const y = above < 58 ? r.bottom + 8 : above;
+    const y = Math.max(58, Math.min(innerHeight - bar.offsetHeight - 8, above < 58 ? r.bottom + 8 : above));
     bar.style.left = x + "px"; bar.style.top = y + "px";
   }
+  PR.showSelectionBar = showSelbar;
   document.addEventListener("mouseup", (e) => { if (!(e.target.closest && e.target.closest("#selbar, #blockbar"))) setTimeout(showSelbar, 10); });
   document.addEventListener("keyup", (e) => { if (e.shiftKey && e.key.startsWith("Arrow")) showSelbar(); });
-  document.addEventListener("selectionchange", PR.debounce(() => { const s = getSelection(); if (!s || s.isCollapsed) selbar().classList.remove("open"); }, 120));
+  document.addEventListener("selectionchange", PR.debounce(() => { const s = getSelection(); if ((!s || s.isCollapsed) && !PR.webReadSelection?.()) selbar().classList.remove("open"); }, 120));
 
   function resolveHighlight(part) {
     const at = locate(part);
-    return at && { part, el: at.el, text: fullText(at.el), start: at.i, end: at.i + part.quote.length };
+    return at && { part, el: Array.isArray(at.el) ? at.el[0] : at.el, text: fullText(at.el), start: at.i, end: at.i + part.quote.length };
   }
 
   function paintHighlight(note, intent) {
@@ -247,12 +272,13 @@
     if (kind !== "highlight") {
       selbar().classList.remove("open");
       getSelection().removeAllRanges();
+      PR.webClearSelection?.();
     }
     if (kind === "paper-note") { PR.openPaperNote(); PR.paperNoteEditor.insertSources(parts || [{ anchor, quote, quoteContent }]); return; }
     if (kind === "translate") { PR.translateSelection({ anchor, quote, rect }); return; }
     if (kind === "en") { PR.toggleEn(anchor, true); return; }
     if (kind === "copy") { navigator.clipboard.writeText(quote).then(() => PR.toast(PR.t("已复制"))); return; }
-    if (kind === "chat") { PR.chatAsk({ anchor, quote }); return; }
+    if (kind === "chat") { PR.chatAsk({ anchor, quote, ...(parts ? { refs: parts.map(p => ({ anchor: p.anchor, quote: p.quote })) } : {}) }); return; }
     const pen = selectedPen || (PR.prefs.pen === "underline" ? "underline" : "marker");
     color = color || (PR.prefs.penColors || {})[pen] || "yellow";
     const note = { anchor, key, start, quote, prefix, suffix, kind, color };
@@ -265,7 +291,7 @@
       rememberPen(pen, color);
       // Finish the native input event before clearing its range. A new selection
       // can start before the timer runs and must keep its toolbar and text.
-      const sel = getSelection();
+      const sel = PR.webContentWindow?.()?.getSelection() || getSelection();
       const range = sel.rangeCount ? sel.getRangeAt(0) : null;
       setTimeout(() => {
         if (pendingSel || (sel.rangeCount && sel.getRangeAt(0) !== range)) return;

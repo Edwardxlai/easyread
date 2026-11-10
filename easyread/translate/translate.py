@@ -30,6 +30,8 @@ _QUOTA = re.compile(r"session limit|usage limit|rate limit reached|insufficient_
 
 
 def prepare(ws: Workspace) -> None:
+    if (ws.load("paper") or {}).get("meta", {}).get("source_type") == "web":
+        return
     pages = pdfwork.prepare(ws.root)
     extra = {}
     try:  # 本地拖进来的 PDF：从第一页的 arXiv 编号或 DOI 补上作者、年份、出处
@@ -264,6 +266,9 @@ def _batches(pages: list[int], size: int, en_pages: set[int]) -> list[list[int]]
 def translate_pages(ws: Workspace, cfg: dict, pages: list[int], cancel, report, meter=None, read=False) -> dict[int, str]:
     """翻译给定的页（已完成的页会重译并替换；只读原文整理过的页就地补译文）。report(done, total, message)；
     meter 收集 token 用量。read：只读原文，把页整理成块但不翻译。返回没做成的页 {页码: 原因}。"""
+    if (ws.load("paper") or {}).get("meta", {}).get("source_type") == "web":
+        from ..weblog.translation import translate_pages as translate_web
+        return translate_web(ws, cfg, pages, cancel, report, meter, read)
     if cancel.is_set():
         raise engines.Cancelled()
     blank = blank_pages.find(ws, pages, cancel)

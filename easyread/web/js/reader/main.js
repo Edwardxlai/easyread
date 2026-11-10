@@ -190,7 +190,7 @@
       Promise.all([document.fonts ? document.fonts.ready : null, new Promise((r) => setTimeout(r, 900))])
         .then(() => PR.jumpTo(id, { noBack: true, instant: true, noFlash: true }));
     } else if (!PR.restoreProgress()) {
-      if (!PR.ls.get("easyread-hint-seen", false)) {
+      if (!PR.ls.get("easyread-hint-seen", false) && m.source_type !== "web") {
         PR.ls.set("easyread-hint-seen", true);
         const touch = matchMedia("(pointer: coarse)").matches;  // 手机上没有右键和键盘
         const tip = S.demo ? PR.t("在线演示：点段落、选中文字试试划线和笔记；顶栏“问 AI”里有一段真实的 AI 对话。")

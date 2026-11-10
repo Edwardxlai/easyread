@@ -7,6 +7,7 @@ from __future__ import annotations
 import base64
 import html as htmllib
 import json
+import mimetypes
 import re
 from pathlib import Path
 
@@ -49,7 +50,7 @@ def build(ws: Workspace, out: Path | None = None, assets: Path | None = None, ex
     paper = ws.load("paper")
     images = {}
     done = set((paper.get("translation") or {}).get("done_pages") or []) if mobile else set()
-    rels = [p["img"] for p in paper.get("meta", {}).get("pages", []) if p.get("n") not in done] + [b["src"] for b in paper.get("blocks", []) if b.get("src")]
+    rels = [p["img"] for p in paper.get("meta", {}).get("pages", []) if p.get("img") and p.get("n") not in done] + [b["src"] for b in paper.get("blocks", []) if b.get("src")]
     rels += [b["translated_image"]["src"] for b in paper.get("blocks", []) if (b.get("translated_image") or {}).get("src")]
     for rel in rels:
         src = ws.root / rel
@@ -61,10 +62,12 @@ def build(ws: Workspace, out: Path | None = None, assets: Path | None = None, ex
             dst.write_bytes(src.read_bytes())
             images[rel] = f"{assets.name}/{dst.name}"
         else:
-            images[rel] = _data_uri(src, "image/webp")
+            images[rel] = _data_uri(src, mimetypes.guess_type(src.name)[0] or "image/webp")
     data = {n: ws.load(n) for n in ("discussion", "reader", "layout", "item")}
     if mobile:  # 笔记、讨论、改过的译文都带上（手机上只读）；原页定位用不上
         data["layout"] = {}
+    if paper.get("meta", {}).get("source_type") == "web":
+        data["web_snapshot"] = (ws.root / "source.html").read_text(encoding="utf-8")
     data.update({"paper": paper, "images": images}, **(extra or {}))
     payload = json.dumps(data, ensure_ascii=False).replace("<", "\\u003c")
     page = page.replace("<!--PR:DATA-->", f'<script id="pr-data" type="application/json">{payload}</script>')

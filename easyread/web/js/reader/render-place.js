@@ -33,6 +33,15 @@
   };
 
   PR.rerenderKeepingPlace = function () {
+    if (PR.webContentWindow?.()) {
+      const id = PR.readingBlock();
+      const before = PR.webBlockHost(id);
+      const top = before ? PR.webRect(before).top : 0;
+      PR.renderPaper();
+      const after = PR.webBlockHost(id);
+      if (after) window.scrollBy(0, PR.webRect(after).top - top);
+      return;
+    }
     const line = PR.readingLine ? PR.readingLine() : innerHeight * .3;
     let anchor = null;
     for (const el of PR.$$('#paper > .paper-head, #paper > .blk, #paper .orig-page')) {

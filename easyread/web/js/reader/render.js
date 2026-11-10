@@ -310,6 +310,7 @@
     for (const raw of S.paper.blocks || []) {
       const b = raw && typeof raw === "object" ? raw : null;
       if (!b || !R[b.type]) continue;
+      if (S.paper.meta?.source_type === "web" && b.en?.trim() === S.paper.meta.title_en?.trim()) continue;
       if (b.page && b.page > lastPage + 1) {
         const gap = allPages.filter((p) => p.n > lastPage && p.n < b.page && !done.has(p.n));
         if (gap.length) html += gapHtml(gap);

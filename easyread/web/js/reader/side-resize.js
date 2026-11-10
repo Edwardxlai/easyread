@@ -14,10 +14,10 @@
   /* 宽度变了：正文重排并停在刚才读的段，原页按新宽度换合适清晰度的图 */
   function relayout() {
     const anchor = PR.readingBlock && PR.readingBlock();
-    const node = anchor && document.getElementById("b-" + anchor);
-    const before = node ? node.getBoundingClientRect().top : 0;
+    const node = anchor && (PR.webBlockHost?.(anchor) || document.getElementById("b-" + anchor));
+    const before = node ? (PR.webRect?.(node) || node.getBoundingClientRect()).top : 0;
     PR.fitWide(); PR.renderMargin();
-    if (node) window.scrollBy(0, node.getBoundingClientRect().top - before);
+    if (node) window.scrollBy(0, (PR.webRect?.(node) || node.getBoundingClientRect()).top - before);
     if (PR.side === "pages" && PR.refreshPages) PR.refreshPages();
   }
 

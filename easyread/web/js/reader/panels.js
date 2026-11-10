@@ -35,11 +35,11 @@
   const relayout = PR.debounce(() => { PR.fitWide(); PR.renderMargin(); PR.syncPage && PR.syncPage(true); }, 60);
   PR.setPref = function (k, v, quiet) {
     const anchor = PR.readingBlock && PR.readingBlock();
-    const node = anchor && document.getElementById("b-" + anchor);
-    const before = node ? node.getBoundingClientRect().top : 0;
+    const node = anchor && (PR.webBlockHost?.(anchor) || document.getElementById("b-" + anchor));
+    const before = node ? (PR.webRect?.(node) || node.getBoundingClientRect()).top : 0;
     PR.prefs[k] = v;
     PR.applyPrefs();
-    if (node) window.scrollBy(0, node.getBoundingClientRect().top - before);  // 调字号时阅读位置不跳
+    if (node) window.scrollBy(0, (PR.webRect?.(node) || node.getBoundingClientRect()).top - before);  // 调字号时阅读位置不跳
     if (!quiet) PR.renderSettings();
     else syncSettings();
     relayout();
@@ -278,7 +278,7 @@
     pop.classList.toggle("wide", !!(opts && opts.wide));
     pop.innerHTML = html;
     pop.classList.add("open");
-    const r = anchor.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;
+    const r = (PR.webRect?.(anchor) || anchor.getBoundingClientRect()), w = pop.offsetWidth, h = pop.offsetHeight;
     const x = Math.min(innerWidth - w - 10, Math.max(10, r.left + r.width / 2 - w / 2));
     let y = r.bottom + 8;
     if (y + h > innerHeight - 10) y = r.top - h - 8;

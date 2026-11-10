@@ -79,7 +79,7 @@
       '<div class="detail-inner">' +
       '<div class="cover">' + thumb + '<div class="actions">' +
       '<a class="btn accent" href="/read/' + i.id + '">' + PR.icon("book", "sm") + readLabel + "</a>" +
-      '<a class="btn line" href="/p/' + i.id + '/source.pdf" target="_blank" rel="noopener">' + PR.icon("pdf", "sm") + PR.t("打开原 PDF") + "</a>" +
+      '<a class="btn line" href="/p/' + i.id + '/' + (i.source_type === "web" ? "source.html" : "source.pdf") + '" target="_blank" rel="noopener">' + PR.icon("pdf", "sm") + (i.source_type === "web" ? PR.t("打开原网页") : PR.t("打开原 PDF")) + "</a>" +
       '<div class="act-row"><button class="btn line" data-d="cite" title="' + PR.t("复制参考文献格式：GB/T 7714、APA、BibTeX") + '">' + PR.icon("copy", "sm") + PR.t("复制引用") + "</button>" +
       '<button class="btn icon line" data-d="star" title="' + PR.t("星标（S）") + '" style="color:' + (i.starred ? "#c9a24a" : "") + '">' + PR.icon("star", "sm").replace('class="i sm"', 'class="i sm"' + (i.starred ? ' style="fill:currentColor"' : "")) + "</button>" +
       '<button class="btn icon line" data-d="more" title="' + PR.t("更多：导出、打开文件夹、回收站") + '">' + PR.icon("more", "sm") + "</button></div></div></div>" +
@@ -180,7 +180,7 @@
     const setStatus = (s) => () => L.patch(id, { status: s });
     PR.menu(where, [
       { label: PR.t("打开阅读"), icon: "book", kbd: "Enter", fn: () => L.openReader(id) },
-      { label: PR.t("打开原 PDF"), icon: "pdf", fn: () => window.open("/p/" + id + "/source.pdf") },
+      { label: (i.source_type === "web" ? PR.t("打开原网页") : PR.t("打开原 PDF")), icon: "pdf", fn: () => window.open("/p/" + id + (i.source_type === "web" ? "/source.html" : "/source.pdf")) },
       "-",
       { label: i.starred ? PR.t("取消星标") : PR.t("加星标"), icon: "star", kbd: "S", fn: () => L.patch(id, { starred: !i.starred }) },
       { label: L.side.pinned.includes("p:" + id) ? PR.t("取消置顶") : PR.t("置顶到侧栏"), icon: "pin", fn: () => L.togglePin("p:" + id) },

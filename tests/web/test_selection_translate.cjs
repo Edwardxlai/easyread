@@ -111,7 +111,7 @@ function selectionToolbar(mode, side) {
   };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../easyread/web/js/reader/anchor.js'), 'utf8'), {
     window: { PR, getSelection: () => selection }, document, getSelection: () => selection,
-    Node: { TEXT_NODE: 3 }, NodeFilter: { SHOW_TEXT: 4 }, innerWidth: 1000, setTimeout: fn => fn(),
+    Node: { TEXT_NODE: 3 }, NodeFilter: { SHOW_TEXT: 4 }, innerWidth: 1000, innerHeight: 800, setTimeout: fn => fn(),
   });
   events.mouseup({ target: { closest: () => null } });
   return { bar, calls, selection, click: () => clicks.click({ target: { closest: s => s === 'button[data-s]' ? { dataset: { s: 'translate' } } : null } }) };

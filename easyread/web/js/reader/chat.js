@@ -32,7 +32,7 @@
     PR.openSide(open ? "chat" : null);
     if (open) { autoContext(); load().then(() => { render(); focusInput(); }); render(); }
   };
-  const focusInput = () => setTimeout(() => { const t = PR.$("#chatInput"); t && t.focus(); }, 300);
+  const focusInput = () => setTimeout(() => { const t = PR.$("#chatInput"); if (PR.chatOpen() && t) t.focus(); }, 300);
 
   function autoContext() {
     const id = (PR.currentBlock && PR.currentBlock()) || PR.readingBlock();
@@ -53,7 +53,7 @@
     if (PR.side !== "chat") { PR.openSide("chat"); autoContext(); }
     load().then(() => {
       if (opts.text) return send(opts.text, opts.note, [{ anchor: opts.anchor, quote: opts.quote || "" }]);
-      const added = addRef(opts.anchor, opts.quote);
+      const added = (opts.refs || [opts]).map(ref => addRef(ref.anchor, ref.quote)).some(Boolean);
       if (opts.draft) st.draft = opts.draft;
       render(); focusInput();
       if (added && st.refs.length > 1) PR.toast(PR.t("已引用 {n} 段", { n: st.refs.length }), null, 1000);
@@ -359,6 +359,11 @@
 
   /* 把正文里选中的文字拖进问 AI 面板：变成一段引用，而不是一堆粘进来的字 */
   let dragRef = null;
+  PR.beginChatDrag = ref => {
+    dragRef = ref && PR.blockById[ref.anchor] ? { anchor: ref.anchor, quote: (ref.quote || "").trim().slice(0, 1000) } : null;
+    if (dragRef && PR.chatOpen()) panel().classList.add("drop-ok");
+  };
+  PR.endChatDrag = () => { dragRef = null; panel().classList.remove("drop-ok", "drop-on"); };
   document.addEventListener("dragstart", (e) => {
     const sel = window.getSelection();
     const node = sel && sel.rangeCount && sel.getRangeAt(0).startContainer;

@@ -90,8 +90,7 @@ def cmd_import(a):
     elif Path(src).exists():
         ws, fresh = L.import_pdf_path(src)
     else:
-        data, name, meta = L.fetch(src)
-        ws, fresh = L.create_from_pdf(data, name, meta)
+        ws, fresh = L.import_reference(src)
     if not fresh and ws.load("paper").get("meta", {}).get("pages"):
         out(f"已在库里：{ws.id}")
         return
@@ -119,7 +118,8 @@ def cmd_translate(a):
     from ..translate.translate import translate_pages
     cfg = config.load()
     paper = ws.load("paper")
-    done = set(paper.get("translation", {}).get("done_pages", []))
+    tl = paper.get("translation", {})
+    done = set(tl.get("done_pages", [])) - set(tl.get("en_pages", []))
     pages = pages or [p["n"] for p in paper["meta"]["pages"] if p["n"] not in done]
     failed = translate_pages(ws, cfg, pages, threading.Event(), lambda d, t, m: out(f"[{d}/{t}] {m}"))
     if failed:

@@ -28,6 +28,8 @@ def prepare_later(ws, gate=None) -> None:
     a library full of old documents cannot allocate several PDF layouts at once.
     The migration gate remains held from registration through the final crop.
     """
+    if (ws.load("paper") or {}).get("meta", {}).get("source_type") == "web":
+        return
     key = str(ws.root.resolve())
     with _PREPARE_GUARD:
         if key in _preparing or (ws.load("job") or {}).get("state") in ("queued", "running"):

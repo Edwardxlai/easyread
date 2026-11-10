@@ -118,6 +118,8 @@ class Handler(BaseHTTPRequestHandler):
         if queued:
             if translate_after and not read:
                 langs.remember(ws, target)  # 导入框里选的译文语言
+            if paper.get("meta", {}).get("source_type") == "web":
+                scope = "all"
             self.app.jobs.enqueue(ws, translate_after=translate_after, scope=scope, read=read, model=model, translation_extra=translation_extra)
         result = {"id": ws.id, "new": fresh, "queued": queued}
         if citation:
@@ -250,6 +252,8 @@ class Handler(BaseHTTPRequestHandler):
         if path.startswith("/p/"):
             _, _, pid, rel = path.split("/", 3)
             ws = lib.ws(pid)
+            if ws and rel == "source.html" and (ws.load("paper") or {}).get("meta", {}).get("source_type") == "web":
+                return self._file(ws.root / "source.html", ctype="text/html; charset=utf-8")
             if ws and re.fullmatch(r"extract/page-[0-9]{3,6}\.chars\.json", rel):
                 if parse_qs(url.query).get("selection") == ["2"]:
                     from ..pdf.selectable_text import page_file
@@ -327,8 +331,7 @@ class Handler(BaseHTTPRequestHandler):
                                        read=q.get("read") == "1", model=q.get("model", ""), target=q.get("target", ""), translation_extra=q.get("translation_extra", ""))
         if path in ("/api/import-url", "/api/import-arxiv"):
             body = json.loads(self._body() or b"{}")
-            data, name, meta = lib.fetch(body.get("ref", ""))  # sources.SourceError 是 ValueError，回 400
-            ws, fresh = lib.create_from_pdf(data, name, meta)
+            ws, fresh = lib.import_reference(body.get("ref", ""), body.get("kind", "auto"))
             return self._import_result(ws, fresh, bool(body.get("translate", True)), body.get("scope"),
                                        read=bool(body.get("read")), model=str(body.get("model") or ""), target=str(body.get("target") or ""), translation_extra=body.get("translation_extra", ""))
         if path in settings_api.POST:  # 设置页：保存配置、模型名单、试一下、取模型列表

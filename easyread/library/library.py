@@ -1,6 +1,7 @@
 """文献库：一个目录里放多篇论文，每篇一个子目录（目录名就是 id，取 PDF 的 SHA-256 前 12 位）。"""
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import re
@@ -8,6 +9,7 @@ import shutil
 import time
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urldefrag, urlparse
 
 from ..pdf import sources
 from ..translate import page_check
@@ -54,8 +56,16 @@ class Library:
         notes = [n for n in reader.get("notes", {}).values() if not n.get("deleted")]
         replied = {e.get("reply_to") for e in disc.get("entries", []) if e.get("reply_to")}
         abstract = next((b.get("zh") or b.get("en") for b in paper.get("blocks", []) if b.get("role") == "abstract"), "") or meta.get("abstract_en", "")
+        thumb = "pages/page-001.webp"
+        if meta.get("source_type") == "web":
+            from ..weblog.cover import COVER, ensure
+            thumb = COVER
+            try:
+                ensure(ws, paper)
+            except (OSError, ValueError):
+                log.exception("生成网页封面失败 %s", ws.id)
         return {
-            "id": ws.id,
+            "id": ws.id, "source_type": meta.get("source_type", "pdf"),
             "title_zh": meta.get("title_zh", ""), "title_en": meta.get("title_en", ""), "short_zh": meta.get("short_zh", ""), "target": meta.get("target", ""),
             "authors": meta.get("authors", ""), "affiliation": meta.get("affiliation", ""),
             "year": meta.get("year") or _year(meta.get("date", "")), "date": meta.get("date", ""),
@@ -73,7 +83,7 @@ class Library:
             "discussions": len(disc.get("entries", [])),
             "has_paper_note": bool((reader.get("paper_note") or {}).get("body")),
             "job": {k: job.get(k) for k in ("type", "state", "message", "done", "total", "updated", "error", "failed", "scope", "read", "model", "target", "pages", "cap_check", "page_cap", "usage", "usage_total")} if job else None,
-            "thumb": f"/p/{ws.id}/pages/page-001.webp" if (ws.root / "pages" / "page-001.webp").exists() else "",
+            "thumb": f"/p/{ws.id}/{thumb}" if (ws.root / thumb).exists() else "",
         }
 
     def list(self) -> list[dict]:
@@ -168,6 +178,57 @@ class Library:
         write_json_atomic(ws.discussion_path, empty_discussion())
         write_json_atomic(ws.reader_path, empty_reader())
         write_json_atomic(ws.item_path, {"added": now_iso(), "tags": [], "status": "unread", "starred": False})
+        return ws, True
+
+    def import_reference(self, ref: str, kind: str = "auto") -> tuple[Workspace, bool]:
+        """Keep scholarly/PDF resolution; fall back to a frozen web article for ordinary URLs."""
+        from ..weblog import snapshot
+        ref = (ref or "").strip().strip("<>")
+        if kind not in ("auto", "web", "pdf"):
+            raise ValueError("Unknown import type")
+        canonical = urldefrag(ref)[0]
+        digest = sha256_bytes(("web:" + canonical).encode())
+        if kind != "pdf":
+            existing = self.ws(digest[:12])
+            if existing and existing.load("paper").get("meta", {}).get("source_type") == "web":
+                return existing, False
+        if kind != "web":
+            try:
+                data, name, meta = self.fetch(ref)
+                return self.create_from_pdf(data, name, meta)
+            except sources.SourceError:
+                parsed = urlparse(ref)
+                scholarly = parsed.hostname in ("arxiv.org", "www.arxiv.org", "doi.org", "openreview.net", "aclanthology.org")
+                if kind == "pdf" or parsed.scheme not in ("http", "https") or scholarly or parsed.path.lower().endswith(".pdf"):
+                    raise
+        ws = self.ws(digest[:12])
+        if ws:
+            return ws, False
+        html, meta, blocks = snapshot.fetch(canonical)
+        ws = Workspace(self.root / digest[:12])
+        ws.root.mkdir(parents=True, exist_ok=True)
+        with dir_lock(ws.root):
+            if ws.paper_path.exists():
+                return ws, False
+            (ws.root / "source.html").write_text(html, encoding="utf-8")
+            # Reader figures use the same local image routes and offline-export machinery as PDFs.
+            for block in blocks:
+                src = block.get("src", "")
+                if src.startswith("data:image/") and ";base64," in src:
+                    header, payload = src.split(",", 1)
+                    ext = {"image/svg+xml": ".svg", "image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp", "image/gif": ".gif"}.get(header[5:].split(";")[0], ".img")
+                    relative = "figures/" + block["id"] + ext
+                    (ws.root / "figures").mkdir(exist_ok=True)
+                    (ws.root / relative).write_bytes(base64.b64decode(payload))
+                    block["src"] = relative
+            meta["source_sha256"] = digest
+            write_json_atomic(ws.discussion_path, empty_discussion())
+            write_json_atomic(ws.reader_path, empty_reader())
+            write_json_atomic(ws.item_path, {"added": now_iso(), "tags": [], "status": "unread", "starred": False})
+            write_json_atomic(ws.paper_path, {
+                "schema": SCHEMA, "meta": meta, "blocks": blocks, "glossary": [], "references": [],
+                "translation": {"done_pages": list(range(1, meta["page_count"] + 1)),
+                                "en_pages": list(range(1, meta["page_count"] + 1)), "gaps_checked": True}})
         return ws, True
 
     def fetch(self, ref: str) -> tuple[bytes, str, dict]:

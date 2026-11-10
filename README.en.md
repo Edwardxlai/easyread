@@ -23,6 +23,8 @@ Runs locally. You choose the model service and whether to keep your library in a
 
 <p align="center"><img src="docs/images/en/japanese.png" width="860" alt="Japanese abstract alongside the original English PDF"></p>
 
+Blog URLs are also supported: retain the original web layout, translate text in place, and highlight, annotate, and ask AI directly in the original layout. Dynamic pages require Chrome or Edge. See [web articles](docs/web-articles.md).
+
 ## How it differs from "throw the PDF into a translator"
 
 - **Reads like a typeset book.** Serif body text, comfortable line length and spacing. Equations are re-rendered with KaTeX, tables become clean three-line tables, references stay in the original, and bold and italic in the original carry over to the translation. One click in the top bar for dark mode.

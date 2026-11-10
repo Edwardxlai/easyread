@@ -1663,5 +1663,19 @@
  "关联笔记 {n}": "Linked notes {n}",
  "点击查看关联笔记，再次点击切换下一处": "View linked notes; click again for the next reference",
  "展开引用": "Expand quote",
- "收起引用": "Collapse quote"
+ "收起引用": "Collapse quote",
+  "导入论文或博客": "Import a paper or blog",
+  "博客链接、论文链接、arXiv 编号、DOI 或论文标题": "Blog or paper URL, arXiv ID, DOI, or paper title",
+  "2411.00640 · 10.18653/v1/N19-1423 · 论文或博客网页链接 · 论文标题": "2411.00640 · 10.18653/v1/N19-1423 · Paper or blog URL · Paper title",
+  "链接类型": "Link type",
+  "自动识别": "Detect automatically",
+  "网页 / 博客（保留原排版）": "Web page / blog (original layout)",
+  "PDF 论文": "PDF paper",
+  "博客保留网页排版、图片和链接；页码范围仅用于 PDF。读博客原文无需模型。": "Blogs keep their layout, images and links. Page ranges apply to PDFs only. Reading the original blog requires no model.",
+  "阅读与批注": "Read and annotate",
+  "网页排版": "Web layout",
+  "切换原网页排版与支持划线、笔记的阅读视图": "Switch between the original web layout and the reader with highlights and notes",
+  "打开原网页": "Open original web page",
+  "阅读排版": "Reading layout",
+  "EasyRead 风格": "EasyRead style"
 }

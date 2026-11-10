@@ -5,12 +5,14 @@
 (function (PR) {
   "use strict";
   const S = PR.state;
+  const blockHost = id => PR.webBlockHost?.(id) || document.getElementById("b-" + id);
+  const rectOf = el => PR.webRect?.(el) || el.getBoundingClientRect();
   const EVERY = 2000;  // 滚动中最多两秒记一次
   const REVEAL = 1200;  // 字体没排好时最多藏这么久
   const SETTLE = [900, 2200, 4000];  // 字体、图片、图注陆续排进来，各对一次
 
   const maxScroll = () => Math.max(0, document.documentElement.scrollHeight - innerHeight);
-  const element = (block) => block && (/^orig-\d+$/.test(block) ? document.getElementById(block) : document.getElementById("b-" + block));
+  const element = (block) => block && (/^orig-\d+$/.test(block) ? document.getElementById(block) : blockHost(block));
 
   /* 现在读到哪儿，写成一条 progress 操作 */
   PR.progressOp = function () {
@@ -20,9 +22,9 @@
     for (const page of PR.$$("#paper .orig-page")) {
       const top = page.getBoundingClientRect().top;
       if (top > PR.readingLine()) break;
-      if (!el || top >= el.getBoundingClientRect().top) { block = page.id; el = page; }
+      if (!el || top >= rectOf(el).top) { block = page.id; el = page; }
     }
-    const box = el ? el.getBoundingClientRect() : null;
+    const box = el ? rectOf(el) : null;
     const off = box && box.height > 0 ? (PR.readingLine() - box.top) / box.height : 0;
     const max = maxScroll();
     return {
@@ -57,7 +59,7 @@
     // 旧版把读到原页的进度记成 head；越过标题的记录按全文比例恢复。
     const el = p.block === "head" && p.ratio > 0 && (p.off == null || p.off >= 1) ? null : element(p.block);
     if (el) {
-      const box = el.getBoundingClientRect();
+      const box = rectOf(el);
       if (box.height > 0) return Math.max(0, Math.round(scrollY + box.top + box.height * (p.off ?? 0) - PR.readingLine()));
     }
     return p.ratio != null ? Math.round(maxScroll() * p.ratio) : null;
