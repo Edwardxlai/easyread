@@ -19,3 +19,12 @@
 沿用每篇一个目录和现有 `paper.json`、`reader.json`、`discussion.json`、`item.json`、`job.json`。网页使用 `meta.source_type = "web"`，保存 `source.html`，没有 `source.pdf` 或 PDF 原页图。ID 为带 `web:` 前缀的导入 URL 的 SHA-256 前 12 位（忽略锚点）；重复导入同一 URL 会复用原条目，保留笔记和译文。
 
 正文块保持稳定 ID，`web_runs` 保存原 DOM 文字片段的 `id`、`en` 和 `zh`。`source.html` 内的 `data-easyread-run` 与片段对应；阅读器只通过 `textContent` 更新文字，不把模型输出当作 HTML。模型逐批返回完整片段映射，通过校验后原子写入；失败批次可重试。用户编辑仍保存在 `reader.json`，重译不会覆盖。运行时按文字片段建立原文／译文的 DOM 映射，批注仍使用现有 `anchor`、`key`、`quote`、`prefix`、`suffix`、`side` 和跨段 `parts` 字段，不另建存储。网页脚本继续禁用；选区、键盘和菜单由父阅读器的可信代码处理，模型输出只作为文字显示。
+
+## 离线回归验证
+
+```bash
+python -m unittest tests.weblog.test_offline_assets -v
+python -m tests.e2e_web_offline
+```
+
+第二条命令需要 Playwright 和本机 Chrome 或 Edge。测试分别模拟图片归档失败、样式归档失败及二者同时失败，通过阅读器保存带原句引用的笔记并导出 HTML。随后关闭本地服务，在新的断网浏览器会话中打开导出文件，检查正文、笔记内容、原句划线、点击笔记后的正文定位和刷新后的锚定。测试还会确认失败资源确实无法加载，且没有成功的 HTTP / HTTPS 响应。截图和导出文件写入临时目录，可通过 `EASYREAD_E2E_OUTPUT` 指定输出目录。
