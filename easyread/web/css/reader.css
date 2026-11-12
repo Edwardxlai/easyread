@@ -8,6 +8,7 @@
   --margin-w: 272px;
   --gap: 44px;
   --side-w: min(44vw, 720px);
+  --toc-w: 320px;
 }
 html { scroll-padding-top: calc(var(--bar-h) + 24px); }
 body { font-size: 15px; }
@@ -265,9 +266,9 @@ textarea.editor { display: block; width: 100%; resize: none; overflow: hidden; b
   .blk.notes-open > .inline-notes { display: block; }
 }
 @media (min-width: 1240px) {
-  body.side-open #margin, body.no-margin #margin { display: none; }
-  body.side-open .note-pin, body.no-margin .note-pin { display: inline-block; }
-  body.side-open .blk.notes-open > .inline-notes, body.no-margin .blk.notes-open > .inline-notes { display: block; }
+  body.side-open #margin, body.no-margin #margin, body.toc-tight #margin { display: none; }
+  body.side-open .note-pin, body.no-margin .note-pin, body.toc-tight .note-pin { display: inline-block; }
+  body.side-open .blk.notes-open > .inline-notes, body.no-margin .blk.notes-open > .inline-notes, body.toc-tight .blk.notes-open > .inline-notes { display: block; }
 }
 @media (max-width: 760px) {
   :root { --gutter: 18px; }

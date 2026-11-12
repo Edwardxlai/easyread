@@ -11,6 +11,10 @@ body.drawer-open #scrim { opacity: 1; pointer-events: auto; }
 .drawer-tabs { display: flex; gap: 2px; padding: 12px 12px 0; border-bottom: 1px solid var(--rule); }
 .drawer-tabs button { padding: 8px 10px 9px; font-size: 13px; color: var(--ink-3); border-bottom: 2px solid transparent; margin-bottom: -1px; }
 .drawer-tabs button.on { color: var(--ink); border-bottom-color: var(--ink); }
+.drawer-tabs .toc-pin { display: none; margin-left: auto; align-self: center; padding: 4px; margin-bottom: 0; border: 0; border-radius: 6px; color: var(--ink-3); }
+.drawer-tabs .toc-pin:hover { background: var(--accent-soft); color: var(--ink); }
+.drawer-tabs .toc-pin.on { color: var(--accent); }
+@media screen and (min-width: 1180px) { .drawer-tabs .toc-pin { display: inline-flex; } }
 .drawer-body { flex: 1; overflow-y: auto; padding: 14px 18px 40px; font-size: 13.5px; }
 .toc a { display: block; padding: 4px 8px; margin: 0 -8px; border-radius: 6px; text-decoration: none; color: var(--ink-2); line-height: 1.55; font-size: 13px; }
 .toc a:hover { background: var(--accent-soft); color: var(--ink); }
@@ -46,6 +50,16 @@ body.resizing .side-panel { transition: none; }
   /* 右侧开着面板：边注收进正文（页边的小数字），版心在剩下的地方居中，放不下就变窄 */
   body.side-open #stage { grid-template-columns: var(--gutter) minmax(0, var(--measure)) var(--gutter); width: min(calc(var(--measure) + 2 * var(--gutter)), calc(100vw - var(--side-w) - 24px));
     margin-right: calc(var(--side-w) + 8px); margin-left: max(12px, calc((100vw - var(--side-w) - var(--measure) - 2 * var(--gutter)) / 2)); }
+}
+/* 固定目录（panels.js applyTocPin）：抽屉贴在顶栏下的左边不收起，版心在右边剩下的地方居中；放不下边注就收进正文 */
+@media screen and (min-width: 1180px) {
+  body.toc-pinned #drawer { top: var(--bar-h); z-index: 40; width: var(--toc-w); transform: none; transition: none; box-shadow: none; border-right: 1px solid var(--rule); }
+  body.toc-pinned #scrim { display: none; }
+  body.toc-pinned #stage { margin-left: calc(var(--toc-w) + max(0px, (100vw - var(--toc-w) - var(--gutter) - var(--measure) - var(--gap) - var(--margin-w)) / 2)); }
+  body.toc-pinned.toc-tight #stage, body.toc-pinned.no-margin #stage { grid-template-columns: var(--gutter) minmax(0, var(--measure)) var(--gutter); width: min(calc(var(--measure) + 2 * var(--gutter)), calc(100vw - var(--toc-w) - 24px));
+    margin-left: max(calc(var(--toc-w) + 12px), calc(var(--toc-w) + (100vw - var(--toc-w) - var(--measure) - 2 * var(--gutter)) / 2)); }
+  body.toc-pinned.side-open #stage { width: min(calc(var(--measure) + 2 * var(--gutter)), calc(100vw - var(--toc-w) - var(--side-w) - 24px));
+    margin-left: max(calc(var(--toc-w) + 12px), calc(var(--toc-w) + (100vw - var(--toc-w) - var(--side-w) - var(--measure) - 2 * var(--gutter)) / 2)); }
 }
 .pv-head { display: flex; align-items: center; gap: 4px; height: 46px; padding: 0 8px; border-bottom: 1px solid var(--rule); font-size: 13px; color: var(--ink-2); flex: none; }
 .pv-head .grow { flex: 1; }

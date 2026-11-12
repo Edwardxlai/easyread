@@ -43,6 +43,7 @@
       lastBlock = id;
       const h = PR.blockById[PR.currentHeading()];
       PR.$(".bar-section").textContent = h ? (h.num ? h.num + " " : "") + PR.plain(PR.textFor(h.id) || h.zh) : "";
+      PR.syncToc();
       PR.syncPage(false);
     }
     PR.saveProgress();
@@ -69,7 +70,7 @@
     if (k === "escape") {
       if (e.defaultPrevented || e.repeat) return;
       e.preventDefault();
-      if (PR.$("#settings").classList.contains("open") || PR.$("#popover").classList.contains("open") || body.classList.contains("drawer-open")) {
+      if (PR.$("#settings").classList.contains("open") || PR.$("#popover").classList.contains("open") || (body.classList.contains("drawer-open") && !PR.tocPinned())) {
         PR.toggleDrawer(false); PR.hidePopover(); PR.$("#settings").classList.remove("open");
       } else if (PR.currentBlock()) PR.setCurrent(null);
       else if (PR.side) PR.openSide(null);
@@ -163,11 +164,12 @@
     PR.citationNav.setup();
     PR.setupDemo();  // 署名要放在论文标题下面，得等正文渲染出来
     PR.applyMarks();
+    PR.applyTocPin();
     PR.renderMargin();
     PR.renderJobState();
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", PR.debounce(() => { PR.fitWide(); PR.renderMargin(); }, 150));
+    window.addEventListener("resize", PR.debounce(() => { PR.applyTocPin(); PR.fitWide(); PR.renderMargin(); }, 150));  // 宽度变了，固定目录旁可能放不下边注
     if (document.fonts) document.fonts.ready.then(() => { PR.fitWide(null, true); PR.layoutMargin(); });
     // 正文变宽变窄（最大化、贴边分屏只来一次 resize，那时版面可能还没变完）就重新缩放宽公式
     let paperW = 0;

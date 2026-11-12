@@ -5,7 +5,7 @@
   const body = document.body;
 
   /* ---------- 偏好 ---------- */
-  const DEF = Object.assign({ theme: "auto", mode: "zh", lead: "translation", biOrder: "translation" }, PR.TYPE_DEFAULTS);
+  const DEF = Object.assign({ theme: "auto", mode: "zh", lead: "translation", biOrder: "translation", tocPin: false }, PR.TYPE_DEFAULTS);
   /* 1.3.1 测试版存过 readingLanguage（zh / en），换成 lead；传进来的是存下的原样，还没合默认值 */
   PR.migratePrefs = function (p) {
     if (p.lead == null && p.readingLanguage != null) p.lead = p.readingLanguage === "en" ? "original" : "translation";
@@ -42,6 +42,7 @@
     if (node) window.scrollBy(0, node.getBoundingClientRect().top - before);  // 调字号时阅读位置不跳
     if (!quiet) PR.renderSettings();
     else syncSettings();
+    applyTocPin();  // 字号、版心变了，左边固定目录旁可能放不下边注了
     relayout();
   };
   PR.bumpFont = (d) => { PR.setPref("fs", Math.min(28, Math.max(13, PR.prefs.fs + d)), true); PR.toast(PR.t("字号 {n} px", { n: PR.prefs.fs }), null, 900); };
@@ -102,6 +103,7 @@
     PR.$("#bar .save-state").before(pill);
   };
   PR.$('[data-act="drawer"]').innerHTML = PR.icon("menu");
+  PR.$("[data-pin]").innerHTML = PR.icon("pin");
   PR.$('[data-act="pages"]').innerHTML = PR.icon("page", "sm") + "<span>PDF</span>";
   PR.$('[data-act="pages"]').addEventListener("mouseenter", () => PR.preloadPage && PR.preloadPage());  // 鼠标移过去就开始加载
   PR.$('[data-act="notes"]').innerHTML = PR.icon("note", "sm") + "<span>" + PR.t("笔记") + "</span>";
@@ -158,20 +160,74 @@
     if (which) tab = which;
     PR.$('[data-tab="citations"]').hidden = PR.store.mode !== "server";
     PR.$('[data-tab="recent"]').hidden = PR.store.mode !== "server";
+    if (PR.tocPinned()) {  // 固定着：点目录、Esc 不收起；再按目录键（或换到别的分页再按）就取消固定
+      if (force === false) return;
+      if (force == null && !(which && which !== shownTab)) return PR.setTocPin(false);
+      return PR.renderDrawer(true);
+    }
     const open = force != null ? force : !body.classList.contains("drawer-open");
     body.classList.toggle("drawer-open", open);
     if (open) PR.renderDrawer(true);
   };
   PR.$("#scrim").onclick = () => PR.toggleDrawer(false);
   if (PR.store.mode !== "server") PR.$('[data-tab="recent"]').hidden = true;  // 离线单文件版没有文献库
-  PR.$(".drawer-tabs").addEventListener("click", (e) => { const b = e.target.closest("[data-tab]"); if (b) { tab = b.dataset.tab; PR.renderDrawer(true); } });
+  PR.$(".drawer-tabs").addEventListener("click", (e) => {
+    if (e.target.closest("[data-pin]")) return PR.setTocPin(!PR.prefs.tocPin);
+    const b = e.target.closest("[data-tab]"); if (b) { tab = b.dataset.tab; PR.renderDrawer(true); }
+  });
 
+  let shownTab = null;
   PR.renderDrawer = function (reopened = false) {
-    PR.$$(".drawer-tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab));
+    PR.$$(".drawer-tabs [data-tab]").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab));
     const box = PR.$(".drawer-body");
+    const keep = shownTab === tab ? box.scrollTop : 0;
     if (tab === "citations") PR.citationsDrawer(box, reopened);
     else box.innerHTML = ({ toc: tocHtml, terms: termsHtml, about: aboutHtml, recent: recentHtml })[tab]();
     box.className = "drawer-body " + tab;
+    box.scrollTop = keep;
+    shownTab = tab;
+  };
+
+  /* 固定目录：宽屏才生效，窄屏照旧是浮出的抽屉；偏好记着，回到宽屏自动固定回来 */
+  const pinWide = matchMedia("screen and (min-width: 1180px)");
+  PR.tocPinned = () => body.classList.contains("toc-pinned");
+  const cssPx = (name) => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name)) || 0;
+  function applyTocPin() {
+    const on = !!PR.prefs.tocPin && pinWide.matches && !body.classList.contains("mobile-read");
+    const tight = on && (innerWidth < 1240 || innerWidth < cssPx("--toc-w") + cssPx("--gutter") + PR.prefs.measure * PR.prefs.fs + cssPx("--gap") + cssPx("--margin-w"));
+    const pin = PR.$("[data-pin]");
+    pin.classList.toggle("on", !!PR.prefs.tocPin);
+    pin.title = PR.prefs.tocPin ? PR.t("取消固定") : PR.t("固定在左边");
+    if (on === PR.tocPinned() && tight === body.classList.contains("toc-tight")) return false;
+    const anchor = PR.readingBlock && PR.readingBlock();
+    const node = anchor && document.getElementById("b-" + anchor);
+    const before = node ? node.getBoundingClientRect().top : 0;
+    body.classList.toggle("toc-pinned", on);
+    body.classList.toggle("toc-tight", tight);
+    if (on) { body.classList.add("drawer-open"); PR.renderDrawer(); }
+    else if (!PR.prefs.tocPin) body.classList.remove("drawer-open");
+    if (node) window.scrollBy(0, node.getBoundingClientRect().top - before);  // 重排后还停在刚才读的地方
+    return true;
+  }
+  PR.applyTocPin = function () { if (applyTocPin()) relayout(); };
+  PR.setTocPin = function (on) {
+    if (!on) body.classList.remove("drawer-open");
+    PR.prefs.tocPin = on;
+    PR.applyPrefs();
+    PR.applyTocPin();
+  };
+  pinWide.addEventListener("change", () => { if (!pinWide.matches) body.classList.remove("drawer-open"); PR.applyTocPin(); });
+  /* 固定着时，读到哪一节，目录就标到哪一节 */
+  PR.syncToc = function () {
+    if (!body.classList.contains("drawer-open") || tab !== "toc") return;
+    const cur = PR.currentHeading && PR.currentHeading();
+    let at = null;
+    PR.$$("#drawer .toc a[data-go]").forEach((a) => { const on = a.dataset.go === cur; a.classList.toggle("on", on); if (on) at = a; });
+    const box = PR.$(".drawer-body");
+    if (at && PR.tocPinned()) {
+      const top = at.offsetTop - box.offsetTop, h = at.offsetHeight;
+      if (top < box.scrollTop + 40 || top + h > box.scrollTop + box.clientHeight - 40) box.scrollTop = top - box.clientHeight / 3;
+    }
   };
   /* 最近读过的论文：不用回文献库就能换一篇 */
   let recent = null;
