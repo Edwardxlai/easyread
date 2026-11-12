@@ -27,7 +27,7 @@ DEFAULTS = {
     "port": 8765,
     "engine": "claude",          # claude | codex | codebuddy | grok | agy | cursor（本机 CLI 无头）| openai（任意 OpenAI 兼容接口）| none
     "auto_translate": True,      # 导入后自动开始翻译
-    "target": "zh",              # 译文语言，见 langs.py
+    "target": os.environ.get("EASYREAD_TARGET") or "zh",  # 译文语言，见 langs.py；环境变量只改默认值，设置里选的仍然优先
     "translation_instructions": "",
     "translation_prompt": None,
     "translate_figure_text": True,
