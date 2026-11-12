@@ -1663,5 +1663,7 @@
  "关联笔记 {n}": "Linked notes {n}",
  "点击查看关联笔记，再次点击切换下一处": "View linked notes; click again for the next reference",
  "展开引用": "Expand quote",
- "收起引用": "Collapse quote"
+ "收起引用": "Collapse quote",
+ "固定在左边": "Pin to the left",
+ "取消固定": "Unpin"
 }
