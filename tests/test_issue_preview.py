@@ -78,8 +78,12 @@ class PreviewTests(unittest.TestCase):
         self.assertEqual(config["permission"], {"*": "deny"})
         args = opencode_cli.build_args("opencode", {"model": "provider/model"}, [Path("image.png")])
         self.assertNotIn("--agent", args)
+        self.assertIn("--title", args)
+        self.assertIn("EasyRead translation", args)
         self.assertIn("provider/model", args)
         self.assertIn(str(Path("image.png").resolve()), args)
+        chat_args = opencode_cli.build_args("opencode", {"model": "provider/model", "_chat": True}, [])
+        self.assertIn("EasyRead chat", chat_args)
 
 
 if __name__ == "__main__":
