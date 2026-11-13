@@ -20,7 +20,10 @@ def path(c):
 
 
 def build_args(exe, c, images):
-    args = [exe, "run", "--format", "json"]
+    # Give every scripted run an explicit title. Otherwise OpenCode generates one
+    # with its small_model (often a separate paid model) for each fresh session.
+    title = "EasyRead chat" if c.get("_chat") else "EasyRead translation"
+    args = [exe, "run", "--format", "json", "--title", title]
     if c.get("model"):
         args += ["--model", c["model"]]
     for image in images:
