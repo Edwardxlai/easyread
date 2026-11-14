@@ -58,12 +58,8 @@ class Library:
         abstract = next((b.get("zh") or b.get("en") for b in paper.get("blocks", []) if b.get("role") == "abstract"), "") or meta.get("abstract_en", "")
         thumb = "pages/page-001.webp"
         if meta.get("source_type") == "web":
-            from ..weblog.cover import COVER, ensure
+            from ..weblog.cover import COVER
             thumb = COVER
-            try:
-                ensure(ws, paper)
-            except (OSError, ValueError):
-                log.exception("生成网页封面失败 %s", ws.id)
         return {
             "id": ws.id, "source_type": meta.get("source_type", "pdf"),
             "display_title": meta.get("display_title", ""),
@@ -229,10 +225,16 @@ class Library:
             write_json_atomic(ws.discussion_path, empty_discussion())
             write_json_atomic(ws.reader_path, empty_reader())
             write_json_atomic(ws.item_path, {"added": now_iso(), "tags": [], "status": "unread", "starred": False})
-            write_json_atomic(ws.paper_path, {
+            paper = {
                 "schema": SCHEMA, "meta": meta, "blocks": blocks, "glossary": [], "references": [],
                 "translation": {"done_pages": list(range(1, meta["page_count"] + 1)),
-                                "en_pages": list(range(1, meta["page_count"] + 1)), "gaps_checked": True}})
+                                "en_pages": list(range(1, meta["page_count"] + 1)), "gaps_checked": True}}
+            write_json_atomic(ws.paper_path, paper)
+        from ..weblog.cover import ensure
+        try:
+            ensure(ws, paper)
+        except (OSError, ValueError):
+            log.exception("生成网页封面失败 %s", ws.id)
         return ws, True
 
     def fetch(self, ref: str) -> tuple[bytes, str, dict]:

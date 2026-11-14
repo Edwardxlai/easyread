@@ -11,6 +11,7 @@ from PIL import Image
 
 from easyread.library.library import Library
 from easyread.weblog import cover, snapshot
+from easyread.weblog.backfill_covers import backfill
 
 
 def png(color, size=(600, 300)):
@@ -57,11 +58,14 @@ class CoverTest(unittest.TestCase):
     def test_existing_text_article_backfills_once_and_keeps_reader_data(self):
         with patch.object(snapshot.Assets, 'get', return_value=None):
             ws = self.import_blog()
+        (ws.root / cover.COVER).unlink()  # Older imported article without a cached cover.
         ws.apply_reader_ops([{'op': 'paper_note', 'body': 'My saved note'}])
         before = {name: (ws.root / name).read_bytes() for name in ('source.html', 'paper.json', 'reader.json')}
+        self.assertEqual(self.lib.list()[0]['thumb'], '')
+        self.assertFalse((ws.root / cover.COVER).exists())
         with ThreadPoolExecutor(max_workers=3) as pool:
-            results = list(pool.map(lambda _: self.lib.summary(ws), range(3)))
-        self.assertTrue(all(result['thumb'].endswith(cover.COVER) for result in results))
+            list(pool.map(lambda _: backfill(self.lib), range(3)))
+        self.assertTrue(self.lib.summary(ws)['thumb'].endswith(cover.COVER))
         with Image.open(ws.root / cover.COVER) as image:
             self.assertEqual(image.size, (600, 780))
         modified = (ws.root / cover.COVER).stat().st_mtime_ns
