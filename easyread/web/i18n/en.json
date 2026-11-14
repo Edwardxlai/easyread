@@ -786,6 +786,7 @@
   "模型没有给出回答": "The model gave no answer",
   "模型没有给出新译文": "The model gave no new translation",
   "模型没有译出任何内容": "The model produced no translation",
+  "模型遗漏了原页图块：{ids}": "The model omitted figures from the source PDF: {ids}",
   "模型能看图": "Model supports images",
   "模型能看图（把原页图一起发过去，公式和表格更准）": "Model supports images (sends original page images too, for more accurate formulas and tables)",
   "模型输出的 JSON 格式有错（{err}），会自动重试": "Model output has invalid JSON ({err}); retrying automatically",

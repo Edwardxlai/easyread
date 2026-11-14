@@ -45,7 +45,7 @@ class MathDelimiterTest(unittest.TestCase):
                 problems, _ = checks.block_problems([{
                     "id": "alg1", "type": "list", "ordered": True,
                     "items": [{"en": line, "zh": line}]}])
-                self.assertTrue(any("$TeX$" in p for p in problems))
+                self.assertTrue(any("缩进" in p for p in problems))
 
     def test_algorithm_layout_commands_inside_math_code_and_paths_are_preserved(self):
         text = r"$\quad \textbf{if}$, `\textbf{if}`, C:\quad\file, \quadrature."

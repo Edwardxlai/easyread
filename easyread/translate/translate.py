@@ -14,6 +14,7 @@ from . import codeblocks, consistency, continuation, front_context, langs, page_
 from ..engines import engines, netcheck
 from ..engines.timing import merge_lock, stage
 from ..pdf import figures, pdfwork, sources, blank_pages, xrefs
+from ..pdf import numbered_listings
 from ..library.checks import block_problems, tex_problems
 from ..pdf.figures import normalize_figure, prepare_figures
 from ..app.i18n import tr
@@ -171,6 +172,11 @@ def _one_batch(ws: Workspace, cfg: dict, batch: list[int], total_pages: int, can
         prompt = prompts_en.structure(ws, batch, mode, head, skip_head, peek)
     else:
         prompt = prompts.translate(ws, batch, mode, head, skip_head, peek, front_context.build(ws.root, batch[0]) if front else "")
+    listing_figures = {(page, number): caption for page in batch
+                       for number, (_, caption) in numbered_listings.read_listings(ws.root / "extract", page).items()}
+    if listing_figures:
+        prompt += "\n以下原页图题紧接在带行号的代码后。每条保留为单独的 figure 块，照录图号和题注：\n" + "\n".join(
+            f"p.{page} {caption}" for (page, _), caption in listing_figures.items())
     text = engines.run(cfg, prompt if read else instructions.apply(prompt, cfg), ws.root, images, cancel, meter)
     try:
         data = engines.parse_json(text)
@@ -180,6 +186,12 @@ def _one_batch(ws: Workspace, cfg: dict, batch: list[int], total_pages: int, can
         (failed / f"failed-{batch[0]:03d}-{uuid.uuid4().hex}.txt").write_text(text, encoding="utf-8")
         raise
     data = _normalize(data, batch, _taken(ws, batch))
+    if listing_figures:
+        present = {(b["page"], numbered_listings.figure_number(b.get("caption_en")) or str(b.get("num")))
+                   for b in data["blocks"] if b["type"] == "figure" and b.get("caption_en")}
+        missing = [f"p.{page} Fig. {num}" for page, num in listing_figures if (page, num) not in present]
+        if missing:
+            raise engines.EngineError(tr("模型遗漏了原页图块：{ids}", ids=", ".join(missing)))
     expected_notes = footnotes.expected(ws, data["blocks"])
 
     def validate(candidate):

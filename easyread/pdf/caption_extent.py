@@ -29,14 +29,27 @@ def page_locs(layout: dict, page: int) -> list[dict]:
             if region["page"] == page for box in [region["box"]]]
 
 
-def extend_captioned(blocks: list[dict], layout: dict, root: Path | None = None):
+def extend_captioned(blocks: list[dict], layout: dict, root: Path | None = None, stream=None):
     """图优先用 PDF 图形边界（模型给的框只用来认图）；认不出时用模型的框，没有框再按题注所在栏估算。"""
     from .figure_geometry import locate_figures
+    from . import numbered_listings
     visual = locate_figures(root, blocks, layout) if root else {}
+    listing_pages = {}
     for block in blocks:
         loc = layout.get(block.get("id"))
         if block.get("type") not in ("table", "figure") or not loc or loc.get("src") == "manual":
             continue
+        if stream and block["type"] == "figure" and block.get("caption_pos", "below") == "below":
+            page = loc["page"]
+            number = numbered_listings.figure_number(block.get("caption_en"))
+            if number:
+                if page not in listing_pages:
+                    listing_pages[page] = numbered_listings.read_listings(root / "extract", page)
+                listing = listing_pages[page].get(number)
+                if listing:
+                    bounds = numbered_listings.locate(listing, stream(page), loc["box"])
+                    if bounds:
+                        visual[block["id"]] = bounds
         if block["id"] in visual:
             loc.update(visual[block["id"]])
             loc.pop("boxes", None)
