@@ -1,11 +1,11 @@
 /* Documents are read into the draft and sent only with its question. */
 (function (PR) {
   "use strict";
-  PR.createChatDocuments = function (st, panel, render) {
+  PR.createChatDocuments = function (st, panel, render, addImages) {
     let generation = 0;
     Object.assign(st, { documents: [], fileLoading: false, fileError: "" });
 
-    async function add(files) {
+    async function addDocuments(files) {
       if (!files.length || st.streaming || st.fileLoading || !PR.canChat()) return;
       const ticket = generation;
       st.fileLoading = true;
@@ -34,6 +34,21 @@
       }
     }
 
+    function add(files) {
+      if (!PR.canChat()) return;
+      if (st.streaming || st.fileLoading || st.imageLoading) {
+        st.fileError = st.streaming ? PR.t("请先停止当前回答再添加附件") : PR.t("正在读取文件…");
+        render();
+        return;
+      }
+      const images = [], documents = [];
+      for (const file of files) {
+        const isImage = (file.type || "").startsWith("image/") || /\.(png|jpe?g|webp)$/i.test(file.name);
+        (isImage ? images : documents).push(file);
+      }
+      st.fileError = ""; st.imageError = "";
+      return Promise.all([addDocuments(documents), addImages(images)]);
+    }
     panel().addEventListener("change", event => {
       if (event.target.id === "chatFileInput") add(Array.from(event.target.files));
     });

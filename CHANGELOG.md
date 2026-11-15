@@ -1,5 +1,25 @@
 # 更新记录
 
+## v1.5.0（发布候选）
+
+### 阅读与导入
+
+- **PDF 和笔记可以左右并排**。侧栏可拉到覆盖整个阅读区。把笔记标签拖到 PDF 右边，或从「+」选「左右分栏」，即可左看原页、右写笔记。也可上下分栏，或将正文图片留在侧栏对照。[#158](https://github.com/Edwardxlai/easyread/issues/158)
+- **全库问 AI**。用自己的话描述想找的内容，从回答中的编号直接跳回相应论文段落。检索覆盖本机已整理的原文和译文，结果显示本次发给模型的段数和可用的 token 用量。[#160](https://github.com/Edwardxlai/easyread/issues/160)
+- **按选段或整篇论文问 AI**。选中文字提问时，随问题附上引用段落和相邻内容。从侧栏直接提问时，仍参考整篇论文，长文按段节选。PDF、文本和图片可以从同一个附件入口添加。
+- **按原文件名整理 PDF**。单篇、多选或整文件夹导入时，可勾选「用原文件名作为文献库标题」。按标题排序即可依次看到 01、02、03 等编号，论文自身的书目标题另行保留。[#161](https://github.com/Edwardxlai/easyread/issues/161)
+- **模型与翻译设置**。在同一份模型列表中分别指定翻译和问 AI 的默认模型。图中文字可选择保留原文、只生成文字译文，或同时生成文字译文和译图。
+- **阅读排版**。阅读页和全局设置使用相同的字号、行距和每行字数选项，可直接输入字号，也可一键恢复默认排版。
+- **长论文打开与续读**。打开长论文时优先显示开头或上次读到的段落，再补齐其余正文。Windows 桌面版启动时可直接加载随安装包提供的后端文件。
+- **桌面主题跟随系统**。选用「跟随系统」后，系统切换深浅色时，已打开的论文标签页和文献库会一起切换。[PR #157](https://github.com/Edwardxlai/easyread/pull/157) · @mvanhorn
+- **伪代码排版**。检查模型输出中直接显示的 LaTeX 命令，例如算法里的 `\textbf` 和 `\quad`，发现后要求模型重新整理对应内容。[#159](https://github.com/Edwardxlai/easyread/issues/159)
+- **OpenCode 与部署**。翻译和问 AI 时，EasyRead 会为 OpenCode 会话指定标题，省去自动命名的模型调用。部署时可用 `EASYREAD_TARGET` 指定默认译文语言，例如 `zh-Hant`，用户已保存的语言设置优先。[PR #166](https://github.com/Edwardxlai/easyread/pull/166) · @moon-jam · [PR #165](https://github.com/Edwardxlai/easyread/pull/165) · @toxayu
+
+- **网页和博客导入**。粘贴文章链接即可保存网页快照，按原网页排版或 EasyRead 排版阅读，切换原文与译文，在段落上划线、记笔记，也可导出离线 HTML。[PR #162](https://github.com/Edwardxlai/easyread/pull/162) · @wyifei26
+- **找回带图号的代码示例**。补上被当作普通文字漏掉的代码图。在 MASFuzzer 论文第 3 页，Fig. 1 可以从 PDF 原页完整截取。[#159](https://github.com/Edwardxlai/easyread/issues/159)
+- **保留表格行的层级**。首列行标签有可辨认的缩进时，译文正文和表格预览保留父项、子项的缩进关系。[#145](https://github.com/Edwardxlai/easyread/issues/145)
+- **单页翻译超限后分步重试**。首次翻译一页就遇到模型输出上限时，先整理原文，再单独翻译。分步后仍超限，会提示调整服务商的输出上限或更换模型。[#168](https://github.com/Edwardxlai/easyread/issues/168)
+
 ## v1.4.7（2026-11-07）
 
 - **引用论文导航与导入**。从参考文献打开库里的论文，或通过 DOI、arXiv、链接、本地 PDF 导入被引论文。引用树显示库内已识别的引用关系，跨论文跳转后可以逐层返回原来的阅读位置。[PR #131](https://github.com/Edwardxlai/easyread/pull/131) · @wangwu-30

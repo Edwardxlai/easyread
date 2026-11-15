@@ -21,18 +21,18 @@
   }, true);
 
   /* 字号：手机上滑杆难拖，用 − 数字 + */
-  const FS_MIN = 13, FS_MAX = 28;
-  const setFs = (v) => { v = Math.round(+v); if (v >= FS_MIN && v <= FS_MAX) PR.setPref("fs", v, true); PR.$("#settings [data-fs-input]").value = PR.prefs.fs; };
+  const { min, max } = PR.typeRanges.fs;
+  const setFs = (v) => { v = Math.round(+v); if (v >= min && v <= max) PR.setPref("fs", v, true); PR.$("#settings [data-fs-input]").value = PR.prefs.fs; };
   PR.renderSettings = function () {
     PR.$("#settings").innerHTML =
       '<div class="row view-row-narrow">' + PR.viewSegHtml(false) + "</div>" +
       '<div class="row fs-row"><span>' + PR.t("字号") + '</span><button class="btn" data-fs="-1" aria-label="' + PR.t("字号变小") + '">−</button>' +
-      '<input type="number" inputmode="numeric" min="' + FS_MIN + '" max="' + FS_MAX + '" value="' + PR.prefs.fs + '" data-fs-input aria-label="' + PR.t("字号") + '">' +
+      '<input type="number" inputmode="numeric" min="' + min + '" max="' + max + '" value="' + PR.prefs.fs + '" data-fs-input aria-label="' + PR.t("字号") + '">' +
       '<button class="btn" data-fs="1" aria-label="' + PR.t("字号变大") + '">+</button></div>';
   };
   PR.$("#settings").addEventListener("click", (e) => {
     const b = e.target.closest("[data-fs]");
-    if (b) setFs(Math.min(FS_MAX, Math.max(FS_MIN, PR.prefs.fs + +b.dataset.fs)));
+    if (b) setFs(PR.clampFontSize(PR.prefs.fs + +b.dataset.fs));
   });
   PR.$("#settings").addEventListener("change", (e) => { if (e.target.matches("[data-fs-input]")) setFs(e.target.value); });
 

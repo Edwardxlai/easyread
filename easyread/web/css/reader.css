@@ -8,6 +8,7 @@
   --margin-w: 272px;
   --gap: 44px;
   --side-w: min(44vw, 720px);
+  --reader-reserved: min(var(--side-w), calc(100vw - 420px));
 }
 html { scroll-padding-top: calc(var(--bar-h) + 24px); }
 body { font-size: 15px; }
@@ -23,7 +24,6 @@ body { font-size: 15px; }
 .job-state { font-size: 12.5px; color: var(--accent); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .job-state .err { color: var(--danger); }
 .save-state { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 8px; border-radius: 8px; font-size: 12px; color: var(--ink-3); white-space: nowrap; }
-.save-state:hover { background: var(--accent-soft); }
 .save-state i { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
 .save-state[data-s="saving"] i { background: #c9a24a; }
 .save-state[data-s="offline"] i, .save-state[data-s="error"] i { background: var(--danger); }

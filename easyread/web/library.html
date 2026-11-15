@@ -19,6 +19,7 @@
 <link rel="stylesheet" href="/web/css/pick-pages.css">
 <link rel="stylesheet" href="/web/css/settings-cloud.css">
 <link rel="stylesheet" href="/web/css/usage.css">
+<link rel="stylesheet" href="/web/css/library-search.css">
 <script>try{var p=JSON.parse((localStorage.getItem("easyread-prefs")||localStorage.getItem("coread-prefs"))||"{}");var d=p.theme==="dark"||(p.theme!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.dataset.theme=d?"dark":"light"}catch(e){}</script>
 </head>
 <body>
@@ -29,6 +30,7 @@
     <input id="q" type="search" placeholder="搜索标题、作者、分类、摘要" autocomplete="off">
     <kbd>/</kbd>
   </label>
+  <button class="btn line" id="libraryAskBtn">全库问 AI</button>
   <span class="grow"></span>
   <button class="engine-chip" id="engineChip"></button>
   <button class="btn accent" id="importBtn"></button>
@@ -63,6 +65,17 @@
 
 <div class="drop-overlay" id="dropOverlay"><div><div class="big">松手导入</div><div class="hint">可以一次拖多个 PDF</div></div></div>
 
+<dialog id="libraryAsk" aria-labelledby="libraryAskTitle">
+  <form>
+    <div class="ask-head"><h2 id="libraryAskTitle">全库问 AI</h2><button class="btn" type="button" data-dismiss>关闭</button></div>
+    <label for="libraryQuestion">想从文献里找什么？</label>
+    <textarea class="input" id="libraryQuestion" rows="2" maxlength="2000" required></textarea>
+    <div class="ask-head"><span class="hint">使用问 AI 的默认模型，只发送检索到的段落</span><button class="btn accent" type="submit">提问</button></div>
+  </form>
+  <div class="ask-status hint" role="status"></div>
+  <div class="ask-answer"></div>
+  <ol class="ask-sources"></ol>
+</dialog>
 <div class="dialog-backdrop" id="importDlg"><div class="dialog" role="dialog" aria-label="导入论文"></div></div>
 <div class="dialog-backdrop" id="bulkDlg"><div class="dialog" role="dialog" aria-label="成批导入"></div></div>
 <div class="dialog-backdrop" id="settingsDlg"><div class="dialog wide" role="dialog" aria-label="设置"></div></div>
@@ -81,10 +94,12 @@
 <script src="/web/js/common/confirm.js"></script>
 <script src="/web/js/common/translation-task.js"></script>
 <script src="/web/js/common/features.js"></script>
+<script src="/web/js/common/reader-typography.js"></script>
 <script src="/web/js/common/usage.js"></script>
 <script src="/web/js/common/theme.js"></script>
 <script src="/web/js/common/lang-toggle.js"></script>
 <script src="/web/js/library/app.js"></script>
+<script src="/web/js/library/library-search.js"></script>
 <script src="/web/js/common/cite.js"></script>
 <script src="/web/js/common/cite-zotero.js"></script>
 <script src="/web/js/common/page-cap.js"></script>

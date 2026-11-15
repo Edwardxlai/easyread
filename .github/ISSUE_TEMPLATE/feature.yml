@@ -1,0 +1,25 @@
+name: 功能或体验建议
+description: 说明在什么场景下遇到不便，希望怎样改善
+title: "[建议] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: scenario
+    attributes:
+      label: 你想完成什么，现在哪里不方便？
+      placeholder: 例如，读长论文时经常要跳回上一节，每次都得重新打开目录。
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: 怎样就能解决这个问题？
+      description: 描述你希望能做到的事，具体的界面或实现可以再讨论。
+      placeholder: 例如，连续跳转几个章节时，目录能一直保持打开。
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: 补充说明（选填）
+      description: 可以附截图，或说说你目前怎么绕过这个问题。

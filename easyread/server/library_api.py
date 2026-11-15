@@ -141,6 +141,9 @@ def get(app, path: str):
 
 
 def post(app, path: str, body: dict):
+    if path == "/api/library/ask":
+        from ..chat.library_search import answer
+        return answer(app.lib, app.lib.passage_index, body)
     if path == "/api/library/inspect":
         return inspect(body)
     if path == "/api/library/pick-folder":  # 浏览器版：后端弹系统的选文件夹窗口
@@ -160,4 +163,4 @@ def post(app, path: str, body: dict):
     return None
 
 
-POST = {"/api/library/inspect", "/api/library/pick-folder", "/api/library/cleanup", "/api/library/move", "/api/library/reveal", "/api/shutdown"}
+POST = {"/api/library/ask", "/api/library/inspect", "/api/library/pick-folder", "/api/library/cleanup", "/api/library/move", "/api/library/reveal", "/api/shutdown"}

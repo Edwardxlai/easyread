@@ -29,7 +29,8 @@ def handle(self, ws, body: dict):
     user["documents"] = documents.extract(body.get("documents"))
     past = (thread or {}).get("messages", [])
     convo = [{"role": x["role"], "content": x["content"]} for x in past] + [{"role": "user", "content": text}]
-    prompt_text = chat.prompt(ws, convo, user["anchor"], user["quote"], ecfg["engine"], refs, answer_style=style)
+    prompt_text = chat.prompt(ws, convo, user["anchor"], user["quote"], ecfg["engine"], refs,
+                              answer_style=style, context_scope=body.get("context_scope", "paper"))
     prompt_text += documents.context((past + [user])[-chat.HISTORY:])
     images = chat.receive_images(ws, body.get("images"), ecfg)
     user["images"] = images
@@ -50,9 +51,13 @@ def handle(self, ws, body: dict):
         send({"model": model, "thread": tid, "answer_style": style,
               "documents": [{k: f[k] for k in ("name", "truncated")} for f in user["documents"]]})
         def seen(actual):
-            chat_models.remember(m.get("model", ""), actual)
+            nonlocal model
             if m.get("engine") == "claude":
-                send({"model": chat_models.label(m)})
+                chat_models.remember(m.get("model") or "_default", actual)
+            elif not m.get("model"):
+                chat_models.remember("last-default:" + m["engine"], actual)
+            model = chat_models.pretty(actual)
+            send({"model": model})
         attachments = chat.image_paths(ws, past + [user])
         image_options = {"images": attachments} if attachments else {}
         for piece in chat.stream(ecfg, prompt_text, ws.root, cancel, seen, meter, **image_options):

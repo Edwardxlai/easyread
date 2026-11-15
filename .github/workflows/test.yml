@@ -6,6 +6,39 @@ on:
   pull_request:
 
 jobs:
+  reader:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Select checks for the change
+        if: github.event_name == 'pull_request'
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: python scripts/check_change.py --base "$BASE" --head "$HEAD"
+      - run: python -m pip install .
+      - name: Install isolated browser tools
+        run: |
+          npm install --prefix "$RUNNER_TEMP/reader-check" playwright@1.61.1
+          "$RUNNER_TEMP/reader-check/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Open library, quote a passage, return to source and reload
+        run: PLAYWRIGHT="$RUNNER_TEMP/reader-check/node_modules/playwright" node tests/browser/fixture-smoke.cjs
+      - name: Reopen exported web annotations with missing resources offline
+        run: |
+          python -m pip install playwright==1.65.2
+          python -m tests.e2e_web_offline
+
   test:
     strategy:
       fail-fast: false
@@ -18,6 +51,7 @@ jobs:
         shell: bash
     env:
       PYTHONIOENCODING: utf-8
+      EASYREAD_HOME: ${{ github.workspace }}/ci-library-home
       EASYREAD_LIBRARY: ${{ github.workspace }}/ci-library
     steps:
       - uses: actions/checkout@v4
@@ -58,7 +92,22 @@ jobs:
       - name: ./start.sh
         run: |
           export EASYREAD_LIBRARY="$RUNNER_TEMP/lib"
+          export EASYREAD_HOME="$RUNNER_TEMP/easyread-home"
+          mkdir -p "$EASYREAD_HOME"
           (./start.sh > start.log 2>&1 &)
           for i in $(seq 1 120); do curl -sf http://127.0.0.1:8765/ -o /dev/null && break; sleep 1; done
           cat start.log
           curl -sf http://127.0.0.1:8765/ | grep -q "EasyRead"
+
+  harness:
+    name: EasyRead acceptance
+    if: always()
+    needs: [test, start-sh, reader]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require all suites to pass
+        env:
+          TEST: ${{ needs.test.result }}
+          START: ${{ needs.start-sh.result }}
+          READER: ${{ needs.reader.result }}
+        run: test "$TEST/$START/$READER" = success/success/success

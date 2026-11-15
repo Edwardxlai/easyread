@@ -13,25 +13,24 @@
         if (key in saved) s.type[key] = saved[key];
       }
     }
-    const t = Object.assign({ view: s.type.mode === "bi" ? "both" : s.type.lead === "original" ? "original" : "translation" }, s.type), range = (a, b, step) => { const out = []; for (let v = a; v <= b + 1e-9; v += step) out.push([+v.toFixed(2), +v.toFixed(2)]); return out; };
+    const t = Object.assign({ view: s.type.mode === "bi" ? "both" : s.type.lead === "original" ? "original" : "translation" }, s.type);
     const sel = (key, label, list) => '<label class="field"><span>' + label + '</span><select class="input" data-type="' + key + '">' + PR.opt(list, t[key]) + "</select></label>";
     return '<h4 class="set-h">' + PR.t("排版") + '</h4><div class="settings-sec grid3">' +
-      sel("fs", PR.t("字号"), range(13, 28, 1).map(([v]) => [v, PR.t("{n} px", { n: v })])) + sel("measure", PR.t("版心（每行字数）"), range(26, 50, 1).map(([v]) => [v, PR.t("{n} 字", { n: v })])) +
-      sel("lh", PR.t("行距"), range(1.5, 2.4, 0.05)) + sel("font", PR.t("字体"), [["serif", PR.t("宋体")], ["sans", PR.t("黑体")]]) +
-      sel("view", PR.t("打开时显示"), [["translation", PR.t("译文")], ["original", PR.t("原文")], ["both", PR.t("双语")]]) + sel("margin", PR.t("边注"), [["true", PR.t("显示")], ["false", PR.t("收起")]]) +
-      '</div><div class="keys-foot" style="margin-top:4px"><span class="hint">' + PR.t("阅读时也能在右上角 Aa 里随手调。") + '</span><button class="btn sm" data-type-reset>' + PR.t("恢复默认排版") + "</button></div>";
+      sel("fs", PR.t("字号"), PR.typeValues("fs").map(v => [v, PR.t("{n} px", { n: v })])) + sel("measure", PR.t("版心（每行字数）"), PR.typeValues("measure").map(v => [v, PR.t("{n} 字", { n: v })])) +
+      sel("lh", PR.t("行距"), PR.typeValues("lh").map(v => [v, v])) + sel("font", PR.t("字体"), [["serif", PR.t("宋体")], ["sans", PR.t("黑体")]]) +
+      sel("view", PR.t("默认阅读模式"), [["translation", PR.t("译文")], ["original", PR.t("原文")], ["both", PR.t("双语")]]) + sel("margin", PR.t("边注"), [["true", PR.t("显示")], ["false", PR.t("收起")]]) +
+      '</div><div class="keys-foot" style="margin-top:4px"><button class="btn sm" data-type-reset>' + PR.t("恢复默认排版") + "</button></div>";
   }
   T.reading = {
     render(s) {
-      return typeHtml(s) + '<h4 class="set-h">' + PR.t("功能") + '</h4><p class="set-lead">' + PR.t("阅读页上显示哪些功能。关掉的功能，按钮和快捷键都会一起消失。") + '</p><div class="switch-list">' +
+      return typeHtml(s) + '<h4 class="set-h">' + PR.t("阅读工具") + '</h4><div class="switch-list">' +
         PR.FEATURES.map(([id, name, , desc]) => '<label class="switch-row"><span><b>' + name + "</b><small>" + desc + '</small></span><input type="checkbox" class="switch" data-feat="' + id + '"' + (s.ui.features[id] !== false ? " checked" : "") + "></label>").join("") +
         "</div>" + '<div class="settings-sec grid2"><label class="field"><span>' + PR.t("界面主题") + '</span><select class="input" id="themeSel">' +
         PR.opt([["auto", PR.t("跟随系统")], ["light", PR.t("浅色")], ["dark", PR.t("深色")]], s.theme) + "</select></label>" +
         (location.protocol === "file:" ? "" : '<label class="field"><span>' + PR.t("界面语言") + '</span><select class="input" id="langSel">' +
           PR.opt([["auto", PR.t("跟随系统")], ["zh", PR.t("简体中文")], ["zh-Hant", PR.t("繁体中文")], ["en", PR.t("英文")]], s.lang || PR.langChoice) + "</select></label>") +
-        (location.protocol === "file:" ? "" : '<label class="field"><span>' + PR.t("论文译成") + '</span><select class="input" id="targetSel">' +
-          PR.opt(PR.TARGETS, s.target || PR.target) + "</select></label>") + "</div>" +
-        (location.protocol === "file:" ? "" : '<p class="set-lead">' + PR.t("新翻译的论文用这个语言；已经译过的论文保持原来的语言。不需要译文的话，导入时选“读英文原文”。") + "</p>");
+        (location.protocol === "file:" ? "" : '<label class="field"><span>' + PR.t("默认译文语言") + '</span><select class="input" id="targetSel">' +
+          PR.opt(PR.TARGETS, s.target || PR.target) + "</select></label>") + "</div>";
     },
     click(e, s) {
       if (!e.target.closest("[data-type-reset]")) return false;
@@ -53,7 +52,7 @@
   /* ---------- 快捷键 ---------- */
   T.keys = {
     render(s) {
-      let h = '<label class="switch-row big"><span><b>' + PR.t("启用快捷键") + "</b><small>" + PR.t("关掉后只剩 Esc。单个字母的快捷键打字时不会触发，但点着页面时按到会触发。") + '</small></span><input type="checkbox" class="switch" id="keysOn"' + (s.ui.keys_on ? " checked" : "") + "></label>";
+      let h = '<label class="switch-row big"><span><b>' + PR.t("启用快捷键") + "</b><small>" + PR.t("关闭后仍可使用 Esc。") + '</small></span><input type="checkbox" class="switch" id="keysOn"' + (s.ui.keys_on ? " checked" : "") + "></label>";
       h += '<div class="keys-list' + (s.ui.keys_on ? "" : " dim") + '">';
       let grp = "";
       for (const [id, label, , group, need] of PR.KEY_ACTIONS) {
@@ -61,7 +60,7 @@
         const off = need && s.ui.features[need] === false;
         const k = s.ui.keys[id];
         h += "<span>" + label + (off ? ' <small class="hint">' + PR.t("（功能已关）") + "</small>" : "") + '</span><button class="kcap' + (s.recording === id ? " rec" : k ? "" : " off") + '" data-krec="' + id + '">' +
-          (s.recording === id ? PR.t("按一个键…") : k ? PR.esc(PR.keyName(k)) : PR.t("未设置")) + '</button><button class="kx" data-koff="' + id + '" title="' + PR.t("不用这个快捷键") + '">' + PR.t("清除") + "</button>";
+          (s.recording === id ? PR.t("请按键") : k ? PR.esc(PR.keyName(k)) : PR.t("未设置")) + '</button><button class="kx" data-koff="' + id + '" title="' + PR.t("不用这个快捷键") + '">' + PR.t("清除") + "</button>";
       }
       return h + '</div><div class="keys-foot"><span class="hint">' + PR.t("选中文字后 1–4 四色划线、N 笔记、Q 提问，跟着总开关。") + '</span><button class="btn sm" data-kreset>' + PR.t("恢复默认键位") + "</button></div>";
     },

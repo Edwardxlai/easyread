@@ -4,9 +4,6 @@
 (function (PR) {
   "use strict";
 
-  /* 阅读页排版的默认值（Aa 面板和设置 → 阅读共用；主题单独存） */
-  PR.TYPE_DEFAULTS = { fs: 21, measure: 35, lh: 1.9, font: "serif", margin: true };  // 只管排版；显示方式（mode / lead）不在这里，恢复默认不碰它
-
   /* [id, 名字, 默认开关, 说明] */
   PR.FEATURES = [
     ["chat", PR.t("问 AI"), true, PR.t("阅读页右侧边读边问；段落操作条、选中文字、笔记卡片上的“问 AI”")],

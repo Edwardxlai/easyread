@@ -8,7 +8,7 @@ function setup() {
   const listeners = {};
   const element = () => ({
     style: {}, events: {}, classList: {add(){}, remove(){}},
-    addEventListener(k, fn) { this.events[k] = fn; }, setAttribute(){},
+    addEventListener(k, fn) { this.events[k] = fn; }, setAttribute(){}, before(){},
   });
   const image = {...element(), naturalWidth: 1600, naturalHeight: 1200, complete: true};
   const viewport = {...element(), clientWidth: 800, clientHeight: 600, scrollLeft: 0, scrollTop: 0, setPointerCapture(){}};
@@ -16,7 +16,7 @@ function setup() {
   const source = {...element(), src: 'figure.webp', alt: 'Figure 1', focus(){this.focused = true;}, matches(){return true;}};
   const dialog = {...element(), querySelector(s){return s === 'img' ? image : s.includes('scroll') ? viewport : label;},
     showModal(){this.open = true;}, close(){this.open = false; this.events.close();}};
-  const document = {createElement: () => dialog, body: {appendChild(){}}, querySelectorAll: () => [source],
+  const document = {createElement: tag => tag === 'dialog' ? dialog : element(), body: {appendChild(){}}, querySelectorAll: () => [source],
     addEventListener(k, fn){listeners[k] = fn;}};
   const failures = [];
   const PR = {t: s => s, on(){}, toast(){}, failFigureImage: (...args) => failures.push(args)};

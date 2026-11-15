@@ -4,6 +4,7 @@
   const L = (PR.lib = { items: [], loadStatus: "loading", loadError: "", view: "all", tag: null, q: "", sort: PR.ls.get("easyread-sort", "opened"), selected: null, engine: "claude", picked: new Set(), picking: false });
   const prefs = PR.ls.get("easyread-prefs", {});
   PR.applyTheme(prefs.theme);
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => PR.applyTheme(PR.ls.get("easyread-prefs", {}).theme));
 
 
   PR.$("#importBtn").innerHTML = PR.icon("plus", "sm") + "<span>" + PR.t("导入论文") + "</span>";
@@ -124,7 +125,7 @@
     const q = L.q.trim().toLowerCase();
     let list = L.items.filter(view[3]);
     if (L.tag) list = list.filter((i) => L.inCat(i, L.tag));  // 含子分类里的
-    if (q) list = list.filter((i) => [i.title_zh, i.title_en, i.authors, i.venue, i.arxiv, i.abstract, (i.tags || []).join(" "), i.year]
+    if (q) list = list.filter((i) => [i.display_title, i.title_zh, i.title_en, i.authors, i.venue, i.arxiv, i.abstract, (i.tags || []).join(" "), i.year]
       .join(" ").toLowerCase().includes(q));
     const key = { opened: (i) => i.last_opened || i.added, added: (i) => i.added, year: (i) => String(i.year || ""), title: (i) => PR.titles(i).main };
     const k = key[L.sort] || key.opened;
@@ -277,7 +278,7 @@
       if (e.key === "Escape") e.target.blur();
       return;
     }
-    if (PR.$(".dialog-backdrop.open")) return;
+    if (PR.$(".dialog-backdrop.open, #libraryAsk[open]")) return;
     const rows = PR.$$(".row");
     const idx = rows.findIndex((r) => r.dataset.id === L.selected);
     if (e.key === "/" || (e.key === "k" && (e.ctrlKey || e.metaKey))) { e.preventDefault(); PR.$("#q").focus(); }

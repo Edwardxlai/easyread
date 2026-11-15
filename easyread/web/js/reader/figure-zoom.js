@@ -28,6 +28,13 @@
     dialog.setAttribute("aria-label", PR.t("查看图片"));
     dialog.innerHTML = '<div class="figure-viewer-tools"><button class="btn icon" data-zoom="out" aria-label="' + PR.t("缩小图片") + '">−</button><span class="figure-viewer-scale" aria-live="polite"></span><button class="btn icon" data-zoom="in" aria-label="' + PR.t("放大图片") + '">+</button><button class="btn sm" data-zoom="fit">' + PR.t("适合窗口") + '</button><button class="btn sm" data-zoom="actual">100%</button><span class="grow"></span><button class="btn icon" data-zoom="close" aria-label="' + PR.t("关闭") + '">×</button></div><div class="figure-viewer-scroll" tabindex="0"><div class="figure-viewer-canvas"><img alt="" draggable="false"></div></div>';
     document.body.appendChild(dialog);
+    const pin = document.createElement("button");
+    pin.className = "btn sm"; pin.textContent = PR.t("在侧栏打开");
+    dialog.querySelector('[data-zoom="close"]').before(pin);
+    pin.addEventListener("click", () => {
+      const ref = origin?.closest("[data-media-block], .blk-figure");
+      if (ref) { dialog.close(); PR.pinDockFigure(ref.dataset.mediaBlock || ref.dataset.id); }
+    });
     image = dialog.querySelector("img");
     viewport = dialog.querySelector(".figure-viewer-scroll");
     label = dialog.querySelector(".figure-viewer-scale");

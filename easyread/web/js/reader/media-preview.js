@@ -37,9 +37,11 @@
     return '<div class="media-preview" data-media-block="' + PR.esc(b.id) + '">' + content + '<div class="media-caption">' + PR.esc(caption(b)) + '</div><div class="media-footer"><span>' + PR.t("第 {page} 页", { page: b.page || "?" }) + '</span><button class="btn sm" data-media-go="' + PR.esc(b.id) + '">' + PR.t("定位正文") + '</button>' + (b.page ? '<button class="btn sm" data-media-page="' + Number(b.page) + '" data-media-block="' + PR.esc(b.id) + '">PDF</button>' : "") + '</div></div>';
   }
   function hover(anchor, b) {
-    PR.popover(anchor, '<div class="media-hover"><div class="media-title">' + PR.esc(label(b)) + '</div>' + html(reference(b)) + '</div>', { wide: true });
+    PR.popover(anchor, '<div class="media-hover"><div class="media-title">' + PR.esc(label(b)) + '</div>' + html(reference(b)) + '<button class="btn sm" data-dock-pin="' + PR.esc(b.id) + '">' + PR.t("在侧栏打开") + '</button></div>', { wide: true });
   }
   document.addEventListener("click", (e) => {
+    const pin = e.target.closest("[data-dock-pin]");
+    if (pin) { e.preventDefault(); PR.pinDockFigure(pin.dataset.dockPin); PR.hidePopover(); return; }
     const go = e.target.closest("[data-media-go]"), page = e.target.closest("[data-media-page]");
     if (!go && !page) return;
     e.preventDefault(); e.stopPropagation(); PR.hidePopover();

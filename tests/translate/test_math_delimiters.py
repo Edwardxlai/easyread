@@ -38,6 +38,20 @@ class MathDelimiterTest(unittest.TestCase):
         self.assertTrue(problems)
         self.assertIn(("p1", "x", False), tex)
 
+    def test_algorithm_layout_commands_outside_math_reach_repair(self):
+        for line in (r"\textbf{foreach} $i$ \textbf{do}", r"\quad $x$",
+                     r"\qquad $t$"):
+            with self.subTest(line=line):
+                problems, _ = checks.block_problems([{
+                    "id": "alg1", "type": "list", "ordered": True,
+                    "items": [{"en": line, "zh": line}]}])
+                self.assertTrue(any("缩进" in p for p in problems))
+
+    def test_algorithm_layout_commands_inside_math_code_and_paths_are_preserved(self):
+        text = r"$\quad \textbf{if}$, `\textbf{if}`, C:\quad\file, \quadrature."
+        problems, _ = checks.block_problems([{"id": "p1", "type": "para", "en": text}])
+        self.assertEqual(problems, [])
+
     def test_all_renderer_delimiters_reach_katex_validation(self):
         for left, right, display in (("$", "$", False), (r"\(", r"\)", False),
                                      ("$$", "$$", True), (r"\[", r"\]", True)):

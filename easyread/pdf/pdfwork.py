@@ -130,7 +130,7 @@ def crop(root: Path, page: int, box: list[float], out_name: str, scale: float = 
 
 _MATH = re.compile(r"\$[^$]*\$")
 _ALNUM = re.compile(r"[a-z0-9]")
-LOCATE_VERSION = "10"  # 正文保存跨栏、跨页的多个实测区域；旧论文打开时重算一次。
+LOCATE_VERSION = "11"  # Recompute crops for figures made of numbered lines of PDF text.
 
 
 def _norm(s: str) -> str:
@@ -260,7 +260,7 @@ def _locate(root: Path) -> dict:
         else:
             if manual:
                 layout[bid] = manual
-    _extend_captioned(paper.get("blocks", []), layout, root)
+    _extend_captioned(paper.get("blocks", []), layout, root, stream)
     _clamp_overlaps(layout)
     ids = float_order.order(paper.get("blocks", []), layout)
     if ids:  # 图表挪回原页位置；公式的估算框按块顺序算，要在这之后

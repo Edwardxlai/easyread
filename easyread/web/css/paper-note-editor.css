@@ -10,7 +10,6 @@
 .pn-bar .seg button { min-height: 28px; color: var(--ink-2); }
 .pn-bar .seg button.on { color: var(--accent); }
 .pn-bar .btn { min-height: 28px; color: var(--ink-2); }
-.pn-bar [data-note-map-toggle].on { color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
 .pn-bar .grow { flex: 1; }
 .pn-sync { color: var(--ink-2); font-size: 12px; }
 .pn-format { flex: none; min-height: 44px; border-bottom: 1px solid var(--rule); background: var(--surface); }

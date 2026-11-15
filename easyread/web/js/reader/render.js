@@ -114,7 +114,14 @@
         end--;
       }
     }
-    return {head, rows: rows.slice(0, end), notes};
+    // HTML collapses leading ASCII spaces. Preserve row-label indentation in the
+    // display copy shared by the reader, the figure/table preview and offline HTML.
+    const displayRows = rows.slice(0, end).map(row => {
+      const label = row[0];
+      if (typeof label !== "string" || !/^ {2,}\S/.test(label)) return row;
+      return [label.replace(/^ +/, spaces => "\u00a0".repeat(spaces.length)), ...row.slice(1)];
+    });
+    return {head, rows: displayRows, notes};
   };
   PR.tableNotesHtml = (notes, b) => notes.map(note => '<div class="caption table-note">' +
     PR.md(note, PR.footnoteOptions(b.id)) + "</div>").join("");
@@ -302,28 +309,39 @@
     return '<div class="pending-pages"><div class="pending">' + head + recovery + "</div>" + miss.map(origFig).join("") + "</div>";
   }
 
-  PR.renderPaper = function () {
+  PR.renderPaper = function (opening = false) {
+    PR.cancelPaperChunks?.();
     buildIndex();
     let html = headHtml() + (PR.store.mode === "server" ? PR.pageCapHtml(S.job) : ""), appendixSeen = false, lastPage = 0;
     const done = new Set((S.paper.translation || {}).done_pages || []);
     const allPages = (S.paper.meta || {}).pages || [];
-    for (const raw of S.paper.blocks || []) {
+    const blocks = S.paper.blocks || [];
+    const defer = opening && blocks.length >= 80 && PR.store.mode === "server" &&
+      S.paper.meta?.source_type !== "web" && typeof IntersectionObserver !== "undefined";
+    const sections = [];
+    for (const raw of blocks) {
       const b = raw && typeof raw === "object" ? raw : null;
       if (!b || !R[b.type]) continue;
+      if (S.paper.meta?.source_type === "web" && b.en?.trim() === S.paper.meta.title_en?.trim()) continue;
+      let before = "";
       if (b.page && b.page > lastPage + 1) {
         const gap = allPages.filter((p) => p.n > lastPage && p.n < b.page && !done.has(p.n));
-        if (gap.length) html += gapHtml(gap);
+        if (gap.length) before = gapHtml(gap);
       }
       let extra = "";
       if (b.appendix && !appendixSeen) { extra = " appendix-start"; appendixSeen = true; }
       const mark = b.page && b.page > lastPage;
       if (b.page) lastPage = Math.max(lastPage, b.page);
-      try {
-        html += sectionHtml(b, extra, mark);
-      } catch (error) {
-        html += blockErrorHtml(b, error);
+      function section() {
+        try { return before + sectionHtml(b, extra, mark); }
+        catch (error) { return before + blockErrorHtml(b, error); }
       }
+      if (defer) sections.push({block: b, section});
+      else html += section();
     }
+    const range = (start, end) => sections.slice(start, end).map(entry => entry.section()).join("");
+    const chunks = defer && PR.openPaperChunks(sections.map(entry => entry.block), range);
+    if (defer) html += chunks ? chunks.html : range(0, sections.length);
     if (missingReferences) html += sectionHtml(missingReferences, "", false);
     PR.updatePaperHtml(PR.$("#paper"), html + pendingHtml(lastPage));
     // 一段译文都没有（只读原文）：顶栏的“译文 / 对照”没意义，藏起来
@@ -333,6 +351,7 @@
     document.documentElement.dataset.target = target;
     const paperEl = document.getElementById("paper");
     if (paperEl) paperEl.lang = target === "zh" ? "zh-CN" : target;  // 让浏览器选对简繁、日文、韩文字形，西文能断词
+    if (chunks) chunks.start();
     PR.emit("rendered");
   };
 
@@ -352,43 +371,5 @@
     node.replaceWith(nn);
     PR.emit("block-rendered", id);
   };
-
-  /* 版心放不下的长公式、宽表格：先缩小字号，再不行才横向滚动。
-     公式原本多宽只和字号、字体有关，量一次记下来；开关侧栏、改窗口大小只是版心变了，不用再把几百个公式复原重量一遍
-     （复原再量要整页重排，长论文一两百毫秒，点“原页”“笔记”会明显顿一下）。 */
-  // 记的是 { w, over }：over 为真时 w 是放不下时量到的真实宽度；为假时只知道“宽 w 的版心放得下”，版心变窄得重量
-  const natural = new WeakMap();
-  let typeface = "";
-  PR.fitWide = function (scope, remeasure) {  // remeasure：字体刚加载完这类，量过的也不作数
-    const paper = PR.$("#paper");
-    const cs = getComputedStyle(paper);
-    const tf = cs.fontSize + "|" + cs.fontFamily;
-    const fresh = remeasure || tf !== typeface;
-    typeface = tf;
-    const boxes = PR.$$(".math-body, .tbl-wrap", fresh ? paper : scope || paper).filter((box) => box.firstElementChild);
-    const avail = boxes.map((box) => box.clientWidth);
-    const todo = boxes.filter((box, i) => {
-      const n = !fresh && natural.get(box.firstElementChild);
-      return !n || !n.w || (!n.over && avail[i] < n.w - 1);  // w 为 0：上次量时藏着（比如对照模式的英文）
-    });
-    // 要重量的：先全部复原、再一起量、最后一起改，边改边量会让浏览器每个公式都重排一次整页
-    todo.forEach((box) => { box.firstElementChild.style.fontSize = ""; });
-    todo.forEach((box) => {
-      const need = box.firstElementChild.scrollWidth, w = box.clientWidth;
-      natural.set(box.firstElementChild, need > w + 1 ? { w: need, over: true } : { w, over: false });
-    });
-    const floor = window.innerWidth < 760 ? 0.58 : 0.72;
-    boxes.forEach((box, i) => {
-      const n = natural.get(box.firstElementChild);
-      let size = "";
-      if (n.over && n.w > avail[i] + 1) {
-        const r = Math.max(floor, avail[i] / n.w) * 0.99;
-        size = box.classList.contains("tbl-wrap") ? (0.86 * r).toFixed(3) + "em" : (r * 100).toFixed(1) + "%";
-      }
-      if (box.firstElementChild.style.fontSize !== size) box.firstElementChild.style.fontSize = size;
-    });
-  };
-  PR.on("rendered", () => PR.fitWide());
-  PR.on("block-rendered", (id) => PR.fitWide(document.getElementById("b-" + id)));
 
 })(window.PR);

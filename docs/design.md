@@ -4,7 +4,7 @@
 
 ## 借鉴的开源项目
 
-用 `gh repo view` 核过仓库和简介；只借交互思路，没有拷代码。KaTeX（MIT）是唯一打包进来的第三方代码，在 `assets/vendor/katex/`。
+下表记录阅读交互的设计参考。公式渲染使用 [KaTeX](../easyread/web/vendor/katex/)，笔记编辑器和导图的构建依赖见 [package.json](../package.json) 与[构建脚本](../scripts/build_note_editor.cjs)。
 
 | 项目 | 它怎么做 | 这里怎么用 |
 |---|---|---|

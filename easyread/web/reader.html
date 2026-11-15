@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="/web/vendor/katex/katex.min.css">
 <link rel="stylesheet" href="/web/css/base.css">
 <link rel="stylesheet" href="/web/css/reader.css">
+<link rel="stylesheet" href="/web/css/webpage.css">
 <link rel="stylesheet" href="/web/css/reader-navigation.css">
 <link rel="stylesheet" href="/web/css/reader-media.css">
 <link rel="stylesheet" href="/web/css/figure-crop.css">
@@ -22,6 +23,7 @@
 <link rel="stylesheet" href="/web/css/settings.css">
 <link rel="stylesheet" href="/web/css/page-cap.css">
 <link rel="stylesheet" href="/web/css/usage.css">
+<link rel="stylesheet" href="/web/css/reader-dock.css">
 <script>try{var p=JSON.parse((localStorage.getItem("easyread-prefs")||localStorage.getItem("coread-prefs"))||"{}");var d=p.theme==="dark"||(p.theme!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.dataset.theme=d?"dark":"light"}catch(e){}</script>
 </head>
 <body>
@@ -43,11 +45,9 @@
     <button data-view="both"></button>
     <button class="order-caret" data-order-menu aria-haspopup="menu" aria-expanded="false"></button>
   </div>
-  <button class="btn" data-act="pages" title="PDF 原页，跟随阅读位置（O）"></button>
-  <button class="btn" data-act="notes" title="笔记面板（M）"></button>
-  <button class="btn" data-act="chat" title="边读边问 AI（A）"></button>
+  <button class="btn" data-act="dock" aria-controls="readerDock" aria-expanded="false" disabled>侧栏</button>
   <button class="btn" data-act="settings" title="字号、版心、字体（=、- 调字号）">Aa</button>
-  <button class="save-state" data-act="about" title="保存状态"><i></i><span>…</span></button>
+  <span class="save-state" role="status" title="保存状态"><i aria-hidden="true"></i><span>…</span></span>
 </header>
 
 <aside id="drawer" aria-label="目录">
@@ -88,6 +88,7 @@
 
 <section id="notespanel" class="side-panel" aria-label="笔记"></section>
 <section id="chatpanel" class="side-panel" aria-label="问 AI"></section>
+<aside id="readerDock" aria-label="阅读侧栏" hidden></aside>
 <div class="dialog-backdrop" id="readerDlg"><div class="dialog" role="dialog"></div></div>
 <div class="dialog-backdrop" id="settingsDlg"><div class="dialog" role="dialog" aria-label="设置"></div></div>
 <div class="dialog-backdrop" id="textDlg"><div class="dialog wide" role="dialog"></div></div>
@@ -107,13 +108,16 @@
 <script src="/web/js/common/confirm.js"></script>
 <script src="/web/js/common/translation-task.js"></script>
 <script src="/web/js/common/features.js"></script>
+<script src="/web/js/common/reader-typography.js"></script>
 <script src="/web/js/common/usage.js"></script>
 <script src="/web/js/common/page-cap.js"></script>
 <script src="/web/js/common/theme.js"></script>
 <script src="/web/js/common/markup.js"></script>
 <script src="/web/js/reader/store.js"></script>
 <script src="/web/js/reader/annotation-history.js"></script>
+<script src="/web/js/reader/paper-chunks.js"></script>
 <script src="/web/js/reader/render.js"></script>
+<script src="/web/js/reader/wide-layout.js"></script>
 <script src="/web/js/reader/render-place.js"></script>
 <script src="/web/js/reader/media-preview.js"></script>
 <script src="/web/js/reader/note-media.js"></script>
@@ -136,10 +140,12 @@
 <script src="/web/js/reader/reading-language.js"></script>
 <script src="/web/js/reader/page-zoom.js"></script>
 <script src="/web/js/reader/pageview.js"></script>
+<script src="/web/js/reader/reader-dock.js"></script>
 <script src="/web/js/reader/pdf-text.js"></script>
 <script src="/web/js/reader/side-resize.js"></script>
 <script src="/web/vendor/note-libraries.js"></script>
 <script src="/web/js/reader/paper-note-editor.js"></script>
+<script src="/web/js/reader/dock-resources.js"></script>
 <script src="/web/js/reader/paper-note-sources.js"></script>
 <script src="/web/js/reader/notespanel.js"></script>
 <script src="/web/js/reader/chat-effort.js"></script>
@@ -163,6 +169,7 @@
 <script src="/web/js/common/settings-tabs.js"></script>
 <script src="/web/js/common/settings-chat.js"></script>
 <script src="/web/js/common/settings-translation.js"></script>
+<script src="/web/js/reader/webpage.js"></script>
 <script src="/web/js/reader/main.js"></script>
 </body>
 </html>

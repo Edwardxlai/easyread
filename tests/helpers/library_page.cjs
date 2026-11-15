@@ -19,6 +19,7 @@ function page(url = "http://127.0.0.1:8765/", storage = new Map(), state = null,
   const history = { state, replaceState(value, unused, url) { this.state = value; location.href = url; } };
   const nodes = new Map(), listeners = new Map(), windowEvents = new Map(), frames = [], timers = new Map(), requests = [];
   let rows = [], items = [], categories = [], prefsResult = null, libraryRead;
+  const scheme = { matches: false, listeners: [] };
   const node = selector => {
     if (!nodes.has(selector)) nodes.set(selector, {
       value: "", style: { setProperty() {} }, dataset: {}, scrollTop: 0, offsetHeight: selector === ".list-head" ? 60 : 0,
@@ -61,6 +62,7 @@ function page(url = "http://127.0.0.1:8765/", storage = new Map(), state = null,
     localStorage: { getItem: key => { if (blocked) throw new Error("storage blocked"); return storage.get(key) || null; },
       setItem: (key, value) => { if (blocked) throw new Error("storage blocked"); storage.set(key, value); },
       removeItem: key => { if (blocked) throw new Error("storage blocked"); storage.delete(key); } },
+    matchMedia: () => ({ get matches() { return scheme.matches; }, addEventListener(name, fn) { if (name === "change") scheme.listeners.push(fn); } }),
     requestAnimationFrame: fn => frames.push(fn),
     setTimeout(fn, ms) { const id = ++timerSeq; timers.set(id, { fn, at: clock + ms }); return id; },
     clearTimeout(id) { timers.delete(id); },
@@ -76,6 +78,7 @@ function page(url = "http://127.0.0.1:8765/", storage = new Map(), state = null,
   const p = { PR, location, history, storage, node, listeners, windowEvents, requests,
     get rows() { return rows; }, setItems(value) { items = value; },
     setPrefs(value) { prefsResult = value; }, setLibraryRead(fn) { libraryRead = fn; },
+    preferColorScheme(matches) { scheme.matches = matches; scheme.listeners.forEach(fn => fn({ matches })); },
     library(value, cats = ["分类"]) {
       items = value; categories = cats;
       vm.runInNewContext(source("library/app.js"), context);

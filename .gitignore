@@ -8,7 +8,7 @@ __pycache__/
 .server.json
 easyread.log*
 tests/shots/
-*.lock
+.write.lock
 *.egg-info/
 build/
 dist/
@@ -25,3 +25,8 @@ dist/
 .claude/
 .ruff_cache/
 /docs/tasks/
+/.maintainer/
+/ci-library/
+.env
+.env.*
+!.env.example

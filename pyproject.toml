@@ -1,6 +1,6 @@
 [project]
 name = "easyread"
-version = "1.4.7"
+version = "1.5.0"
 description = "EasyRead：把英文论文读成舒服的中文——后台翻译、对照原文、批注笔记、文献库"
 readme = "README.md"
 license = { text = "MIT" }
@@ -11,6 +11,7 @@ dependencies = [
   "pdfplumber>=0.11",
   "pillow>=10",
   "pypdf>=4",
+  "beautifulsoup4>=4.12",
   "truststore>=0.10",
   "certifi>=2024.8.30",
 ]

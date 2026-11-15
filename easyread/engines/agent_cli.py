@@ -72,7 +72,7 @@ def run(engine: str, c: dict, prompt: str, cwd: Path, cancel=None, meter=None) -
         out = engines._communicate(engines._popen(args, cwd), line, timeout, cancel)
     else:
         out = engines._communicate(engines._popen(args, cwd), prompt, timeout, cancel)
-    text, err, used = parse(engine, out)
+    text, err, used = parse(engine, out, on_model=c.get("_report_model"))
     if meter is not None and used:
         meter.add(**used)
     if err or not text:
@@ -100,7 +100,7 @@ def build_args(engine: str, c: dict) -> list[str]:
     return args + list(c.get("extra_args") or [])
 
 
-def parse(engine: str, out: str) -> tuple[str, str, dict | None]:
+def parse(engine: str, out: str, on_model=None) -> tuple[str, str, dict | None]:
     """CLI 的输出 → (回答, 报错, 给 Meter 的用量)。"""
     from .engines import _json_lines
     events = _json_lines(out)
@@ -110,6 +110,13 @@ def parse(engine: str, out: str) -> tuple[str, str, dict | None]:
             events = [obj] if isinstance(obj, dict) else []
         except json.JSONDecodeError:
             pass
+    if on_model:
+        for event in reversed(events):
+            payload = event.get("result") if isinstance(event.get("result"), dict) else event
+            model = payload.get("model") or event.get("model")
+            if isinstance(model, str) and 0 < len(model.strip()) <= 120:
+                on_model(model.strip())
+                break
     if engine == "grok":
         res = next((e for e in reversed(events) if "text" in e or e.get("type") == "error"), None) or {}
         if res.get("type") == "error":

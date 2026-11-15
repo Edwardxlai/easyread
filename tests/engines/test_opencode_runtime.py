@@ -21,7 +21,7 @@ class OpenCodeRuntimeTest(unittest.TestCase):
             self.assertFalse((root / ".opencode").exists())
             self.assertFalse((root / "opencode.json").exists())
             self.assertEqual(Path(kwargs["env"]["PWD"]), root.resolve())
-            self.assertEqual(args, ["opencode", "run", "--format", "json"])
+            self.assertEqual(args, ["opencode", "run", "--format", "json", "--title", "EasyRead translation"])
             return Mock(poll=Mock(return_value=0))
 
         with patch.object(opencode_cli, "path", return_value="opencode"), \

@@ -32,6 +32,15 @@ class AnswerStyleTest(unittest.TestCase):
             {"id": "c", "type": "para", "page": 6, "en": "A final limitation.", "zh": "局限"},
         ]})
 
+    def test_explicit_selection_does_not_attach_the_whole_paper(self):
+        messages = [{"role": "user", "content": "解释这句"}]
+        for style in answer_styles.VALUES:
+            selected = chat.prompt(self.ws, messages, "b", "引用", "openai", answer_style=style, context_scope="selection")
+            self.assertIn("A source fact", selected)
+            self.assertIn("引用", selected)
+            self.assertNotIn("A final limitation.", selected)
+            self.assertIn("A final limitation.", chat.prompt(self.ws, messages, None, "", "openai", answer_style=style))
+
     def test_prompt_switches_language_without_losing_source_or_history(self):
         messages = [{"role": "assistant", "content": "Previous answer in English."}, {"role": "user", "content": "总结论文"}]
         for engine in ("openai", "claude", "codex"):

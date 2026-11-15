@@ -29,6 +29,10 @@ class EngineError(RuntimeError):
     pass
 
 
+class OutputLimitReached(EngineError):
+    """The provider explicitly reported an output token limit."""
+
+
 class Cancelled(RuntimeError):
     pass
 
@@ -52,6 +56,8 @@ def run(cfg: dict, prompt: str, cwd: Path, images: list[Path] | None = None, can
     try:
         with stage(meter, "model"):
             return _run(cfg, prompt, cwd, images, cancel, meter)
+    except OutputLimitReached:
+        raise
     except EngineError as e:
         raise EngineError(netcheck.explain(cfg, str(e))) from None
 

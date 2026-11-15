@@ -33,7 +33,7 @@ function reader({ mode = "server", progress = {}, scrollY = 0 } = {}) {
     throttle: fn => fn,  // 多久记一次由 util.js 的节流管，这里只看记了什么
     readingBlock: () => "head",
     $$: () => [...layout.keys()].filter(id => id.startsWith("orig-")).map(id => sandbox.document.getElementById(id)),
-    $: (sel) => (sel === "#paper" ? { classList: { add: (c) => classes.add(c), remove: (c) => classes.delete(c) } } : null),
+    $: (sel) => (sel === "#paper" ? { querySelector: () => null, classList: { add: (c) => classes.add(c), remove: (c) => classes.delete(c) } } : null),
     blockById: {}, store: { mode },
     commit: op => { PR.committed.push(op); PR.state.reader.progress = { block: op.block, off: op.off, ratio: op.ratio }; },
     committed: [],

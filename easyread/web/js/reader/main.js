@@ -159,8 +159,9 @@
     PR.$(".bar-title").innerHTML = PR.titleHtml(m.short_zh || m.title_zh || m.title_en || "");
     PR.ls.get("pr-seen-" + PR.paperKey, (S.discussion.entries || []).map((e) => e.id)).forEach((id) => seen.add(id));
     PR.ls.set("pr-seen-" + PR.paperKey, Array.from(seen));
-    PR.renderPaper();
+    PR.renderPaper(true);
     PR.citationNav.setup();
+    PR.$('[data-act="dock"]').disabled = false;
     PR.setupDemo();  // 署名要放在论文标题下面，得等正文渲染出来
     PR.applyMarks();
     PR.renderMargin();
@@ -190,7 +191,7 @@
       Promise.all([document.fonts ? document.fonts.ready : null, new Promise((r) => setTimeout(r, 900))])
         .then(() => PR.jumpTo(id, { noBack: true, instant: true, noFlash: true }));
     } else if (!PR.restoreProgress()) {
-      if (!PR.ls.get("easyread-hint-seen", false)) {
+      if (!PR.ls.get("easyread-hint-seen", false) && m.source_type !== "web") {
         PR.ls.set("easyread-hint-seen", true);
         const touch = matchMedia("(pointer: coarse)").matches;  // 手机上没有右键和键盘
         const tip = S.demo ? PR.t("在线演示：点段落、选中文字试试划线和笔记；顶栏“问 AI”里有一段真实的 AI 对话。")

@@ -1,7 +1,11 @@
 async page => {
   const check = (ok, message) => { if (!ok) throw new Error(message); };
   await page.setViewportSize({ width: 1440, height: 1000 });
-  if (!await page.locator('body').evaluate(el => el.classList.contains('np-open'))) await page.getByRole('button', { name: '笔记', exact: true }).click();
+  if (!await page.locator('#notespanel').isVisible()) {
+    if (!await page.locator('#readerDock').isVisible()) await page.locator('[data-act=dock]').click();
+    await page.locator('.dock-group:visible .dock-add').first().click();
+    await page.locator('.dock-menu:popover-open [data-open=notes]').click();
+  }
   await page.locator('[data-np=paper]').click();
   const panel = page.locator('#notespanel'), workspace = panel.locator('.pn-workspace');
   const note = await panel.locator('#paperNote').inputValue();

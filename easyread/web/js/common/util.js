@@ -29,6 +29,10 @@ window.PR = window.PR || {};
      译成英文时原标题可能是别的语言，不标 lang；原文本来就是英文、标题照抄的，第二行不重复 */
   PR.titles = function (i) {
     const tr = i.title_zh || "", en = i.title_en || "", lang = i.target || "zh";
+    if (i.display_title) {
+      const sub = tr && PR.lang.split("-")[0] === lang.split("-")[0] ? tr : en;
+      return { main: i.display_title, short: i.display_title, sub: sub === i.display_title ? "" : sub, subLang: sub === tr ? lang : "" };
+    }
     if (tr && (PR.lang.split("-")[0] === lang.split("-")[0] || !en)) return { main: tr, sub: tr === en ? "" : en, subLang: lang === "en" ? "" : "en", short: i.short_zh || tr.split(/[：:]/)[0] };
     return { main: en || PR.t("（未命名）"), sub: tr, subLang: lang, short: en.split(/:\s/)[0] || PR.t("（未命名）") };
   };
@@ -223,10 +227,7 @@ window.PR = window.PR || {};
       (it.kbd ? '<span class="kbd">' + PR.esc(it.kbd) + "</span>" : "") + "</button>").join("") + "</div>";
     m.onclick = (e) => {
       const b = e.target.closest("[data-i]"); if (!b) return;
-      const r = m.getBoundingClientRect();
-      PR.lastMenuAt = { x: r.left, y: r.top };  // 菜单项要确认时，确认框就出在菜单原来的位置
       PR.closeMenu(); items[+b.dataset.i].fn();
-      setTimeout(() => (PR.lastMenuAt = null), 0);
     };
     m.classList.add("open");
     const r = anchorOrPoint.getBoundingClientRect ? anchorOrPoint.getBoundingClientRect() : { left: anchorOrPoint.x, right: anchorOrPoint.x, top: anchorOrPoint.y, bottom: anchorOrPoint.y };

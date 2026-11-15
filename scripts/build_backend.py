@@ -12,7 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "build" / "backend"
 WORK = ROOT / "build" / "pyinstaller"
-REQUIRED = ("easyread", "pypdfium2", "pypdfium2_raw", "pdfplumber", "PIL", "pypdf", "truststore", "certifi")
+REQUIRED = ("easyread", "pypdfium2", "pypdfium2_raw", "pdfplumber", "PIL", "pypdf", "truststore", "certifi", "bs4")
 
 
 def python_with_pyinstaller() -> list[str]:
@@ -49,12 +49,18 @@ def main() -> None:
             old.unlink()
         elif old.is_dir():
             shutil.rmtree(old)
-    cmd = python + ["-m", "PyInstaller", "--noconfirm", "--clean", "--onefile",
-                    "--name", "easyread-backend", "--distpath", str(OUT),
+    # On Windows the installer already bundles this directory. Avoid unpacking
+    # the PDF libraries and web assets to Temp on every desktop launch.
+    windows = os.name == "nt"
+    dist = WORK / "dist" if windows else OUT
+    cmd = python + ["-m", "PyInstaller", "--noconfirm", "--clean", "--onedir" if windows else "--onefile",
+                    "--name", "easyread-backend", "--distpath", str(dist),
                     "--workpath", str(WORK), "--specpath", str(WORK),
                     *[arg for module in REQUIRED for arg in ("--collect-all", module)],
                     str(ROOT / "scripts" / "backend_entry.py")]
     subprocess.run(cmd, cwd=ROOT, check=True)
+    if windows:
+        shutil.copytree(dist / "easyread-backend", OUT, dirs_exist_ok=True)
     print(f"后端已生成：{OUT / ('easyread-backend.exe' if os.name == 'nt' else 'easyread-backend')}")
 
 

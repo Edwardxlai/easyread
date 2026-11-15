@@ -1,6 +1,6 @@
 /* 阅读页 · 面板与浮层：抽屉、右侧面板（原页 / 笔记）、设置、操作条、选区条、悬浮卡 */
 :root {
-  --toc-base-indent: 16px;
+  --toc-base-indent: 12px;
 }
 
 /* 左侧抽屉 */
@@ -20,7 +20,13 @@ body.drawer-open #scrim { opacity: 1; pointer-events: auto; }
 .toc a.l4 { padding-left: calc(8px + var(--toc-base-indent) * 3); }
 .toc a.l5 { padding-left: calc(8px + var(--toc-base-indent) * 4); }
 .toc a.l6 { padding-left: calc(8px + var(--toc-base-indent) * 5); }
-.toc a .n { display: inline-block; min-width: 1.9em; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.outline a { display: flex; align-items: baseline; gap: 8px; padding-block: 5px; }
+.outline .n { flex: none; color: var(--ink-3); font-variant-numeric: tabular-nums; font-size: .92em; }
+.outline-title { min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.outline .l1 { font-weight: 600; color: var(--ink); }
+.outline a.l1:not(:first-child) { margin-top: 5px; }
+.outline a[aria-current="location"] { color: var(--accent); background: var(--accent-soft); box-shadow: inset 2px 0 var(--accent); }
+.outline a[aria-current="location"] .n { color: inherit; }
 .toc .cnt { float: right; font-size: 11px; color: var(--ink-3); }
 .toc .group { font-size: 11px; letter-spacing: .2em; color: var(--ink-3); margin: 14px 0 4px; }
 .terms-t { width: 100%; border-collapse: collapse; }
@@ -38,14 +44,14 @@ body.drawer-open #scrim { opacity: 1; pointer-events: auto; }
 body.pv-open #pageview, body.np-open #notespanel { transform: none; }
 /* 面板左边缘的拖动把手（side-resize.js）；窄屏面板是固定宽度，不显示 */
 .panel-grip { display: none; position: fixed; top: var(--bar-h); bottom: 0; right: calc(var(--side-w) - 3px); width: 6px; cursor: col-resize; z-index: 41; }
-@media (min-width: 1180px) { body.side-open .panel-grip { display: block; } }
+@media (min-width: 761px) { body.side-open .panel-grip { display: block; touch-action: none; right: min(calc(100% - 6px), calc(var(--side-w) - 3px)); } }
 .panel-grip:hover, body.resizing .panel-grip { background: linear-gradient(90deg, transparent 2px, var(--accent) 2px, var(--accent) 4px, transparent 4px); }
 body.resizing { cursor: col-resize; user-select: none; }
 body.resizing .side-panel { transition: none; }
 @media (min-width: 1180px) {
   /* 右侧开着面板：边注收进正文（页边的小数字），版心在剩下的地方居中，放不下就变窄 */
-  body.side-open #stage { grid-template-columns: var(--gutter) minmax(0, var(--measure)) var(--gutter); width: min(calc(var(--measure) + 2 * var(--gutter)), calc(100vw - var(--side-w) - 24px));
-    margin-right: calc(var(--side-w) + 8px); margin-left: max(12px, calc((100vw - var(--side-w) - var(--measure) - 2 * var(--gutter)) / 2)); }
+  body.side-open #stage { grid-template-columns: var(--gutter) minmax(0, var(--measure)) var(--gutter); width: min(calc(var(--measure) + 2 * var(--gutter)), calc(100vw - var(--reader-reserved) - 24px));
+    margin-right: calc(var(--reader-reserved) + 8px); margin-left: max(12px, calc((100vw - var(--reader-reserved) - var(--measure) - 2 * var(--gutter)) / 2)); }
 }
 .pv-head { display: flex; align-items: center; gap: 4px; height: 46px; padding: 0 8px; border-bottom: 1px solid var(--rule); font-size: 13px; color: var(--ink-2); flex: none; }
 .pv-head .grow { flex: 1; }

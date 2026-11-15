@@ -126,6 +126,15 @@ def translation_id(cfg: dict) -> str:
 
 def label(m: dict) -> str:
     """面板上显示的名字：Claude 别名显示实际版本（Claude Opus 5），Codex 没填模型时带上它实际用的模型。"""
+    if not m.get("model") and m.get("engine") in engines.CLI_ENGINES:
+        from ..app.cli_models import default_model
+        name = default_model(m["engine"])
+        if name:
+            return tr("跟随默认（{model}）", model=name)
+        last = actual_of("last-default:" + m["engine"])
+        if last:
+            return tr("CLI 默认（上次使用 {model}）", model=last)
+        return engines.engine_name(m["engine"]) + " · " + tr("跟随 CLI 默认（型号未确认）")
     if m.get("engine") == "claude" and m.get("model") in ("opus", "sonnet", "haiku") and actual_of(m["model"]):
         return pretty(actual_of(m["model"]))
     if m.get("engine") == "codex" and (not m.get("name") or m.get("name") in ("GPT", m.get("model"))):

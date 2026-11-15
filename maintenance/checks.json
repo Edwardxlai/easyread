@@ -1,0 +1,15 @@
+[
+  {"area":"阅读器与文献库","paths":["easyread/web/*","tests/web/*","tests/browser/*"],"tests":["tests/web/test_reader_navigation.cjs"],"evidence":"在隔离库从文献库进入阅读页，核对宽窄屏与批注回跳。"},
+  {"area":"本地服务","paths":["easyread/server/*","tests/server/*"],"tests":["tests.server.test_jobs"],"evidence":"从受影响的 HTTP 入口核对成功请求、错误处理及 docs/api.md。"},
+  {"area":"文献数据","paths":["easyread/library/*","tests/library/*"],"tests":["tests.library.test_reader_ops"],"evidence":"在旧库副本验证重开、原段落 ID 和读者记录。"},
+  {"area":"离线导出","paths":["easyread/export/*","tests/export/*"],"tests":["tests.export.test_mobile_export"],"evidence":"断网重开导出文件，核对内容、资源和批注。"},
+  {"area":"翻译","paths":["easyread/translate/*","tests/translate/*"],"tests":["tests.translate.test_continuation"],"evidence":"验证续跑与原段落；声称速度或质量变化需同条件实测。"},
+  {"area":"模型适配","paths":["easyread/engines/*","tests/engines/*"],"tests":["tests.engines.test_engine_lean"],"evidence":"选择受影响引擎的定向用例，真实调用单独验证。"},
+  {"area":"论文问答","paths":["easyread/chat/*","tests/chat/*"],"tests":["tests.chat.test_chat_store"],"evidence":"核对上下文、对话隔离和历史恢复。"},
+  {"area":"PDF","paths":["easyread/pdf/*","tests/pdf/*"],"tests":["tests.pdf.test_pdf_extraction"],"evidence":"使用含对应排版的 PDF，在原页核对提取内容和坐标。"},
+  {"area":"批量导入","paths":["easyread/bulk/*","tests/bulk/*"],"tests":["tests.bulk.test_runner"],"evidence":"从导入入口验证重试与停止。"},
+  {"area":"Zotero","paths":["easyread/zotero/*","tests/zotero/*"],"tests":["tests.zotero.test_reader"],"evidence":"核对来源映射和目标文献库。"},
+  {"area":"设置与启动","paths":["easyread/app/*","tests/app/*"],"tests":["tests.app.test_open_link"],"evidence":"核对已保存偏好、重开与实际启动入口。"},
+  {"area":"桌面与构建","paths":["electron/*","installer/*","scripts/build_*","package*.json","pyproject.toml","tests/desktop/*"],"tests":["tests/desktop/test_desktop.cjs"],"evidence":"在受影响的系统核对原生操作；打包、安装和升级分别记录。"},
+  {"area":"文档与维护规则","paths":["*.md","maintenance/*",".github/*","scripts/*"],"tests":[],"evidence":"核对引用、执行入口和维护权限；改发布流程走候选包验证。"}
+]

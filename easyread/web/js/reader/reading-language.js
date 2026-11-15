@@ -89,13 +89,10 @@
     if (menu.classList.contains("open")) renderMenu();
   }
 
-  PR.applyReadingLanguage = function () {
+  PR.prepareReadingBlocks = function (root) {
     const first = PR.originalFirst();
-    document.body.classList.toggle("original-first", first);
-    syncBar();
-    if (!S.paper) return;
     // 标题里的英文（.en-title）拆成和译文同级的一行，才能整体换先后
-    PR.$$("#paper .en-title").forEach((en) => {
+    root.querySelectorAll(".en-title").forEach((en) => {
       const zh = en.parentElement;
       const original = document.createElement(zh.tagName);
       original.className = "en heading-original";
@@ -106,13 +103,22 @@
       en.remove();
       zh.after(original);
     });
-    PR.$$("#paper .en").forEach((en) => {
+    root.querySelectorAll(".en").forEach((en) => {
       const zh = Array.from(en.parentElement.children).find((n) => n.classList.contains("zh"));
       if (!zh) return;
       zh.classList.add("paired-translation");
       if (first) { if (en.nextElementSibling !== zh) zh.before(en); }
       else if (zh.nextElementSibling !== en) zh.after(en);
     });
+  };
+
+  PR.applyReadingLanguage = function () {
+    const first = PR.originalFirst();
+    document.body.classList.toggle("original-first", first);
+    syncBar();
+    PR.refreshDockResource?.();
+    if (!S.paper) return;
+    PR.prepareReadingBlocks(PR.$("#paper"));
     const title = PR.$("#paper .paper-head h1"), meta = S.paper.meta;
     const secondary = PR.$("#paper .title-en");
     if (title && secondary && meta && meta.title_zh && meta.title_en) {

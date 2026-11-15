@@ -162,7 +162,7 @@
     if (embedded) {
       const d = JSON.parse(embedded.textContent);
       mode = "static";
-      Object.assign(S, { paper: d.paper, discussion: d.discussion || { entries: [] }, layout: d.layout || {}, images: d.images || {}, item: d.item || {}, chat: d.chat || null, demo: d.demo || null });
+      Object.assign(S, { paper: d.paper, web_snapshot: d.web_snapshot || "", discussion: d.discussion || { entries: [] }, layout: d.layout || {}, images: d.images || {}, item: d.item || {}, chat: d.chat || null, demo: d.demo || null });
       serverReader = d.reader || {};
       PR.pid = PR.pid || (S.paper.meta.source_sha256 || "paper").slice(0, 12);
     } else {
@@ -185,7 +185,7 @@
     else statusIdle();
   };
 
-  PR.imageUrl = (rel) => (mode === "static" ? S.images[rel] || "" : "/p/" + PR.pid + "/" + rel);
+  PR.imageUrl = (rel) => ((S.paper?.meta || {}).source_type === "web" && /^https?:\/\//.test(rel) ? rel : mode === "static" ? S.images[rel] || "" : "/p/" + PR.pid + "/" + rel);
   PR.pdfUrl = (page) => (mode === "static" ? "" : "/p/" + PR.pid + "/source.pdf#page=" + page);
   PR.canAsk = () => mode === "server" && S.engine && S.engine !== "none";
 

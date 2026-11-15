@@ -14,6 +14,7 @@ from . import codeblocks, consistency, continuation, front_context, langs, page_
 from ..engines import engines, netcheck
 from ..engines.timing import merge_lock, stage
 from ..pdf import figures, pdfwork, sources, blank_pages, xrefs
+from ..pdf import numbered_listings
 from ..library.checks import block_problems, tex_problems
 from ..pdf.figures import normalize_figure, prepare_figures
 from ..app.i18n import tr
@@ -30,6 +31,8 @@ _QUOTA = re.compile(r"session limit|usage limit|rate limit reached|insufficient_
 
 
 def prepare(ws: Workspace) -> None:
+    if (ws.load("paper") or {}).get("meta", {}).get("source_type") == "web":
+        return
     pages = pdfwork.prepare(ws.root)
     extra = {}
     try:  # 本地拖进来的 PDF：从第一页的 arXiv 编号或 DOI 补上作者、年份、出处
@@ -171,6 +174,11 @@ def _one_batch(ws: Workspace, cfg: dict, batch: list[int], total_pages: int, can
         prompt = prompts_en.structure(ws, batch, mode, head, skip_head, peek)
     else:
         prompt = prompts.translate(ws, batch, mode, head, skip_head, peek, front_context.build(ws.root, batch[0]) if front else "")
+    listing_figures = {(page, number): caption for page in batch
+                       for number, (_, caption) in numbered_listings.read_listings(ws.root / "extract", page).items()}
+    if listing_figures:
+        prompt += "\n以下原页图题紧接在带行号的代码后。每条保留为单独的 figure 块，照录图号和题注：\n" + "\n".join(
+            f"p.{page} {caption}" for (page, _), caption in listing_figures.items())
     text = engines.run(cfg, prompt if read else instructions.apply(prompt, cfg), ws.root, images, cancel, meter)
     try:
         data = engines.parse_json(text)
@@ -180,6 +188,12 @@ def _one_batch(ws: Workspace, cfg: dict, batch: list[int], total_pages: int, can
         (failed / f"failed-{batch[0]:03d}-{uuid.uuid4().hex}.txt").write_text(text, encoding="utf-8")
         raise
     data = _normalize(data, batch, _taken(ws, batch))
+    if listing_figures:
+        present = {(b["page"], numbered_listings.figure_number(b.get("caption_en")) or str(b.get("num")))
+                   for b in data["blocks"] if b["type"] == "figure" and b.get("caption_en")}
+        missing = [f"p.{page} Fig. {num}" for page, num in listing_figures if (page, num) not in present]
+        if missing:
+            raise engines.EngineError(tr("模型遗漏了原页图块：{ids}", ids=", ".join(missing)))
     expected_notes = footnotes.expected(ws, data["blocks"])
 
     def validate(candidate):
@@ -264,6 +278,9 @@ def _batches(pages: list[int], size: int, en_pages: set[int]) -> list[list[int]]
 def translate_pages(ws: Workspace, cfg: dict, pages: list[int], cancel, report, meter=None, read=False) -> dict[int, str]:
     """翻译给定的页（已完成的页会重译并替换；只读原文整理过的页就地补译文）。report(done, total, message)；
     meter 收集 token 用量。read：只读原文，把页整理成块但不翻译。返回没做成的页 {页码: 原因}。"""
+    if (ws.load("paper") or {}).get("meta", {}).get("source_type") == "web":
+        from ..weblog.translation import translate_pages as translate_web
+        return translate_web(ws, cfg, pages, cancel, report, meter, read)
     if cancel.is_set():
         raise engines.Cancelled()
     blank = blank_pages.find(ws, pages, cancel)
@@ -340,9 +357,15 @@ def translate_pages(ws: Workspace, cfg: dict, pages: list[int], cancel, report, 
             wait = p in job_pages and p not in state["ok"]  # 上一页这次也要译、还没做成：返回空时现在核对不了续文
         say()
         err, todo = None, batch
+        stage_single_page = False
         for attempt in range(2):
             try:
-                if todo[0] in en_pages:
+                if stage_single_page:
+                    _one_batch(ws, cfg, todo, total_pages, cancel, say, meter, True, skip_head, peek, front)
+                    if cancel.is_set():
+                        raise engines.Cancelled()
+                    _fill_batch(ws, cfg, todo, cancel, say, meter, wait)
+                elif todo[0] in en_pages:
                     _fill_batch(ws, cfg, todo, cancel, say, meter, wait)
                 elif todo is batch:
                     _one_batch(ws, cfg, batch, total_pages, cancel, say, meter, read, skip_head, peek, front, wait)
@@ -364,7 +387,7 @@ def translate_pages(ws: Workspace, cfg: dict, pages: list[int], cancel, report, 
                     state["ok"].update(n for n in batch if n not in e.pages)
                     # 核对不上时再译一次（相当于失败重试，只是挪到最后）：那时上一页已经译完，不用再跳过页首续文
                     # 补译文的页不用：没有块要译，只等所属段落有译文
-                    retry = None if batch[0] in en_pages else (
+                    retry = None if stage_single_page or batch[0] in en_pages else (
                         lambda: _one_batch(ws, cfg, batch, total_pages, cancel, say, meter, read, False, [q] if owner else [], False))
                     state["later"].append((e, retry))
                 journal(ws, tr("{pages} 没有新内容，等上一页译完再核对是不是上一段的续文", pages=label(e.pages)))
@@ -372,6 +395,19 @@ def translate_pages(ws: Workspace, cfg: dict, pages: list[int], cancel, report, 
                 break
             except engines.Cancelled:
                 raise
+            except engines.OutputLimitReached as e:
+                err = (tr("模型输出被截断了（超过它的输出长度上限）。在设置里把“每次交给模型的页数”调成 1 页再试。")
+                       if len(todo) > 1 else str(e))
+                journal(ws, tr("{pages} 失败：{err}", pages=label(todo), err=err))
+                if cancel.is_set():
+                    raise engines.Cancelled()
+                if attempt or read or len(todo) != 1 or todo[0] in had or todo[0] in en_pages:
+                    break
+                # Only stage a fresh page. A failed retranslation must preserve the reader's existing blocks.
+                if any(b.get("page") == todo[0] for b in ws.load("paper").get("blocks", [])):
+                    break
+                stage_single_page = True
+                say(tr("单页输出达到上限，正在分开整理原文和翻译"))
             except Exception as e:  # noqa: BLE001
                 err = str(e) if isinstance(e, engines.EngineError) else f"{type(e).__name__}: {e}"
                 journal(ws, tr("{pages} 第 {n} 次失败：{err}", pages=label(todo), n=attempt + 1, err=err[:500]))

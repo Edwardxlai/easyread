@@ -2,15 +2,18 @@ name: Build desktop releases
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - "v*"
+    inputs:
+      candidate_run:
+        description: "Leave empty on main to build. On the release tag, enter the accepted build run ID to publish."
+        required: false
+        type: string
 
 permissions:
   contents: read
 
 jobs:
   build:
+    if: inputs.candidate_run == '' && github.ref == 'refs/heads/main'
     name: Build ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -39,10 +42,8 @@ jobs:
         run: python -m pip install --upgrade pip pyinstaller .
       - name: Install JavaScript dependencies
         run: npm ci
-      - name: Use the tag as the app version
-        if: startsWith(github.ref, 'refs/tags/v')
-        shell: bash
-        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
+      - name: Check candidate version
+        run: python -c "import json,tomllib,easyread; v=json.load(open('package.json'))['version']; assert v == easyread.__version__ == tomllib.load(open('pyproject.toml','rb'))['project']['version']"
       - name: Build and package
         run: npm run dist
         env:
@@ -60,12 +61,20 @@ jobs:
           need="$(objdump -T "$lib" | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1)"
           echo "$lib needs $need"
           [ "$(printf '%s\n' "$need" GLIBC_2.35 | sort -V | tail -1)" = GLIBC_2.35 ] || { echo "::error::libpython needs $need, newer than Ubuntu 22.04"; exit 1; }
+      - name: Record installer digests
+        env:
+          PLATFORM: ${{ matrix.name }}
+        shell: bash
+        run: |
+          version=$(node -p 'require("./package.json").version')
+          python scripts/release_candidate.py record dist/electron --platform "$PLATFORM" --sha "$GITHUB_SHA" --version "$version"
       - name: Upload installer artifacts
         uses: actions/upload-artifact@v4
         with:
           name: easyread-${{ matrix.name }}
           # 只要安装包本身；dist/electron 里还有解包后的程序目录（Mac 的 .app 里有上百个文件）
           path: |
+            dist/electron/candidate.json
             dist/electron/*.exe
             dist/electron/*.dmg
             dist/electron/*.zip
@@ -75,25 +84,53 @@ jobs:
           if-no-files-found: error
 
   release:
-    name: Attach installers to GitHub Release
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
+    name: Publish the accepted candidate
+    if: inputs.candidate_run != '' && startsWith(github.ref, 'refs/tags/v')
+    concurrency: release-${{ github.ref }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: read
     steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify selected build
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.candidate_run }}
+        run: |
+          [[ "$RUN_ID" =~ ^[0-9]+$ ]]
+          sha=$(git rev-parse HEAD)
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" | jq -e --arg sha "$sha" '
+            .head_sha == $sha and .head_branch == "main" and .event == "workflow_dispatch"
+            and .path == ".github/workflows/release.yml" and .conclusion == "success"'
+          test "v$(node -p 'require("./package.json").version')" = "$GITHUB_REF_NAME"
+          gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft | grep -x true
       - name: Download installers
         uses: actions/download-artifact@v4
         with:
           path: release-assets
+          pattern: easyread-*
+          run-id: ${{ inputs.candidate_run }}
+          github-token: ${{ github.token }}
+      - name: Verify package and updater digests
+        run: |
+          python3 -m pip install --target "$RUNNER_TEMP/candidate-libs" PyYAML==6.0.2
+          PYTHONPATH="$RUNNER_TEMP/candidate-libs" python3 scripts/release_candidate.py verify release-assets --sha "$(git rev-parse HEAD)" --version "${GITHUB_REF_NAME#v}"
       - name: Publish installers
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            release-assets/**/*.exe
-            release-assets/**/*.dmg
-            release-assets/**/*.zip
-            release-assets/**/*.AppImage
-            release-assets/**/*.blockmap
-            release-assets/**/latest*.yml
-          generate_release_notes: false  # 发版说明手写，只往已有的 Release 上挂安装包
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          files=()
+          for asset in release-assets/easyread-*/*; do
+            [[ "${asset##*/}" == candidate.json ]] || files+=("$asset")
+          done
+          gh release upload "$GITHUB_REF_NAME" "${files[@]}" --clobber
+          gh release edit "$GITHUB_REF_NAME" --draft=false
+
+  invalid-input:
+    if: (inputs.candidate_run == '' && github.ref != 'refs/heads/main') || (inputs.candidate_run != '' && !startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo 'Build on main, or promote a candidate run on its release tag.' >&2; exit 1

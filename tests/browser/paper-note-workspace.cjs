@@ -6,9 +6,15 @@ async page => {
   const rich = panel.getByRole('textbox', { name: '论文笔记富文本', exact: true });
   const menu = page.getByRole('dialog', { name: '更多工具', exact: true });
   const open = async () => {
-    if (!await page.locator('body').evaluate(el => el.classList.contains('np-open'))) await page.getByRole('button', { name: '笔记', exact: true }).click();
+    if (!await panel.isVisible()) {
+      if (!await page.locator('#readerDock').isVisible()) await page.locator('[data-act=dock]').click();
+      await page.locator('.dock-group:visible .dock-add').first().click();
+      await page.locator('.dock-menu:popover-open [data-open=notes]').click();
+    }
     await page.locator('[data-np=paper]').click();
     await panel.locator('[data-note-mode=rich]').click();
+    if (!await panel.evaluate(el => el.classList.contains('pn-expanded'))) await panel.locator('[data-note-expand]').click();
+    await panel.locator('[data-note-focus=both]').click();
   };
   const saved = async body => {
     await page.waitForFunction(value => window.PR.state.reader.paper_note.body === value, body);
@@ -28,11 +34,8 @@ async page => {
   await open();
   const original = await source.inputValue();
   const originalZoom = await page.evaluate(() => window.PR.ls.get('easyread-note-zoom', 100));
-  const originalMap = await panel.locator('[data-note-map-toggle]').getAttribute('aria-expanded');
   const cdp = await page.context().newCDPSession(page);
   try {
-    const toggleBeforeTyping = panel.locator('[data-note-map-toggle]');
-    if (await toggleBeforeTyping.getAttribute('aria-expanded') === 'false') await toggleBeforeTyping.click();
     await setBody('输入测试：');
     await rich.click(); await rich.press('ControlOrMeta+End');
     await source.dispatchEvent('input');
@@ -67,8 +70,6 @@ async page => {
     await page.reload(); await open();
     check(await rich.locator('img').count() === 3, 'Images were lost after reload');
     check(await rich.evaluate(el => getComputedStyle(el).zoom) === '1.5', 'Zoom was lost after reload');
-    const toggle = panel.locator('[data-note-map-toggle]');
-    if (await toggle.getAttribute('aria-expanded') === 'false') await toggle.click();
     await page.waitForFunction(() => [...document.querySelectorAll('.pn-map-svg img')].filter(img => img.naturalWidth > 0).length === 3);
     await panel.getByRole('button', { name: '更多工具', exact: true }).click();
     for (const name of ['插入图片', '插入表格', '笔记缩放']) check(await menu.getByRole('button', { name, exact: true }).locator('svg.tiptap-button-icon').count() === 1, `Missing icon: ${name}`);
@@ -78,8 +79,7 @@ async page => {
     if (await menu.isVisible()) await page.keyboard.press('Escape');
     await setBody(original);
     await setZoom(originalZoom);
-    const toggle = panel.locator('[data-note-map-toggle]');
-    if (await toggle.getAttribute('aria-expanded') !== originalMap) await toggle.click();
+    if (await panel.evaluate(el => el.classList.contains('pn-expanded'))) await panel.locator('[data-note-expand]').click();
     await cdp.detach();
   }
 }

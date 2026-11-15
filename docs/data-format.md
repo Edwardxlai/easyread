@@ -36,7 +36,7 @@
 | `para` | `zh`、`en`、`role`、`num`、`cont` | 段落。`role: "abstract"` 用摘要样式；`role: "footnote"` 是脚注，`role: "listing"`/`"algorithm"` 是带编号的代码清单/算法，`num` 是它们的原编号；`cont: true` 表示接着公式的半句（如 “其中 …”） |
 | `list` | `ordered`、`items: [{zh, en}]` | 列表 |
 | `math` | `tex`、`tag` | 行间公式。`tag` 是原文编号（"1"），无编号不写。多行用 `aligned` / `gathered` |
-| `table` | `num`、`head: [[…]]`、`rows: [[…]]`、`align`、`caption_zh`、`caption_en`、`caption_pos` | 表格。单元格支持行内标记，`\n` 换行（第二行括号内容自动变灰，适合“均值\n(标准误)”）。`align` 如 "lrrr" |
+| `table` | `num`、`head: [[…]]`、`rows: [[…]]`、`align`、`caption_zh`、`caption_en`、`caption_pos` | 表格。单元格支持行内标记，`\n` 换行（第二行括号内容自动变灰，适合“均值\n(标准误)”）。第一列行标签每层缩进用两个前导空格。`align` 如 "lrrr" |
 | `figure` | `num`、`src`、`box`、`image_en`、`image_zh`、`caption_zh`、`caption_en` | 图。`src` 是论文目录下的图片（如 `figures/crop-4-….webp`），留空时页面显示“图见原文第 N 页”。`box`、`image_*` 见下文“图：裁图和图内文字” |
 | `references` | `zh`、`en` | 放参考文献列表的位置（内容取 `references`） |
 | `note` | `zh` | 正文流里的“阅读批注（非原文）”。尽量不用，解释放 discussion.json |
@@ -138,6 +138,8 @@ JSON 里 TeX 的反斜杠要写两个（`\\frac`）。`\f` `\b` `\t` `\n` `\r` �
 一篇论文可以有多个对话。`note` 不为空时，这次是在回答页边那条笔记里的问题，回答同时写进 discussion.json（`reply_to` 那条笔记，`live: true`）。“放到页边”把一条回答写成 discussion.json 里的 `qa` 条目。提问时会把读者的全部标记（按颜色分组）一起交给模型。
 
 ## 数据目录里的其他文件
+
+全库问答的段落索引仅保存在服务进程内。下一次查询按当前有效文献列表和 `paper.json`、`reader.json` 的版本重用或重建段落，移入回收站的文献会移出索引。每次问答的段数和模型报告的输入、输出 token 记在服务日志里。
 
 | 文件 | 内容 |
 |---|---|

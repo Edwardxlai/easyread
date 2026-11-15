@@ -21,7 +21,7 @@ _BARE_TEX = re.compile(
     r"alpha|beta|gamma|delta|epsilon|varepsilon|zeta|eta|theta|vartheta|"
     r"iota|kappa|lambda|mu|nu|xi|pi|rho|sigma|tau|upsilon|phi|varphi|chi|psi|omega|"
     r"Gamma|Delta|Theta|Lambda|Xi|Pi|Sigma|Upsilon|Phi|Psi|Omega|"
-    r"mathbb|mathcal|mathbf|mathrm|mathit|operatorname|boldsymbol|"
+    r"mathbb|mathcal|mathbf|mathrm|mathit|operatorname|boldsymbol|textbf(?=\{)|q?quad(?=\s|$)|"
     r"left|right|begin|end|hat|widehat|bar|overline|vec|dot|ddot|"
     r"infty|partial|nabla|times|cdot|leq|geq|neq|approx|in|notin|subset|subseteq)(?![A-Za-z/\\])"
     r"|(?<![A-Za-z0-9_\\/:])[A-Za-z][_\^]\{[^{}\n]+\}"
@@ -87,7 +87,10 @@ def block_problems(blocks: list[dict], refs: set[str] | None = None) -> tuple[li
             if len(re.findall(r"(?<!\\)\$(?![0-9])", outside)) % 2:
                 problems.append(f"{bid}：$ 不成对")  # i18n-ok
             bare = _BARE_TEX.search(outside)
-            if bare:
+            if bare and bare.group() in (r"\textbf", r"\quad", r"\qquad") and (
+                    b.get("type") == "list" or b.get("role") == "algorithm"):
+                problems.append(f"{bid}：伪代码排版命令 {bare.group()} 出现在正文里，请在原块逐行保留关键字、缩进和已有公式，用可读的文字或 Markdown 表示粗体，不要用 TeX 命令模拟缩进")  # i18n-ok
+            elif bare:
                 problems.append(f"{bid}：公式定界符外出现 TeX（{bare.group()[:60]}），请把完整行内公式放进 $TeX$，独立公式用 math 块；保留公式内容，不要把整句正文包进去")  # i18n-ok
             tex += _math_items(bid, t)
             if refs:
