@@ -352,9 +352,15 @@ def translate_pages(ws: Workspace, cfg: dict, pages: list[int], cancel, report, 
             wait = p in job_pages and p not in state["ok"]  # 上一页这次也要译、还没做成：返回空时现在核对不了续文
         say()
         err, todo = None, batch
+        stage_single_page = False
         for attempt in range(2):
             try:
-                if todo[0] in en_pages:
+                if stage_single_page:
+                    _one_batch(ws, cfg, todo, total_pages, cancel, say, meter, True, skip_head, peek, front)
+                    if cancel.is_set():
+                        raise engines.Cancelled()
+                    _fill_batch(ws, cfg, todo, cancel, say, meter, wait)
+                elif todo[0] in en_pages:
                     _fill_batch(ws, cfg, todo, cancel, say, meter, wait)
                 elif todo is batch:
                     _one_batch(ws, cfg, batch, total_pages, cancel, say, meter, read, skip_head, peek, front, wait)
@@ -376,7 +382,7 @@ def translate_pages(ws: Workspace, cfg: dict, pages: list[int], cancel, report, 
                     state["ok"].update(n for n in batch if n not in e.pages)
                     # 核对不上时再译一次（相当于失败重试，只是挪到最后）：那时上一页已经译完，不用再跳过页首续文
                     # 补译文的页不用：没有块要译，只等所属段落有译文
-                    retry = None if batch[0] in en_pages else (
+                    retry = None if stage_single_page or batch[0] in en_pages else (
                         lambda: _one_batch(ws, cfg, batch, total_pages, cancel, say, meter, read, False, [q] if owner else [], False))
                     state["later"].append((e, retry))
                 journal(ws, tr("{pages} 没有新内容，等上一页译完再核对是不是上一段的续文", pages=label(e.pages)))
@@ -384,6 +390,19 @@ def translate_pages(ws: Workspace, cfg: dict, pages: list[int], cancel, report, 
                 break
             except engines.Cancelled:
                 raise
+            except engines.OutputLimitReached as e:
+                err = (tr("模型输出被截断了（超过它的输出长度上限）。在设置里把“每次交给模型的页数”调成 1 页再试。")
+                       if len(todo) > 1 else str(e))
+                journal(ws, tr("{pages} 失败：{err}", pages=label(todo), err=err))
+                if cancel.is_set():
+                    raise engines.Cancelled()
+                if attempt or read or len(todo) != 1 or todo[0] in had or todo[0] in en_pages:
+                    break
+                # Only stage a fresh page. A failed retranslation must preserve the reader's existing blocks.
+                if any(b.get("page") == todo[0] for b in ws.load("paper").get("blocks", [])):
+                    break
+                stage_single_page = True
+                say(tr("单页输出达到上限，正在分开整理原文和翻译"))
             except Exception as e:  # noqa: BLE001
                 err = str(e) if isinstance(e, engines.EngineError) else f"{type(e).__name__}: {e}"
                 journal(ws, tr("{pages} 第 {n} 次失败：{err}", pages=label(todo), n=attempt + 1, err=err[:500]))

@@ -792,6 +792,8 @@
   "模型输出的 JSON 格式有错（{err}），会自动重试": "Model output has invalid JSON ({err}); retrying automatically",
   "模型输出的格式不对（缺 zh）": "Model output is malformed (missing zh)",
   "模型输出被截断了（超过它的输出长度上限）。在设置里把“每次交给模型的页数”调成 1 页再试。": "Model output was cut off (it hit the output length limit). Set “Pages per model call” to 1 in Settings and try again.",
+  "模型输出被截断了。请提高服务商的单次输出上限，或改用支持更长输出的模型。": "The model hit its output limit. Increase the output limit on the provider or switch to a model that supports longer responses.",
+  "单页输出达到上限，正在分开整理原文和翻译": "This page hit the output limit. Preparing the original text and its translation separately.",
   "模型输出被服务商的内容过滤器中断了。": "Model output was stopped by the provider's content filter.",
   "模型输出里没有 JSON：{out}": "No JSON in model output: {out}",
   "正在回答": "Answering",
