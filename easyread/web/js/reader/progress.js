@@ -124,6 +124,9 @@
       const to = target(p);
       if (to != null && to > 0 && Math.abs(to - scrollY) > 2) window.scrollTo({ top: to, behavior: "auto" });
     };
+    // The saved paragraph is already mounted. Reveal it on the first frame
+    // while later font and image changes still correct its position.
+    if (paper?.querySelector("[data-paper-chunk]")) requestAnimationFrame(() => { land(); show(); });
     if (paper) paper.classList.add("landing");
     window.scrollTo({ top: at, behavior: "auto" });
     userInput.forEach((n) => window.addEventListener(n, stop, { passive: true }));

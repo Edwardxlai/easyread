@@ -69,6 +69,7 @@
     else input.blur();
   }
   function open() {
+    PR.finishPaperChunks?.();
     if (panel.hidden) returnFocus = document.activeElement;
     panel.hidden = false; search(); input.focus(); input.select();
   }

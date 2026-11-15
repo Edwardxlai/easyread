@@ -284,6 +284,7 @@
 
   /* opts：noBack 不记返回点；instant 不要动画；noFlash 不闪 */
   PR.jumpTo = function (domId, opts) {
+    if (!document.getElementById(domId)) PR.finishPaperChunks?.();
     const el = (domId.startsWith("b-") && PR.webBlockHost?.(domId.slice(2))) || document.getElementById(domId);
     if (!el) return;
     opts = opts || {};
