@@ -34,6 +34,10 @@ jobs:
           "$RUNNER_TEMP/reader-check/node_modules/.bin/playwright" install --with-deps chromium
       - name: Open library, quote a passage, return to source and reload
         run: PLAYWRIGHT="$RUNNER_TEMP/reader-check/node_modules/playwright" node tests/browser/fixture-smoke.cjs
+      - name: Reopen exported web annotations with missing resources offline
+        run: |
+          python -m pip install playwright==1.65.2
+          python -m tests.e2e_web_offline
 
   test:
     strategy:

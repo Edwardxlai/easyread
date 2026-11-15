@@ -2,7 +2,7 @@
 (function (PR) {
   "use strict";
   const dock = PR.$("#readerDock"), toggle = PR.$('[data-act="dock"]');
-  const names = { pages: "PDF", gallery: "图表", notes: "笔记", map: "思维导图", chat: "问 AI" };
+  const names = { pages: "PDF", gallery: PR.t("图表"), notes: PR.t("笔记"), map: PR.t("思维导图"), chat: PR.t("问 AI") };
   const isResource = key => key === "map" || key === "gallery" || key.startsWith("fig:");
   const views = new Map([["pages", PR.$("#pageview")], ["notes", PR.$("#notespanel")], ["chat", PR.$("#chatpanel")]]);
   const MIME = "application/x-easyread-panel", MEDIA = "application/x-easyread-media";
@@ -31,7 +31,7 @@
     (key !== "chat" || (PR.feature("chat") && PR.chatView?.()));
   function title(key) {
     const block = PR.blockById?.[key.slice(4)];
-    return key.startsWith("fig:") ? (block ? PR.media.label(block) : PR.t("图表")) : PR.t(names[key]);
+    return key.startsWith("fig:") ? (block ? PR.media.label(block) : PR.t("图表")) : names[key];
   }
   function forget(group, key) {
     const at = group.tabs.indexOf(key);
