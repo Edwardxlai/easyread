@@ -13,6 +13,9 @@
   function titleFields(i) {
     const tr = '<div class="%c" contenteditable="plaintext-only" data-meta="title_zh" lang="' + (i.target || "zh") + '" spellcheck="false">' + PR.esc(i.title_zh || "") + "</div>";
     const en = '<div class="%c" contenteditable="plaintext-only" data-meta="title_en" lang="en" spellcheck="false">' + PR.esc(i.title_en || "") + "</div>";
+    if (i.display_title) {
+      return '<div class="title-main" contenteditable="plaintext-only" data-meta="display_title" spellcheck="false">' + PR.esc(i.display_title) + "</div>" + tr.replace("%c", "title-sub") + en.replace("%c", "title-sub");
+    }
     return PR.titles(i).main === i.title_zh && i.title_zh ? tr.replace("%c", "title-main") + en.replace("%c", "title-sub") : en.replace("%c", "title-main") + tr.replace("%c", "title-sub");
   }
 

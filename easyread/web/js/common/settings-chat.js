@@ -24,28 +24,6 @@
   }
   const transIndex = (s) => s.chat.models.findIndex((m) => sameAsTranslation(s, m));
 
-  /* 以前的“跟随默认”卡片（模型空着）钉到具体模型；钉完和别的卡片一样的就合成一张 */
-  function pinDefaults(s) {
-    if (s.pinned || !s.models || !s.chat) return;
-    s.pinned = true;
-    const c = s.cfg;
-    if (c.engine === "claude" || c.engine === "codex") c[c.engine].model = PR.cliPin(s, c.engine, c[c.engine].model);
-    const list = s.chat.models, seen = {};
-    for (let i = 0; i < list.length; i++) {
-      const m = list[i];
-      if (m.engine === "claude" || m.engine === "codex") {
-        const was = m.model || "";
-        m.model = PR.cliPin(s, m.engine, was);
-        if (!was && m.model) { const n = autoName(s, { kind: m.engine, model: m.model }); m.name = m.label = n; m.detail = m.model; }
-      }
-      const key = [m.engine, m.model, m.preset || "", m.base_url || "", m.reasoning_effort || "", m.service_tier || ""].join("|");
-      if (seen[key]) {
-        if (s.chat.default === m.id) s.chat.default = seen[key].id;
-        list.splice(i--, 1);
-      } else seen[key] = m;
-    }
-  }
-
   /* 翻译现在用的模型不在名单里（以前分两页设的）：给它补一张卡片 */
   function ensureTranslationCard(s) {
     if (s.transChecked || !s.chat) return;
@@ -76,44 +54,68 @@
     c[m.engine].service_tier = m.service_tier || "";
   }
 
-  /* ---------- 卡片 ---------- */
-  function cardsHtml(s) {
-    const list = s.chat.models, ti = transIndex(s);
-    return '<div class="engine-cards mc-cards">' + list.map((m, i) => {
-      const def = s.chat.default === m.id, tr = i === ti;
-      const tags = (tr ? '<span class="badge ok">' + PR.t("翻译") + "</span>" : "") + (def ? '<span class="badge ok">' + PR.t("问 AI 默认") + "</span>" : "");
-      const bad = m.ready === false ? '<span class="badge bad" title="' + PR.esc(m.hint || "") + '">' + PR.esc(m.engine === "openai" ? PR.t("未填 API Key") : PR.t("还不能用")) + "</span>" : "";
-      return '<div class="mc' + (tr || def ? " on" : "") + (s.editing === m.id ? " editing" : "") + (m.ready === false ? " off" : "") + '" data-cm="more" data-i="' + i + '" draggable="true" role="button" tabindex="0" title="' + PR.t("点一下设置，拖动排序") + '">' +
-        '<span class="mc-more">' + PR.icon("more", "sm") + "</span>" +
-        "<b>" + PR.esc(m.label || m.name) + "</b>" + PR.esc(m.source || "") +
-        (tags || bad ? '<span class="mc-tags">' + tags + bad + "</span>" : "") + "</div>";
-    }).join("") +
-      '</div><button class="model-add" data-cm="add">' + PR.icon("plus", "sm") + PR.t("添加模型") + '</button>';
+  function roleButton(i, action, active, label, hint) {
+    return '<button type="button" class="model-role" data-cm="' + action + '" data-i="' + i +
+      '" aria-pressed="' + active + '" title="' + PR.esc(hint) + '">' +
+      (active ? PR.icon("check", "sm") : "") + PR.esc(label) + '</button>';
   }
 
-  /* ---------- 添加 / 修改的表单 ---------- */
+  function assignRole(s, m, action) {
+    readTranslation(s);
+    if (action === "translate") useForTranslation(s, m);
+    else s.chat.default = m.id;
+    PR.saveModelSettings();
+  }
+
+  function cardsHtml(s) {
+    const list = s.chat.models, ti = transIndex(s);
+    const rows = list.map((m, i) => {
+      const follows = !m.model && PR.isCli(m.engine);
+      const primary = follows ? (PR.modelDefault(s, m.engine) || m.source || PR.cliName(m.engine))
+        : s.models && m.engine === "claude" ? autoName(s, {kind: m.engine, model: m.model}) : m.label || m.name;
+      const detail = follows ? [primary !== m.source ? m.source : "", PR.modelDefault(s, m.engine) ? PR.t("跟随默认") : PR.modelDefaultLabelText(s, m.engine)].filter(Boolean).join(" · ") :
+        [m.source, m.model && m.model !== primary ? m.model : ""].filter(Boolean).join(" · ");
+      const menu = ' data-cm="more" data-i="' + i + '" aria-haspopup="menu"';
+      const status = m.ready === false ? '<small class="bad">' + PR.t("不可用") + '</small>' : '';
+      return '<div class="mc model-entry" draggable="true" data-i="' + i + '">' +
+        '<button type="button" class="model-identity"' + menu + '><b>' + PR.esc(primary) + '</b><small>' + PR.esc(detail) + '</small>' + status + '</button>' +
+        '<div class="model-roles">' + roleButton(i, "translate", i === ti, PR.t("默认翻译"), PR.t("设为翻译")) +
+        roleButton(i, "chat-default", m.id === s.chat.default, PR.t("问 AI 默认"), PR.t("设为问 AI")) + '</div>' +
+        '<button type="button" class="btn icon" aria-label="' + PR.esc(PR.t("管理模型") + ' · ' + primary) + '"' + menu + '>' + PR.icon("more", "sm") + '</button></div>';
+    });
+    return '<div class="model-heading"><h4 class="set-h">' + PR.t("已配置的模型") + '</h4><button class="btn sm line" data-cm="add">' +
+      PR.icon("plus", "sm") + PR.t("添加模型") + '</button></div><div class="mc-cards model-list">' + rows.join("") + '</div>';
+  }
+
   function formHtml(s) {
-    const f = s.form;
-    const card = (k, title) => '<button data-cmk="' + k + '" class="' + (f.kind === k ? "on" : "") + '"><b>' + title + "</b></button>";
-    let h = '<div class="mc-form"><h4 class="set-h">' + (s.editing === "new" ? PR.t("添加模型") : PR.t("修改")) + "</h4>" +
-      '<div class="engine-cards small">' + card("claude", "Claude Code") + card("codex", "Codex CLI") +
-      Object.keys(PR.agentClis).map((k) => card(k, PR.agentClis[k].name)).join("") + card("api", PR.t("API 接口")) + "</div>";
-    if (PR.isAgentCli(f.kind)) {  // 没有现成的模型名单：自己填，空着用 CLI 自己的默认
-      const found = (s.found || {})[f.kind], a = PR.agentClis[f.kind];
-      h += (a.defaultOnly ? '<p class="hint">' + PR.t("跟随 ZCode 中选择的模型") + '</p>' :
-        '<label class="field"><span>' + PR.t("模型") + '</span><input class="input" id="cmModel" value="' + PR.esc(f.model || "") + '" placeholder="' + PR.t("留空用它自己的默认模型") + '"></label>') +
-        (found && !found.found ? '<p class="hint">' + PR.t("本机没找到 {name}", { name: '<a href="' + a.url + '" target="_blank" rel="noopener">' + a.name + "</a>" }) + "</p>" : "");
-      if (a.hint) h += '<p class="hint">' + PR.esc(a.hint) + ' · <a href="' + a.url + '" target="_blank" rel="noopener">' + PR.esc(a.setup) + " ↗</a></p>";
-    } else if (f.kind === "claude" || f.kind === "codex") {
-      const found = (s.found || {})[f.kind];
-      h += '<label class="field"><span>' + PR.t("模型") + "</span>" + PR.cliModelSelect(s, f.kind, f.model, 'id="cmModel"') + "</label>" +
-        (found && !found.found ? '<p class="hint">' + PR.t("本机没找到 {name}", { name: f.kind === "claude" ? '<a href="https://docs.claude.com/en/docs/claude-code/setup" target="_blank" rel="noopener">Claude Code</a>' : "Codex CLI" }) + "</p>" : "");
-    } else {
-      h += PR.apiForm.html(s, f, { keyProp: "key", vision: false });
+    const f = s.form, sources = s.sources || [], installed = sources.filter(cli => cli.installed);
+    const missing = sources.filter(cli => !cli.installed && cli.install_url);
+    const options = installed.map(cli => [cli.id, cli.name]);
+    if (f.kind !== "api" && !installed.some(cli => cli.id === f.kind)) {
+      options.push([f.kind, PR.cliName(f.kind) + " · " + PR.t("未检测到")]);
     }
-    h += PR.modelReasoningFields(s, f);
-    return h + '<div class="cm-form-acts"><span class="grow"></span>' +
-      '<button class="btn sm" data-cm="cancel">' + (s.editing === "new" ? PR.t("取消") : PR.t("关闭")) + '</button>' + (s.editing === "new" ? '<button class="btn sm accent" data-cm="ok">' + PR.t("添加") + "</button>" : "") + "</div></div>";
+    options.push(["api", PR.t("API 接口")]);
+    const status = s.scanError ? PR.t("检测失败，请重试") : !s.sources ? PR.t("检测中…") :
+      !installed.length ? PR.t("未检测到本机 CLI") : "";
+    const guides = missing.length ? '<details class="model-guides"' + (!installed.length ? ' open' : '') + '><summary>' +
+      PR.t("安装 CLI") + '</summary><div>' + missing.map(cli => '<a href="' + PR.esc(cli.install_url) +
+        '" target="_blank" rel="noopener">' + PR.esc(cli.name) + ' ↗</a>').join("") + '</div></details>' : "";
+    const source = '<label class="field"><span>' + PR.t("模型来源") + '</span><select class="input" data-model-source>' +
+      PR.opt(options, f.kind) + '</select></label>';
+    let modelField = "";
+    if (PR.isAgentCli(f.kind)) {
+      const provider = PR.agentClis[f.kind];
+      modelField = provider.defaultOnly ? '<div class="field"><span>' + PR.t("模型") + '</span>' + PR.modelDefaultLabelText(s, f.kind) + '</div>' :
+        '<label class="field"><span>' + PR.t("模型 ID") + '</span><input class="input" id="cmModel" value="' + PR.esc(f.model || "") +
+        '" placeholder="' + (f.kind === "opencode" ? "provider/model" : PR.esc(PR.modelDefaultLabelText(s, f.kind))) + '"></label>';
+    } else if (!isApi(f.kind)) {
+      modelField = '<label class="field"><span>' + PR.t("模型") + '</span>' + PR.cliModelSelect(s, f.kind, f.model, 'id="cmModel"') + '</label>';
+    }
+    const fields = '<div class="model-fields">' + source + modelField + '</div>' +
+      (isApi(f.kind) ? PR.apiForm.html(s, f, {keyProp: "key", vision: false}) : "") + PR.modelReasoningFields(s, f);
+    return '<section class="model-editor"><div class="model-heading"><h3>' + (s.editing === "new" ? PR.t("添加模型") : PR.t("编辑模型")) +
+      '</h3><button class="linkish" data-rescan>' + PR.t("重新检测") + '</button></div>' +
+      (status ? '<p class="hint" role="status">' + status + '</p>' : "") + fields + guides + '</section>';
   }
   function autoName(s, f) {
     if (PR.isAgentCli(f.kind)) return f.model || PR.agentClis[f.kind].name;
@@ -150,6 +152,12 @@
     s.form = m ? { kind: kindOf(m), model: m.model || "", preset: m.preset || "", base_url: m.base_url || (p ? p.base_url : ""), api: m.api || (p && p.api) || "chat", vision: false,
       name: "", key: "" }
       : { kind: "claude", model: "opus", preset: "", base_url: "", api: "", name: "", key: "" };
+    if (!m) {
+      const cli = (s.sources || []).find(source => source.installed);
+      s.form.kind = cli ? cli.id : "api";
+      s.form.model = "";
+      if (!cli) PR.apiForm.pick(s, s.form, s.cfg.openai.preset || "deepseek", "key");
+    }
     s.form.connection_name = m && !m.preset ? (PR.customApis.find(s, m.base_url) || {}).name || "" : "";
     s.fetchMsg = null; s.apiTyping = false;
     s.form.reasoning_effort = m && m.reasoning_effort || "";
@@ -163,7 +171,7 @@
   function readTranslation(s) {
     PR.$$("[data-k]", root()).forEach((el) => {
       const [a, b] = el.dataset.k.split(".");
-      const v = el.type === "checkbox" ? el.checked : el.value;
+      const v = el.type === "checkbox" ? el.checked : el.dataset.k === "openai.vision" ? el.value === "images" : el.value;
       if (b) (s.cfg[a] ||= {})[b] = v; else s.cfg[a] = ["batch_pages", "concurrency", "paper_concurrency", "page_cap"].includes(a) ? +v : v;
     });
   }
@@ -194,13 +202,34 @@
   T.chat = {
     render(s) {
       if (!s.chat) return '<p class="hint">' + PR.t("读不到模型名单。") + "</p>";
-      pinDefaults(s);
       ensureTranslationCard(s);
-      return cardsHtml(s) + (s.editing ? formHtml(s) : "") +
+      if (s.editing) return formHtml(s);
+      return cardsHtml(s) +
         '<div class="settings-sec">' + translationHtml(s) + "</div>";
     },
     sync(s) { readForm(s); readTranslation(s); },
     change(e, s) {
+      if (e.target.matches("[data-figure-output]")) {
+        readTranslation(s);
+        s.cfg.translate_figure_text = e.target.value !== "original";
+        (s.cfg.figure_images ||= {}).enabled = e.target.value === "image";
+        PR.saveModelSettings();
+        return true;
+      }
+      const source = e.target.matches("[data-model-source]") && e.target;
+      if (source && s.form) {
+        readForm(s);
+        const f = s.form, kind = source.value;
+        if (kind === f.kind) return false;
+        Object.assign(f, { kind, model: "", name: "", key: "", base_url: "", api: "", reasoning_effort: "", service_tier: "" });
+        s.fetchMsg = null; s.apiTyping = false;
+        if (isApi(kind)) {  // 先给一家：翻译那边用的 API，没有就 DeepSeek
+          const o = s.cfg.openai;
+          PR.apiForm.pick(s, f, s.cfg.engine === "openai" && o.preset ? o.preset : "deepseek", "key");
+        }
+        autoSaveForm(s);
+        return true;
+      }
       if (e.target.matches("[data-custom-connection]") && s.form) {
         PR.customApis.select(s, s.form, e.target.value, "key");
         return true;
@@ -212,7 +241,7 @@
           const key = PR.$('[data-k="figure_images.api_key"]', root());
           if (key) key.value = '';
         }
-        readTranslation(s); PR.saveModelSettings(); return ["figure_images.enabled", "figure_images.provider"].includes(e.target.dataset.k);
+        readTranslation(s); PR.saveModelSettings(); return e.target.dataset.k === "figure_images.provider";
       }
       if (e.target.dataset.reasoning) { readForm(s); autoSaveForm(s); return true; }
       if (s.form && isApi(s.form.kind)) {
@@ -238,23 +267,15 @@
         } catch (err) { res.className = "test-result bad"; res.textContent = err.message; }
         return false;
       }
-      const k = e.target.closest("[data-cmk]");
-      if (k && s.form) {
-        readForm(s);
-        const f = s.form, kind = k.dataset.cmk;
-        if (kind === f.kind) return false;
-        Object.assign(f, { kind, model: kind === "claude" ? "opus" : PR.cliPin(s, kind, ""), name: "", key: "", base_url: "", api: "", reasoning_effort: "", service_tier: "" });
-        s.fetchMsg = null; s.apiTyping = false;
-        if (isApi(kind)) {  // 先给一家：翻译那边用的 API，没有就 DeepSeek
-          const o = s.cfg.openai;
-          PR.apiForm.pick(s, f, s.cfg.engine === "openai" && o.preset ? o.preset : "deepseek", "key");
-        }
-        autoSaveForm(s);
+      if (e.target.closest("[data-rescan]")) {
+        e.target.disabled = true;
+        const result = await PR.api("/api/engines?fresh=1").catch(() => null);
+        s.scanError = !result;
+        if (result) Object.assign(s, { sources: result.sources, found: result.found, models: result.models });
         return true;
       }
-      if (s.form && isApi(s.form.kind) && e.target.closest("[data-af-preset], [data-fetch-models], [data-custom-save]")) {
+      if (s.form && isApi(s.form.kind) && e.target.closest("[data-fetch-models], [data-custom-save]")) {
         readForm(s);
-        if (e.target.closest("[data-af-preset]")) s.form.reasoning_effort = s.form.service_tier = "";
         const changed = await PR.apiForm.click(e, s, s.form, "key", root());
         if (e.target.closest("[data-af-preset]")) autoSaveForm(s);
         return changed;
@@ -262,12 +283,17 @@
       const b = e.target.closest("[data-cm]");
       if (!b) return false;
       const i = +b.dataset.i, list = s.chat.models, act = b.dataset.cm;
+      if (act === "translate" || act === "chat-default") {
+        if (b.getAttribute("aria-pressed") === "true") return false;
+        assignRole(s, list[i], act);
+        return true;
+      }
       if (act === "more") {
         const m = list[i], tr = i === transIndex(s);
         readTranslation(s);
         PR.menu(b, [
-          { label: PR.t("设为翻译"), icon: "sparkle", disabled: tr, fn: () => { useForTranslation(s, m); PR.saveModelSettings(); PR.settingsRender(); } },
-          { label: PR.t("设为问 AI"), icon: "note", disabled: s.chat.default === m.id, fn: () => { s.chat.default = m.id; PR.saveModelSettings(); PR.settingsRender(); } },
+          { label: PR.t("设为翻译"), icon: "sparkle", disabled: tr, fn: () => { assignRole(s, m, "translate"); PR.settingsRender(); } },
+          { label: PR.t("设为问 AI"), icon: "note", disabled: s.chat.default === m.id, fn: () => { assignRole(s, m, "chat-default"); PR.settingsRender(); } },
           "-",
           { label: PR.t("修改"), icon: "edit", fn: () => { readForm(s); s.editing = m.id; startForm(s, m); PR.settingsRender(); } },
           "-",
@@ -310,7 +336,7 @@
     const c = cardAt(e);
     if (from < 0 || !c) return;
     e.preventDefault();
-    const r = c.getBoundingClientRect(), after = e.clientX > r.left + r.width / 2;
+    const r = c.getBoundingClientRect(), after = e.clientY > r.top + r.height / 2;
     PR.$$(".mc-cards .mc", root()).forEach((x) => x.classList.remove("drop-before", "drop-after"));
     if (+c.dataset.i !== from) c.classList.add(after ? "drop-after" : "drop-before");
   });
@@ -319,7 +345,7 @@
     if (from < 0 || !c || !s.chat) return;
     e.preventDefault();
     const r = c.getBoundingClientRect(), list = s.chat.models;
-    let to = +c.dataset.i + (e.clientX > r.left + r.width / 2 ? 1 : 0);
+    let to = +c.dataset.i + (e.clientY > r.top + r.height / 2 ? 1 : 0);
     const [m] = list.splice(from, 1);
     if (to > from) to--;
     list.splice(to, 0, m);

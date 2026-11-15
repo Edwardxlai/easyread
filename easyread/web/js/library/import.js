@@ -27,6 +27,7 @@
     dlg.querySelector(".dialog").innerHTML =
       "<h2>" + PR.t("导入论文") + "</h2>" +
       '<div class="dropzone" id="pick">' + PR.icon("upload") + '<div class="big">' + PR.t("选择 PDF，或拖到这里") + '</div><div class="hint">' + PR.t("可以一次选多个；同一个文件不会重复导入") + "</div></div>" +
+      '<label class="zt-opt"><input type="checkbox" id="impKeepFilename"' + (p.keepFilename ? " checked" : "") + ">" + PR.t("用原文件名作为文献库标题") + "</label>" +
       '<div class="or">' + PR.t("或者") + "</div>" +
       '<label class="field"><span>' + PR.t("链接、arXiv 编号、DOI 或论文标题") + '</span><div class="inline"><input class="input" id="arxivRef" placeholder="' + PR.t("2411.00640 · 10.18653/v1/N19-1423 · 论文网页链接 · 论文标题") + '">' +
       '<button class="btn accent" id="arxivGo">' + PR.t("导入") + "</button></div></label>" +
@@ -83,7 +84,7 @@
     if (e.target.closest("#arxivGo")) importRef(PR.$("#arxivRef").value);
     if (e.target.closest("#impEngine")) { close(); PR.openSettings(); }
     if (e.target.closest("#zoteroGo")) { close(); PR.openZotero(); }
-    if (e.target.closest("#folderGo")) { close(); PR.openFolderImport(); }
+    if (e.target.closest("#folderGo")) { close(); PR.openFolderImport(!!pref().keepFilename); }
     const a = e.target.closest("[data-after]");
     if (a && !a.disabled) {
       savePref({ after: a.dataset.after });
@@ -104,7 +105,11 @@
   });
   // 译成英语（#48）：原文本来就是英文时不用翻译，提示改选“读英文原文”
   const enHint = () => { const t = PR.$("#impTarget"); PR.$("#enTargetHint").hidden = t.hidden || t.value !== "en"; };
-  dlg.addEventListener("change", (e) => { if (e.target.id === "impModel") savePref({ model: e.target.value }); if (e.target.id === "impTarget") enHint(); });
+  dlg.addEventListener("change", (e) => {
+    if (e.target.id === "impKeepFilename") savePref({ keepFilename: e.target.checked });
+    if (e.target.id === "impModel") savePref({ model: e.target.value });
+    if (e.target.id === "impTarget") enHint();
+  });
   dlg.addEventListener("input", (e) => {  // 边输边存：输完直接点“导入”也用新的页码
     if (e.target.id === "pgFrom") savePref({ from: +e.target.value || 1 });
     if (e.target.id === "pgTo") savePref({ to: +e.target.value || 1 });
@@ -156,11 +161,12 @@
       if (extra === null) return;
       o.translation_extra = extra;
     }
+    const keepFilename = pref().keepFilename ? "1" : "0";
     let last = null;
     for (const [k, f] of pdfs.entries()) {
       PR.toast(PR.t("正在导入 {i}/{n}：{name}", { i: k + 1, n: pdfs.length, name: PR.esc(f.name) }), null, 60000);
       try {
-        const r = await PR.api("/api/import?translate=" + (o.translate ? 1 : 0) + "&read=" + (o.read ? 1 : 0) + "&model=" + encodeURIComponent(o.model) + "&target=" + encodeURIComponent(o.target) + "&scope=" + encodeURIComponent(o.scope) + "&translation_extra=" + encodeURIComponent(o.translation_extra) + "&name=" + encodeURIComponent(f.name), { method: "POST", body: f });
+        const r = await PR.api("/api/import?translate=" + (o.translate ? 1 : 0) + "&read=" + (o.read ? 1 : 0) + "&model=" + encodeURIComponent(o.model) + "&target=" + encodeURIComponent(o.target) + "&scope=" + encodeURIComponent(o.scope) + "&translation_extra=" + encodeURIComponent(o.translation_extra) + "&keep_filename=" + keepFilename + "&name=" + encodeURIComponent(f.name), { method: "POST", body: f });
         last = r.id;
         if (o.pdf_export) await PR.pdfExport.start(r.id, o.model, o.pdf_output_dir);
         if (!r.new) PR.toast(r.queued ? PR.t("《{name}》已重新加入准备队列", { name: PR.esc(f.name) }) : PR.t("《{name}》已经在库里了", { name: PR.esc(f.name) }));

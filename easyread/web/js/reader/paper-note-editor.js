@@ -5,7 +5,6 @@
   let rich = null, map = null, observer = null, richSource = "", formula = null, unmountToolbar = null;
   let mode = "rich", split = PR.ls.get("easyread-note-split", 58), firstMap = true;
   let mapBody = null, selectingFromMap = false;
-  let mapVisible = PR.ls.get("easyread-note-map-visible", true);
   let expanded = false, layout = PR.ls.get("easyread-note-layout", "side"), focus = "both";
   const wide = window.matchMedia("(min-width: 900px)");
   const horizontal = () => expanded && layout === "side" && wide.matches;
@@ -65,23 +64,15 @@
     divider.setAttribute("aria-orientation", horizontal() ? "vertical" : "horizontal");
     const hint = horizontal() ? PR.t("调整笔记与思维导图的宽度") : PR.t("调整笔记与思维导图的高度");
     divider.setAttribute("aria-label", hint); divider.title = hint;
-    setMapVisible(mapVisible);
+    setMapVisible(expanded && focus !== "note");
   }
   wide.addEventListener("change", setLayout);
 
   function setMapVisible(visible) {
-    mapVisible = visible;
-    visible = expanded ? focus !== "note" : visible;
-    const el = workspace(), button = el.querySelector("[data-note-map-toggle]");
+    const el = workspace();
     el.classList.toggle("pn-map-hidden", !visible);
     el.querySelector(".pn-divider").hidden = !visible || (expanded && focus === "map");
     el.querySelector(".pn-mindmap").hidden = !visible;
-    button.setAttribute("aria-expanded", String(visible));
-    button.setAttribute("aria-pressed", String(visible));
-    button.classList.toggle("on", visible);
-    const action = visible ? PR.t("隐藏思维导图") : PR.t("显示思维导图");
-    button.title = action;
-    button.setAttribute("aria-label", action);
     if (visible && map) updateMap();
   }
 
@@ -190,7 +181,7 @@
     html(body) {
       const modes = [["rich", PR.t("预览")], ["source", "Markdown"]];
       return '<div class="pn-display-bar"><div class="pn-view-controls" hidden><div class="seg" role="group" aria-label="' + label(PR.t("工作区布局")) + '">' + [["side", PR.t("左右")], ["stack", PR.t("上下")]].map(([key, text]) => '<button data-note-layout="' + key + '">' + text + '</button>').join("") + '</div><div class="seg" role="group" aria-label="' + label(PR.t("显示内容")) + '">' + [["both", PR.t("笔记与导图")], ["note", PR.t("仅笔记")], ["map", PR.t("仅导图")]].map(([key, text]) => '<button data-note-focus="' + key + '">' + text + '</button>').join("") + '</div></div><button class="btn sm" data-note-expand aria-pressed="false"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></svg><span>' + PR.t("全屏工作区") + '</span></button></div><div class="pn-workspace"><section class="pn-writing" aria-label="' + label(PR.t("论文笔记编辑器")) + '">' +
-        '<div class="pn-bar"><div class="seg" role="group" aria-label="' + label(PR.t("笔记显示方式")) + '">' + modes.map(([key, text]) => '<button data-note-mode="' + key + '">' + text + '</button>').join("") + '</div><span class="grow"></span><button class="btn sm" data-note-map-toggle aria-controls="pnMindmap">Markmap</button></div>' +
+        '<div class="pn-bar"><div class="seg" role="group" aria-label="' + label(PR.t("笔记显示方式")) + '">' + modes.map(([key, text]) => '<button data-note-mode="' + key + '">' + text + '</button>').join("") + '</div><span class="grow"></span></div>' +
         '<div class="pn-format"></div>' +
         '<form class="pn-formula" hidden><input class="input" data-note-latex aria-label="' + label(PR.t("LaTeX 公式")) + '" placeholder="E = mc^2"><label><input type="checkbox" data-note-display> ' + PR.t("独立公式") + '</label><button class="btn sm accent" type="submit">' + PR.t("应用") + '</button><button class="btn sm" type="button" data-note-math-cancel>' + PR.t("取消") + '</button></form>' +
         '<div class="pn-content"><div class="pn-rich-pane"><div class="pn-rich"></div></div><div class="pn-source" hidden><textarea id="paperNote" spellcheck="false" aria-label="' + label(PR.t("论文笔记 Markdown")) + '">' + PR.esc(body) + '</textarea></div></div></section>' +
@@ -269,6 +260,7 @@
       }
     },
     getBody: () => rich ? PR.$("#paperNote").value : null,
+    documentForMap: body => rich ? rich.markdown.parse(body) : null,
     update: updateSoon,
   };
 
@@ -317,12 +309,6 @@
       libraries.exportXmind(libraries.toMindMap(doc, title), title.replace(/[\\/:*?"<>|]/g, "")).catch(error => PR.toast(error.message)); return;
     }
     if (e.target.closest("[data-note-map-export]")) { exportMap(); return; }
-    if (e.target.closest("[data-note-map-toggle]")) {
-      if (expanded) { focus = focus === "note" ? "both" : "note"; setLayout(); return; }
-      setMapVisible(!mapVisible);
-      PR.ls.set("easyread-note-map-visible", mapVisible);
-      return;
-    }
     if (e.target.closest(".pn-prose")) { revealSelection(); return; }
     if (e.target.closest("[data-note-math-cancel]")) { workspace().querySelector(".pn-formula").hidden = true; rich.commands.focus(); return; }
     const node = e.target.closest(".markmap-node");

@@ -185,7 +185,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/engines":
             cfg = config.load()
             found = detect.detect(cfg, fresh=parse_qs(url.query).get("fresh") == ["1"])
-            return self._json(200, {"found": found, "ready": detect.ready(cfg, found), "engine": cfg.get("engine"), "models": cli_models.listing()})
+            return self._json(200, {"found": found, "sources": detect.cli_sources(found), "ready": detect.ready(cfg, found), "engine": cfg.get("engine"), "models": cli_models.listing()})
         if path == "/api/prefs":
             return self._json(200, prefs.load())
         if path == "/api/chat/models":
@@ -322,7 +322,7 @@ class Handler(BaseHTTPRequestHandler):
             data = self._body()
             if q.get("babeldoc") == "1" and sha256_bytes(data)[:12] in app.babeldoc.running:
                 raise ValueError("这篇文献正在生成 PDF，不能重复上传")
-            ws, fresh = lib.create_from_pdf(data, q.get("name", "paper.pdf"))
+            ws, fresh = lib.create_from_pdf(data, q.get("name", "paper.pdf"), keep_filename=q.get("keep_filename") == "1")
             return self._import_result(ws, fresh, q.get("translate", "1") == "1", q.get("scope"),
                                        read=q.get("read") == "1", model=q.get("model", ""), target=q.get("target", ""), translation_extra=q.get("translation_extra", ""))
         if path in ("/api/import-url", "/api/import-arxiv"):

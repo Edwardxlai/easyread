@@ -67,7 +67,7 @@ class Migration:
 
     # ---------- 搬 ----------
     def start(self, source: str, path: str, base: str = "", with_tags: bool = True, fetch: bool = False,
-              link: bool = False) -> dict:
+              link: bool = False, keep_filename: bool = False) -> dict:
         if link and fetch:
             raise ValueError(tr("链接导入只支持本地 PDF 文件"))
         with self.lock:
@@ -77,7 +77,7 @@ class Migration:
             self.cancel.clear()
             self.status = {"state": "running", "source": source, "link": link, "done": 0, "total": len(snap.entries), "imported": 0, "existing": 0,
                            "skipped": [], "failed": [], "message": tr("正在迁移")}
-        threading.Thread(target=self._run, args=(snap, with_tags, fetch, link), daemon=True).start()
+        threading.Thread(target=self._run, args=(snap, with_tags, fetch, link, keep_filename), daemon=True).start()
         return self.status
 
     def stop(self) -> dict:
@@ -93,7 +93,7 @@ class Migration:
             if len(self.status[key]) < 200:
                 self.status[key].append({"title": _title(e), "why": why})
 
-    def _run(self, snap: Snapshot, with_tags: bool, fetch: bool, link: bool = False):
+    def _run(self, snap: Snapshot, with_tags: bool, fetch: bool, link: bool = False, keep_filename: bool = False):
         lib, jobs = self.app.lib, self.app.jobs
         tag_root = tr("Zotero 标签")
         cats = [_clip(c) for c in snap.collections]
@@ -107,13 +107,13 @@ class Migration:
                         if not e.pdf:
                             self._note("skipped", e, e.missing)
                             continue
-                        ws, fresh = lib.import_pdf_path(e.pdf, e.meta, link=True)
+                        ws, fresh = lib.import_pdf_path(e.pdf, e.meta, link=True, keep_filename=keep_filename)
                     else:
                         data, name, meta = self._pdf(e, fetch, lib)
                         if data is None:
                             self._note("skipped", e, e.missing)
                             continue
-                        ws, fresh = lib.create_from_pdf(data, name, meta)
+                        ws, fresh = lib.create_from_pdf(data, name, meta, keep_filename=keep_filename)
                 except Exception as err:  # noqa: BLE001 —— 下载失败、文件读不了：记下来接着做下一条
                     self._note("failed", e, str(err)[:300])
                     continue

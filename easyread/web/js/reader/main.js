@@ -161,6 +161,7 @@
     PR.ls.set("pr-seen-" + PR.paperKey, Array.from(seen));
     PR.renderPaper();
     PR.citationNav.setup();
+    PR.$('[data-act="dock"]').disabled = false;
     PR.setupDemo();  // 署名要放在论文标题下面，得等正文渲染出来
     PR.applyMarks();
     PR.renderMargin();

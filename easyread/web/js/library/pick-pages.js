@@ -16,16 +16,15 @@
 
   function close() {
     if (!cur) return;
-    document.removeEventListener("keydown", cur.onKey, true);
-    document.removeEventListener("mousedown", cur.onDown, true);
-    cur.box.remove();
+    cur.close();
+    cur.remove();
     cur = null;
   }
 
-  PR.pickPages = function (i, at) {
+  PR.pickPages = function (i) {
     close();
     const todo = pages(i.todo), picked = new Set();
-    const box = PR.el("div", { class: "popover confirm pick-pages", role: "dialog" },
+    const box = PR.el("dialog", { class: "confirm pick-pages", "aria-label": PR.t("选几页翻译") },
       '<div class="cf-title">' + PR.t("选几页翻译") + "</div>" +
       '<div class="cf-body">' + PR.t("这里只列还没译的 {n} 页，点页码选中。", { n: todo.length }) + "</div>" +
       '<div class="pp-grid">' + todo.map((n) => '<button class="pp-page" data-pp="' + n + '">' + n + "</button>").join("") + "</div>" +
@@ -55,15 +54,13 @@
         } catch (err) { PR.toast(PR.esc(err.message)); }
       }
     });
-    const r = at && at.getBoundingClientRect ? at.getBoundingClientRect() : null;
-    const w = box.offsetWidth, h = box.offsetHeight;
-    box.style.left = Math.max(8, Math.min(innerWidth - w - 8, r ? r.left : (innerWidth - w) / 2)) + "px";
-    box.style.top = (r ? (r.bottom + 6 + h > innerHeight - 8 ? Math.max(8, r.top - h - 6) : r.bottom + 6) : Math.max(8, innerHeight * 0.2)) + "px";
-    requestAnimationFrame(() => box.classList.add("open"));
-    const onKey = (e) => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); close(); } };
-    const onDown = (e) => { if (!box.contains(e.target)) close(); };
-    cur = { box, onKey, onDown };
-    document.addEventListener("keydown", onKey, true);
-    setTimeout(() => document.addEventListener("mousedown", onDown, true), 0);
+    box.addEventListener("cancel", e => { e.preventDefault(); close(); });
+    box.addEventListener("keydown", e => e.stopPropagation());
+    box.addEventListener("click", e => {
+      const r = box.getBoundingClientRect();
+      if (e.target === box && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)) close();
+    });
+    cur = box;
+    box.showModal();
   };
 })(window.PR);

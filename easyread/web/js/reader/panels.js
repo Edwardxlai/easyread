@@ -44,18 +44,19 @@
     else syncSettings();
     relayout();
   };
-  PR.bumpFont = (d) => { PR.setPref("fs", Math.min(28, Math.max(13, PR.prefs.fs + d)), true); PR.toast(PR.t("字号 {n} px", { n: PR.prefs.fs }), null, 900); };
+  PR.bumpFont = (d) => { PR.setPref("fs", PR.clampFontSize(PR.prefs.fs + d), true); PR.toast(PR.t("字号 {n} px", { n: PR.prefs.fs }), null, 900); };
 
   function segHtml(key, opts) {
     return '<div class="seg">' + opts.map(([v, label]) => '<button data-p="' + key + '" data-v="' + v + '" class="' + (String(PR.prefs[key]) === String(v) ? "on" : "") + '">' + label + "</button>").join("") + "</div>";
   }
-  function slider(key, label, min, max, step, unit) {
+  function slider(key, label, unit) {
+    const { min, max, step } = PR.typeRanges[key];
     return '<div class="row slider"><span>' + label + '</span><input type="range" data-r="' + key + '" min="' + min + '" max="' + max + '" step="' + step + '" value="' + PR.prefs[key] + '"><b data-rv="' + key + '">' + PR.prefs[key] + unit + "</b></div>";
   }
   PR.renderSettings = function () {
     PR.$("#settings").innerHTML =
       '<div class="row view-row-narrow">' + PR.viewSegHtml(true) + "</div>" +
-      slider("fs", PR.t("字号"), 13, 28, 1, " px") + slider("measure", PR.t("版心"), 26, 50, 1, PR.t(" 字")) + slider("lh", PR.t("行距"), 1.5, 2.4, 0.05, "") +
+      slider("fs", PR.t("字号"), " px") + slider("measure", PR.t("版心"), PR.t(" 字")) + slider("lh", PR.t("行距"), "") +
       '<div class="row"><span>' + PR.t("字体") + "</span>" + segHtml("font", [["serif", PR.t("宋体")], ["sans", PR.t("黑体")]]) + "</div>" +
       '<div class="row"><span>' + PR.t("边注") + "</span>" + segHtml("margin", [[true, PR.t("显示")], [false, PR.t("收起")]]) + "</div>" +
       '<div class="row hintrow"><button class="linkish" data-reset-type>' + PR.t("恢复默认") + '</button><span class="grow"></span>' +
@@ -102,17 +103,9 @@
     PR.$("#bar .save-state").before(pill);
   };
   PR.$('[data-act="drawer"]').innerHTML = PR.icon("menu");
-  PR.$('[data-act="pages"]').innerHTML = PR.icon("page", "sm") + "<span>PDF</span>";
-  PR.$('[data-act="pages"]').addEventListener("mouseenter", () => PR.preloadPage && PR.preloadPage());  // 鼠标移过去就开始加载
-  PR.$('[data-act="notes"]').innerHTML = PR.icon("note", "sm") + "<span>" + PR.t("笔记") + "</span>";
-  PR.$('[data-act="chat"]').innerHTML = PR.icon("sparkle", "sm") + "<span>" + PR.t("问 AI") + "</span>";
-  /* 设置里关掉的功能：顶栏按钮也藏起来 */
+  PR.$('[data-act="dock"]').innerHTML = PR.icon("page", "sm") + "<span>" + PR.t("侧栏") + "</span>";
   PR.applyFeatures = function () {
-    const set = (sel, on) => { const el = PR.$(sel); if (el) el.style.display = on ? "" : "none"; };
-    set('[data-act="pages"]', PR.feature("pages"));
-    set('[data-act="chat"]', PR.feature("chat") && PR.chatView());
-    if (!PR.feature("pages") && PR.side === "pages") PR.openSide(null);
-    if (!PR.feature("chat") && PR.side === "chat") PR.openSide(null);
+    PR.syncDockFeatures?.();
   };
   PR.on("ui-changed", () => { PR.applyFeatures(); PR.hideBlockbar && PR.hideBlockbar(); PR.renderMargin && PR.renderMargin(); });
   PR.$("#bar").addEventListener("click", (e) => {
@@ -123,11 +116,8 @@
     if (!a) return;
     const act = a.dataset.act;
     if (act === "drawer") PR.toggleDrawer();
-    if (act === "pages") PR.togglePages();
-    if (act === "notes") PR.toggleNotesPanel();
-    if (act === "chat") PR.toggleChat();
+    if (act === "dock") PR.toggleDock();
     if (act === "settings") { PR.renderSettings(); PR.$("#settings").classList.toggle("open"); }
-    if (act === "about") PR.toggleDrawer(true, "about");
   });
   document.addEventListener("mousedown", (e) => {
     if (!e.target.closest("#settings, [data-act=settings]")) PR.$("#settings").classList.remove("open");
@@ -197,15 +187,22 @@
   function tocHtml() {
     const counts = countByHeading();
     const cur = PR.currentHeading && PR.currentHeading();
-    let html = '<nav class="toc">', app = false;
+    let html = '<nav class="toc outline">', app = false;
     for (const h of PR.headings) {
       if (h.appendix && !app) { html += '<div class="group">' + PR.t("附录") + "</div>"; app = true; }
-      html += '<a href="#b-' + h.id + '" data-go="' + h.id + '" class="' + "l" + h.level + (cur === h.id ? " on" : "") + '">' +
-        (counts[h.id] ? '<span class="cnt">' + counts[h.id] + "</span>" : "") + '<span class="n">' + PR.esc(h.num || "") + "</span>" + PR.esc(PR.plain(PR.textFor(h.id) || h.zh)) + "</a>";
+      const num = String(h.num || "").trim();
+      const numbered = /^(?:\d+|[A-Z])(?:\.\d+)+\.?$/.test(num);
+      const level = Math.min(6, Math.max(Number(h.level) || 1, numbered ? num.replace(/\.$/, "").split(".").length : 1));
+      const id = PR.esc(h.id);
+      html += '<a href="#b-' + id + '" data-go="' + id + '" class="l' + level + '"' +
+        (cur === h.id ? ' aria-current="location"' : '') + '>' +
+        (num ? '<span class="n">' + PR.esc(num) + '</span>' : '') +
+        '<span class="outline-title">' + PR.esc(PR.plain(PR.textFor(h.id) || h.zh)) + '</span>' +
+        (counts[h.id] ? '<span class="cnt">' + counts[h.id] + '</span>' : '') + '</a>';
     }
     const done = new Set((S.paper.translation || {}).done_pages || []);
     const miss = ((S.paper.meta || {}).pages || []).filter((p) => !done.has(p.n));
-    if (miss.length) html += '<div class="group">' + ((S.job || {}).read || (S.paper.translation || {}).en_pages?.length ? PR.t("还没整理的页") : PR.t("未译的页")) + '</div>' + miss.map((p) => '<a href="#orig-' + p.n + '" data-go-orig="' + p.n + '" class="l1"><span class="n"></span>' + PR.t("原文第 {n} 页", { n: p.n }) + "</a>").join("");
+    if (miss.length) html += '<div class="group">' + ((S.job || {}).read || (S.paper.translation || {}).en_pages?.length ? PR.t("还没整理的页") : PR.t("未译的页")) + '</div>' + miss.map((p) => '<a href="#orig-' + p.n + '" data-go-orig="' + p.n + '" class="l1">' + PR.t("原文第 {n} 页", { n: p.n }) + "</a>").join("");
     return html + "</nav>";
   }
   function termsHtml() {

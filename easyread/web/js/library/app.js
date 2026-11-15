@@ -125,7 +125,7 @@
     const q = L.q.trim().toLowerCase();
     let list = L.items.filter(view[3]);
     if (L.tag) list = list.filter((i) => L.inCat(i, L.tag));  // 含子分类里的
-    if (q) list = list.filter((i) => [i.title_zh, i.title_en, i.authors, i.venue, i.arxiv, i.abstract, (i.tags || []).join(" "), i.year]
+    if (q) list = list.filter((i) => [i.display_title, i.title_zh, i.title_en, i.authors, i.venue, i.arxiv, i.abstract, (i.tags || []).join(" "), i.year]
       .join(" ").toLowerCase().includes(q));
     const key = { opened: (i) => i.last_opened || i.added, added: (i) => i.added, year: (i) => String(i.year || ""), title: (i) => PR.titles(i).main };
     const k = key[L.sort] || key.opened;

@@ -18,7 +18,7 @@
     const before = node ? node.getBoundingClientRect().top : 0;
     PR.fitWide(); PR.renderMargin();
     if (node) window.scrollBy(0, node.getBoundingClientRect().top - before);
-    if (PR.side === "pages" && PR.refreshPages) PR.refreshPages();
+    if (PR.dockVisible("pages") && PR.refreshPages) PR.refreshPages();
   }
 
   const grip = PR.el("div", { class: "panel-grip", title: PR.t("拖动调整面板宽度（双击恢复）") });

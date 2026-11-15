@@ -15,23 +15,24 @@
   PR.openSettings = async function (tab) {
     await modelSaveQueue;
     const [d, chat] = await Promise.all([PR.api("/api/config"), PR.api("/api/chat/models").catch(() => null)]);
+    if (!PR.token) PR.token = (await PR.api("/api/library")).token;
     Object.assign(st, { tab: typeof tab === "string" && tab !== "engine" ? tab : "chat", cfg: d.config, presets: d.presets, groups: d.groups || [], chat,
       fetchMsg: null, apiTyping: false, advOpen: false, ui: { features: Object.assign({}, PR.features), keys_on: PR.keysOn, keys: Object.assign({}, PR.keymap) },
-      theme: PR.ls.get("easyread-prefs", {}).theme || "auto", recording: null, editing: null, form: null, chatKeys: null, type: null, transChecked: false, pinned: false });
+      theme: PR.ls.get("easyread-prefs", {}).theme || "auto", recording: null, editing: null, form: null, chatKeys: null, type: null, transChecked: false });
     render();
     dlg().classList.add("open");
     // 每次打开都问一次（后端有缓存，很快）：刚装好或更新了 Claude Code / Codex，版本号和模型名单马上跟上
     const r = await PR.api("/api/engines").catch(() => null);
     if (r && (JSON.stringify([r.found, r.models]) !== JSON.stringify([st.found, st.models]))) {
-      st.found = r.found; st.models = r.models;
+      st.found = r.found; st.sources = r.sources; st.models = r.models;
       if (dlg().classList.contains("open")) { sync(); render(); }
     }
   };
   window.addEventListener("focus", async () => {
     if (!dlg().classList.contains("open")) return;
     const r = await PR.api("/api/engines").catch(() => null);
-    if (r && JSON.stringify(r.models) !== JSON.stringify(st.models)) {
-      sync(); st.models = r.models; st.found = r.found; render();
+    if (r && JSON.stringify([r.models, r.found]) !== JSON.stringify([st.models, st.found])) {
+      sync(); st.models = r.models; st.found = r.found; st.sources = r.sources; render();
     }
   });
   const btn = PR.$("#settingsBtn");
@@ -54,8 +55,17 @@
     dlg().querySelector(".dialog").innerHTML =
       '<div class="set-head"><h2>' + PR.t("设置") + '</h2><div class="set-tabs">' + tabs().map(([k, l]) => '<button data-set-tab="' + k + '" class="' + (st.tab === k ? "on" : "") + '">' + l + "</button>").join("") + "</div>" + (st.tab === "chat" ? saveStatusHtml() : "") + "</div>" +
       '<div class="set-body">' + (t ? t.render(st) : "") + "</div>" +
-      '<div class="actions set-foot"><button class="linkish" id="showLog">' + PR.t("运行日志") + '</button><span class="grow"></span><button class="btn" id="setCancel">' + (st.tab === "chat" ? PR.t("关闭") : PR.t("取消")) + '</button>' + (st.tab === "chat" ? "" : '<button class="btn primary" id="setSave">' + PR.t("保存") + "</button>") + "</div>";
+      footerHtml();
     dlg().querySelector(".set-body").scrollTop = scroll;
+  }
+
+  function footerHtml() {
+    if (st.tab === "chat" && st.editing) {
+      const adding = st.editing === "new";
+      return '<div class="actions set-foot"><button class="btn" data-cm="cancel">' + (adding ? PR.t("取消") : PR.t("完成")) +
+        '</button>' + (adding ? '<button class="btn accent" data-cm="ok">' + PR.t("添加模型") + '</button>' : "") + '</div>';
+    }
+    return '<div class="actions set-foot"><button class="linkish" id="showLog">' + PR.t("运行日志") + '</button><span class="grow"></span><button class="btn" id="setCancel">' + (st.tab === "chat" ? PR.t("关闭") : PR.t("取消")) + '</button>' + (st.tab === "chat" ? "" : '<button class="btn primary" id="setSave">' + PR.t("保存") + "</button>") + "</div>";
   }
 
   function saveStatusHtml() {
@@ -146,7 +156,7 @@
     if (t && t.change && t.change(e, st, dlg())) render();
   });
   document.addEventListener("keydown", (e) => {
-    if (document.querySelector('.translation-dialog')) return;
+    if (document.querySelector('.translation-dialog, dialog.confirm[open]')) return;
     if (!dlg().classList.contains("open")) return;
     const t = PR.settingsTabs[st.tab];
     if (st.recording && t && t.key) { e.preventDefault(); e.stopImmediatePropagation(); if (t.key(e, st)) render(); return; }

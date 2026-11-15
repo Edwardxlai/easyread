@@ -109,7 +109,21 @@ def _probe(exe: str, version: str) -> None:
 
 
 def listing() -> dict:
-    return {"claude": claude(), "codex": codex()}
+    catalog = {"claude": claude(), "codex": codex()}
+    for engine in engines.agent_cli.ENGINES:
+        last = chat_models.actual_of("last-default:" + engine)
+        if last:
+            catalog[engine] = {"last_used": last}
+    return catalog
+
+
+def default_model(engine: str) -> str:
+    if engine == "claude":
+        return claude_default()
+    if engine == "codex":
+        catalog = codex()
+        return next((m["name"] for m in catalog["models"] if m["id"] == catalog["default"]), catalog["default"])
+    return ""
 
 
 def engine_label(cfg: dict) -> str:
@@ -119,6 +133,8 @@ def engine_label(cfg: dict) -> str:
         preset = next((p["name"] for p in PRESETS if p["id"] == cfg["openai"].get("preset")), "API")
         return f"{preset.split('（')[0]} · {cfg['openai'].get('model') or tr('未填模型')}"  # i18n-ok （ 是拆预设名
     name = engines.engine_name(e)
+    if e in engines.CLI_ENGINES and not cfg[e].get("model"):
+        return name + " · " + (default_model(e) or tr("跟随 CLI 默认（型号未确认）"))
     if e == "claude":  # 带上实际用的模型：Claude Code · Claude Opus 5.5
         m = cfg["claude"].get("model") or ""
         actual = chat_models.actual_of(m) if m else ""

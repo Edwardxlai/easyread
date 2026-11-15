@@ -27,16 +27,22 @@ test("page limit options include a translated page unit and keep numeric values"
 
 test("enabling translated images reveals the API fields and autosaves the choice", () => {
   let saved = 0;
-  const checkbox = {dataset: {k: 'figure_images.enabled'}, type: 'checkbox', checked: true, matches: () => false};
-  const PR = {settingsTabs: {}, $: () => ({addEventListener() {}}), $$: () => [checkbox], saveModelSettings: () => saved++};
+  const output = {value: 'image', matches: selector => selector === '[data-figure-output]'};
+  const PR = {settingsTabs: {}, $: () => ({addEventListener() {}}), $$: () => [], saveModelSettings: () => saved++};
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../easyread/web/js/common/settings-chat.js'), 'utf8'), {window: {PR}});
   const state = {cfg: {figure_images: {enabled: false}}};
-  assert.equal(PR.settingsTabs.chat.change({target: checkbox}, state), true);
+  assert.equal(PR.settingsTabs.chat.change({target: output}, state), true);
   assert.equal(state.cfg.figure_images.enabled, true);
   assert.equal(saved, 1);
-  checkbox.checked = false;
-  assert.equal(PR.settingsTabs.chat.change({target: checkbox}, state), true);
+  assert.equal(state.cfg.translate_figure_text, true);
+  output.value = 'original';
+  assert.equal(PR.settingsTabs.chat.change({target: output}, state), true);
   assert.equal(state.cfg.figure_images.enabled, false);
+  assert.equal(state.cfg.translate_figure_text, false);
+  output.value = 'text';
+  PR.settingsTabs.chat.change({target: output}, state);
+  assert.equal(state.cfg.figure_images.enabled, false);
+  assert.equal(state.cfg.translate_figure_text, true);
 });
 
 test("changing image endpoints does not carry a key typed for the old service", () => {

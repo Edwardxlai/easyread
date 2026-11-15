@@ -49,6 +49,7 @@
     const card = e.target.closest(".card[data-note]");
     const value = e.dataTransfer?.getData(MIME);
     if (!value) { finish(); return; }
+    if (!card && e.target.closest("#readerDock")) { finish(); return; }
     e.preventDefault(); e.stopImmediatePropagation();
     if (!card) { finish(); return; }
     try {

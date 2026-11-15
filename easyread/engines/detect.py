@@ -11,6 +11,24 @@ from . import engines
 _cache: dict = {}
 _lock = threading.Lock()
 
+_INSTALL_GUIDES = {
+    "qoder": "https://docs.qoder.cn/cli/installation",
+    "opencode": "https://opencode.ai/docs/",
+    "zcode": "https://github.com/zai-org/ZCode/tree/main/apps/zcode-cli/docs/usage",
+    "grok": "https://x.ai/cli",
+    "agy": "https://antigravity.google/docs/cli",
+    "cursor": "https://cursor.com/docs/cli/installation",
+    "codebuddy": "https://www.codebuddy.cn/docs/cli/headless",
+    "claude": "https://code.claude.com/docs/en/setup",
+    "codex": "https://developers.openai.com/codex/cli/",
+}
+
+
+def cli_sources(found: dict) -> list[dict]:
+    return [{"id": name, "name": engines.engine_name(name), "installed": bool(found.get(name, {}).get("found")),
+             "install_url": _INSTALL_GUIDES.get(name, "")} for name in engines.CLI_ENGINES]
+
+
 
 def _ollama() -> dict:
     try:

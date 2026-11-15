@@ -93,6 +93,7 @@
     const first = PR.originalFirst();
     document.body.classList.toggle("original-first", first);
     syncBar();
+    PR.refreshDockResource?.();
     if (!S.paper) return;
     // 标题里的英文（.en-title）拆成和译文同级的一行，才能整体换先后
     PR.$$("#paper .en-title").forEach((en) => {

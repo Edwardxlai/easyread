@@ -35,6 +35,7 @@
         '<p class="hint">' + PR.t("导入后不会自动翻译，只准备原页；想读哪篇再翻译哪篇。迁移可以重复做，已经导入的只补分类，不会重复。") + "</p>";
     } else {
       h += '<div class="zt-stats">' + stat(c.with_pdf, PR.t("个 PDF，会导入")) + stat(c.collections, PR.t("个文件夹，变成分类")) + "</div>" +
+        '<label class="zt-opt"><input type="checkbox" data-zo="keepFilename"' + (s.keepFilename ? " checked" : "") + ">" + PR.t("用原文件名作为文献库标题") + "</label>" +
         '<p class="hint">' + PR.t("文件夹的层级就是分类的层级：选的文件夹是最外层，里面的子文件夹是它的子分类。同一个 PDF 放在几个文件夹里，只导入一篇，几个分类都会有它。") + "</p>" +
         '<p class="hint">' + PR.t("导入后不会自动翻译，只准备原页；想读哪篇再翻译哪篇。可以重复导入同一个文件夹，已经导入的只补分类，不会重复。") + "</p>";
     }
@@ -90,11 +91,11 @@
     if (s.candidates.length) s.path = s.candidates[0].path;
     render();
   };
-  PR.openFolderImport = async function () {
+  PR.openFolderImport = async function (keepFilename = s.keepFilename) {
     if (await resume()) return;
     const p = await PR.pickFolder({ title: PR.t("选择要导入的文件夹") });
     if (!p) return;
-    Object.assign(s, { source: "folder", path: p, scan: null, busy: false, fetch: false });
+    Object.assign(s, { source: "folder", path: p, scan: null, busy: false, fetch: false, keepFilename });
     scan();
   };
 
@@ -109,7 +110,7 @@
   async function start() {
     s.busy = true; render();
     try {
-      s.status = await PR.api("/api/migrate/start", { method: "POST", body: { source: s.source, path: s.path, tags: s.tags, fetch: s.fetch, link: s.link } });
+      s.status = await PR.api("/api/migrate/start", { method: "POST", body: { source: s.source, path: s.path, tags: s.tags, fetch: s.fetch, link: s.link, keep_filename: !zotero() && s.keepFilename } });
       s.step = "run"; poll();
     } catch (e) { PR.toast(PR.t("没能开始：{msg}", { msg: esc(e.message) }), null, 8000); }
     s.busy = false; render();

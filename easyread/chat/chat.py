@@ -34,6 +34,16 @@ PAPER_BUDGET = 30000  # 各种问答方式都带上正文，长论文各段取�
 
 
 # ---------- 提示词 ----------
+def _source_text(block: dict) -> str:
+    if block.get("type") == "list":
+        return "\n".join("- " + (item.get("en") or item.get("zh", "")) for item in block.get("items", []))
+    text = block.get("en") or block.get("caption_en") or _block_text(block)
+    if block.get("type") == "table":
+        rows = block.get("head", []) + block.get("rows", [])
+        text += "\n" + "\n".join(" | ".join(str(cell) for cell in row) for row in rows)
+    return text
+
+
 def _context(ws: Workspace, anchor: str | None, quote: str, refs: list[dict] | None = None) -> str:
     paper = ws.load("paper")
     meta = paper.get("meta", {})
@@ -47,10 +57,15 @@ def _context(ws: Workspace, anchor: str | None, quote: str, refs: list[dict] | N
         h = next((b for b in reversed(blocks[:idx + 1]) if b.get("type") == "heading"), None)
         if h:
             lines.append(f"读者正在读的章节：{h.get('num', '')} {h.get('zh') or h.get('en', '')}")  # i18n-ok
-        near = blocks[max(0, idx - 3): idx + 3]
-        lines.append("附近的段落（有译文用译文，没译的是原文）：\n" + "\n\n".join(f"[{b['id']}] {_block_text(b)}" for b in near))  # i18n-ok
+        selected = {anchor, *(r.get("anchor") for r in refs or [])}
+        near = [b for b in blocks[max(0, idx - 3): idx + 3] if b.get("id") not in selected]
+        if near:
+            lines.append("附近的段落：\n" + "\n\n".join(f"[{b['id']}] {_block_text(b)[:1200]}" for b in near))  # i18n-ok
         focus = blocks[idx]
-        lines.append(f"读者指着的段落 [{focus['id']}]：\n译文：{_block_text(focus)}\n原文：{focus.get('en') or focus.get('caption_en') or focus.get('tex', '')}")  # i18n-ok
+        source, translation = _source_text(focus), _block_text(focus)
+        lines.append(f"读者指着的段落 [{focus['id']}]：\n" + source)  # i18n-ok
+        if translation and translation != source:
+            lines.append("译文：" + translation)  # i18n-ok
     if quote:
         lines.append(f"读者选中的原话：「{quote}」")  # i18n-ok
     extra = [r for r in (refs or []) if r.get("anchor") != anchor or (r.get("quote") or "") != quote]
@@ -60,7 +75,7 @@ def _context(ws: Workspace, anchor: str | None, quote: str, refs: list[dict] | N
         for r in extra[:12]:
             b = by_id.get(r.get("anchor")) or {}
             q = (r.get("quote") or "").strip()
-            parts.append(f"[{r.get('anchor')}] " + (f"读者选中：「{q[:800]}」\n  所在段落：" if q else "") + _block_text(b)[:1200])  # i18n-ok
+            parts.append(f"[{r.get('anchor')}] " + (f"读者选中：「{q[:800]}」\n  所在段落：" if q else "") + _source_text(b)[:1200])  # i18n-ok
         lines.append("读者引用了这几处（问题可能是在问它们之间的关系）：\n" + "\n".join(parts))  # i18n-ok
     gl = _glossary_items(paper)
     if gl:
@@ -74,12 +89,7 @@ def _paper_context(ws: Workspace) -> str:
     blocks = paper.get("blocks", [])
     parts = []
     for b in blocks:
-        text = b.get("en") or b.get("caption_en") or _block_text(b)
-        if b.get("type") == "list":
-            text = "\n".join("- " + (it.get("en") or it.get("zh", "")) for it in b.get("items", []))
-        elif b.get("type") == "table":
-            rows = b.get("head", []) + b.get("rows", [])
-            text += "\n" + "\n".join(" | ".join(str(cell) for cell in row) for row in rows)
+        text = _source_text(b)
         if text:
             page = f"第 {b['page']} 页" if b.get("page") else ""  # i18n-ok
             parts.append(f"[{b.get('id', '')}] {page}\n{text}")
@@ -168,7 +178,7 @@ def _marks_summary(ws: Workspace) -> str:
 
 
 def prompt(ws: Workspace, messages: list[dict], anchor: str | None, quote: str, engine: str, refs: list[dict] | None = None,
-           answer_style: str = answer_styles.DEFAULT) -> str:
+           answer_style: str = answer_styles.DEFAULT, context_scope: str = "paper") -> str:
     answer_style = answer_styles.parse(answer_style)
     history = messages[-HISTORY:]
     convo = "\n\n".join(("读者" if m["role"] == "user" else "你") + "：" + m["content"] for m in history[:-1])  # i18n-ok
@@ -182,7 +192,10 @@ def prompt(ws: Workspace, messages: list[dict], anchor: str | None, quote: str, 
     style = {answer_styles.STE100: answer_styles.STE100_INSTRUCTIONS,
              answer_styles.XRAY: answer_styles.XRAY_INSTRUCTIONS}.get(answer_style) or (
              "用" + langs.reply_lang(ws.load("paper").get("meta")) + "，直接、具体，能举例就举例。\n")  # i18n-ok
-    whole = _paper_context(ws) if answer_style in answer_styles.WHOLE_PAPER else ""
+    if context_scope not in ("paper", "selection"):
+        raise ValueError("Invalid paper context scope")
+    focused = context_scope == "selection" and (anchor or refs)
+    whole = "本轮参考引用段落及相邻内容。其余正文未附入。只依据已提供或已核对的材料回答。" if focused else _paper_context(ws)  # i18n-ok
     return ("你在陪读者读一篇学术论文，回答他边读边冒出来的问题。\n" + style  # i18n-ok
             + "区分“论文里写了什么”和“你的补充解释”，论文里没有的内容不要说成是论文说的。"  # i18n-ok
             "当前段落和选中文字只是提问的重点，不限制可参考的论文范围；跨章节问题应结合已提供的正文，依据不足时明确说明。"  # i18n-ok
@@ -278,7 +291,10 @@ def stream(ecfg: dict, text: str, cwd: Path, cancel: threading.Event, on_model=N
         elif e == "openai":
             yield from openai_api.stream(ecfg["openai"], text, cancel, meter, images=images)
         else:  # codex 没有逐字输出，整段给；不拉起用户的 MCP 和用不到的功能（见 codex_lean）
-            yield engines.run(chat_tools.for_chat(ecfg), text, cwd, images, cancel, meter)
+            options = chat_tools.for_chat(ecfg)
+            if e in engines.agent_cli.ENGINES and on_model:
+                options[e]["_report_model"] = on_model
+            yield engines.run(options, text, cwd, images, cancel, meter)
     except engines.EngineError as err:
         raise engines.EngineError(netcheck.explain(ecfg, str(err))) from None
 

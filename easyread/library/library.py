@@ -55,7 +55,7 @@ class Library:
         replied = {e.get("reply_to") for e in disc.get("entries", []) if e.get("reply_to")}
         abstract = next((b.get("zh") or b.get("en") for b in paper.get("blocks", []) if b.get("role") == "abstract"), "") or meta.get("abstract_en", "")
         return {
-            "id": ws.id,
+            "id": ws.id, "display_title": meta.get("display_title", ""),
             "title_zh": meta.get("title_zh", ""), "title_en": meta.get("title_en", ""), "short_zh": meta.get("short_zh", ""), "target": meta.get("target", ""),
             "authors": meta.get("authors", ""), "affiliation": meta.get("affiliation", ""),
             "year": meta.get("year") or _year(meta.get("date", "")), "date": meta.get("date", ""),
@@ -90,20 +90,20 @@ class Library:
         return items
 
     # ---------- 导入 ----------
-    def create_from_pdf(self, data: bytes, filename: str, meta: dict | None = None) -> tuple[Workspace, bool]:
+    def create_from_pdf(self, data: bytes, filename: str, meta: dict | None = None, *, keep_filename: bool = False) -> tuple[Workspace, bool]:
         """建目录、落 PDF 和空数据文件。渲染原页、抽文字放到后台任务里做。返回 (目录, 是否新建)。"""
         if not data.startswith(b"%PDF"):
             raise ValueError(tr("不是 PDF 文件"))
         digest = sha256_bytes(data)
-        return self._create_pdf(digest, filename, meta, data=data)
+        return self._create_pdf(digest, filename, meta, data=data, keep_filename=keep_filename)
 
-    def import_pdf_path(self, source: str | Path, meta: dict | None = None, *, link: bool = False) -> tuple[Workspace, bool]:
+    def import_pdf_path(self, source: str | Path, meta: dict | None = None, *, link: bool = False, keep_filename: bool = False) -> tuple[Workspace, bool]:
         """Import a local PDF. Duplicate imports never change existing storage."""
         if not link:
             source = Path(source).expanduser()
-            return self.create_from_pdf(source.read_bytes(), source.name, meta)
+            return self.create_from_pdf(source.read_bytes(), source.name, meta, keep_filename=keep_filename)
         source, digest = self._linked_pdf(source)
-        return self._create_pdf(digest, source.name, meta, linked=source)
+        return self._create_pdf(digest, source.name, meta, linked=source, keep_filename=keep_filename)
 
     def _linked_pdf(self, source: str | Path) -> tuple[Path, str]:
         if re.match(r"^[A-Za-z][A-Za-z0-9+.-]*://", str(source)):
@@ -144,7 +144,7 @@ class Library:
         return ws
 
     def _create_pdf(self, digest: str, filename: str, meta: dict | None, *, data: bytes | None = None,
-                    linked: Path | None = None) -> tuple[Workspace, bool]:
+                    linked: Path | None = None, keep_filename: bool = False) -> tuple[Workspace, bool]:
         pid = digest[:12]
         ws = Workspace(self.root / pid)
         if (ws.root / "paper.json").exists():
@@ -167,7 +167,10 @@ class Library:
         })
         write_json_atomic(ws.discussion_path, empty_discussion())
         write_json_atomic(ws.reader_path, empty_reader())
-        write_json_atomic(ws.item_path, {"added": now_iso(), "tags": [], "status": "unread", "starred": False})
+        item = {"added": now_iso(), "tags": [], "status": "unread", "starred": False}
+        if keep_filename:
+            item["meta_override"] = {"display_title": Path(filename).name}
+        write_json_atomic(ws.item_path, item)
         return ws, True
 
     def fetch(self, ref: str) -> tuple[bytes, str, dict]:

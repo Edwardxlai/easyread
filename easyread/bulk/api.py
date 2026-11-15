@@ -25,7 +25,8 @@ def post(app, path: str, body: dict):
         return _mig(app).scan(source, where, base)
     if path == "/api/migrate/start":
         return _mig(app).start(source, where, base, with_tags=body.get("tags", True) is not False,
-                               fetch=body.get("fetch") is True, link=body.get("link") is True)
+                               fetch=body.get("fetch") is True, link=body.get("link") is True,
+                               keep_filename=source == "folder" and body.get("keep_filename") is True)
     if path == "/api/migrate/stop":
         return _mig(app).stop()
     return None

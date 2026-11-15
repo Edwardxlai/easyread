@@ -5,21 +5,13 @@
   "use strict";
   /* efforts：能传的推理强度（和后端 agent_cli.SPECS 一致），空的就不显示推理强度 */
   PR.agentClis = {
-    qoder: { name: "Qoder CN CLI", url: "https://docs.qoder.cn/cli/installation", efforts: [],
-      hint: PR.t("使用本机已登录的 Qoder CN；模型留空跟随 CLI 默认，看图能力取决于所选模型"),
-      setup: PR.t("安装并登录 Qoder CN CLI") },
-    opencode: { name: "OpenCode CLI", url: "https://opencode.ai/docs/", efforts: [],
-      hint: PR.t("模型名填写 provider/model，可在终端运行 opencode models 查看；留空使用 OpenCode 默认模型"),
-      setup: PR.t("安装 OpenCode 并配置模型") },
-    zcode: { name: "ZCode CLI", url: "https://github.com/zai-org/ZCode/tree/main/apps/zcode-cli/docs/usage", efforts: [], defaultOnly: true,
-      hint: PR.t("使用本机 ZCode 登录态；模型和推理选项跟随 ZCode 设置，看图能力取决于所选模型"),
-      setup: PR.t("安装并登录 ZCode CLI") },
-    grok: { name: "Grok Build", url: "https://x.ai/cli", efforts: ["low", "medium", "high"] },
-    agy: { name: "Antigravity CLI", url: "https://antigravity.google/docs/cli", efforts: ["low", "medium", "high", "xhigh", "max"] },
-    cursor: { name: "Cursor CLI", url: "https://cursor.com/docs/cli/installation", efforts: [] },
-    codebuddy: { name: "CodeBuddy CLI", url: "https://www.codebuddy.cn/docs/cli/headless", efforts: [],
-      hint: PR.t("WorkBuddy 与 CodeBuddy 共用同账号积分；当前免费体验版不含 CLI 访问，需标准版及以上"),
-      setup: PR.t("安装并登录 CodeBuddy CLI") },
+    qoder: { name: "Qoder CN CLI", efforts: [] },
+    opencode: { name: "OpenCode CLI", efforts: [] },
+    zcode: { name: "ZCode CLI", efforts: [], defaultOnly: true },
+    grok: { name: "Grok Build", efforts: ["low", "medium", "high"] },
+    agy: { name: "Antigravity CLI", efforts: ["low", "medium", "high", "xhigh", "max"] },
+    cursor: { name: "Cursor CLI", efforts: [] },
+    codebuddy: { name: "CodeBuddy CLI", efforts: [] },
   };
   PR.isAgentCli = (k) => Object.prototype.hasOwnProperty.call(PR.agentClis, k);
   PR.isCli = (k) => k === "claude" || k === "codex" || PR.isAgentCli(k);
@@ -28,39 +20,42 @@
     codex: { default: "", models: [] } };
   const lists = (s) => (s.models || FALLBACK);
 
-  /* 下拉框的选项：[[value, label]]，选项就写模型名。Codex 一个模型都没查到时才留一项“Codex 默认” */
+  PR.modelDefault = (s, engine) => {
+    const catalog = lists(s)[engine];
+    if (!catalog || !catalog.default) return "";
+    const match = (catalog.models || []).find(m => m.id === catalog.default);
+    return match?.actual || match?.name || catalog.default;
+  };
+  PR.modelDefaultLabelText = (s, engine) => {
+    const name = PR.modelDefault(s, engine);
+    if (name) return PR.t("跟随默认（{model}）", {model: name});
+    const last = lists(s)[engine]?.last_used;
+    return last ? PR.t("CLI 默认（上次使用 {model}）", {model: last}) : PR.t("跟随 CLI 默认（型号未确认）");
+  };
+
   PR.cliModelOptions = function (s, engine, value) {
     const L = lists(s)[engine] || FALLBACK[engine];
     let opts;
     if (engine === "claude") {
-      opts = L.models.map((m) => [m.id, m.actual || "Claude " + m.name]);
+      opts = L.models.map((m) => [m.id, m.actual || PR.t("{name}（版本未确认）", {name: "Claude " + m.name})]);
     } else {
       opts = L.models.map((m) => [m.id, m.name]);
-      if (!opts.length) opts.unshift(["", PR.t("Codex 默认")]);
     }
+    opts.unshift(["", PR.modelDefaultLabelText(s, engine)]);
     if (value && !opts.some(([v]) => v === value)) opts.push([value, value]);
     return opts;
   };
   PR.cliModelSelect = (s, engine, value, attrs) =>
     "<select class=\"input\" " + attrs + ">" + PR.opt(PR.cliModelOptions(s, engine, value), value) + "</select>";
-  /* 以前存的“跟随 CLI 默认”（模型空着）→ 换成它现在实际用的那个，翻译固定用一个模型，不随 CLI 设置变 */
-  PR.cliPin = function (s, engine, model) {
-    if (model || (engine !== "claude" && engine !== "codex") || !s.models) return model;
-    const L = s.models[engine] || {};
-    if (engine === "codex") return L.default || "";
-    const hit = (L.models || []).find((m) => m.actual && m.actual === L.default);
-    return hit ? hit.id : "opus";
-  };
-
   PR.modelDefaultLabel = function (s, f, key) {
     if (PR.isAgentCli(f.kind)) return PR.t("跟随默认");
     const L = lists(s)[f.kind] || {};
     const model = (L.models || []).find((m) => m.id === (f.model || L.default));
     const value = key === "reasoning_effort"
-      ? L.configured_reasoning || (model && model.default_reasoning) || PR.t("未知")
+      ? L.configured_reasoning || (model && model.default_reasoning) || ""
       : L.configured_tier === "fast" ? PR.t("开启 Fast")
-      : L.configured_tier === "default" || (f.kind === "codex" && !L.configured_tier) ? PR.t("标准速度") : PR.t("未知");
-    return PR.t("跟随默认（{model}）", { model: value });
+      : L.configured_tier === "default" || (f.kind === "codex" && !L.configured_tier) ? PR.t("标准速度") : "";
+    return value ? PR.t("跟随默认（{model}）", { model: value }) : PR.t("使用默认设置");
   };
 
   PR.modelReasoningFields = function (s, f) {

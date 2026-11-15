@@ -33,7 +33,9 @@ async function reader(threads = [], options = {}) {
     t: (s, v) => v ? s.replace(/\{(\w+)\}/g, (m, k) => v[k]) : s,
     state: {}, store: { mode: "server" }, pid: "test", token: "test-token", side: null,
     $: selector => nodes.get(selector) || null,
-    on(name, fn) { events.set(name, fn); }, openSide(side) { this.side = side; }, readingBlock: () => null, blockById: {}, myNotes: () => [],
+    on(name, fn) { events.set(name, fn); }, openSide(side) { this.side = side; },
+    dockVisible(side) { return this.side === side; }, closeDockTab() { this.side = null; },
+    readingBlock: () => null, blockById: {}, myNotes: () => [],
     api: async () => ({ threads: structuredClone(threads), models: [{ id: "m", label: "Model" }, { id: "m2", label: "Other model" }], default: "m" }),
     confirm: async opts => { confirmations.push(opts); return true; },
     nowIso: () => "2026-01-01T00:00:00Z", shortTime: () => "today", autosize() {}, imageUrl: name => "/p/test/" + name,
@@ -342,7 +344,7 @@ test("paste validation retains text and failed sends retain images until a new c
   assert.equal(await r.paste([]), false, "plain text stays with the browser");
   await r.paste(Array(5).fill(pastedImage));
   assert.ok(r.panel.innerHTML.includes('role="alert"'));
-  assert.ok(r.panel.innerHTML.includes("最多粘贴 4 张"));
+  assert.ok(r.panel.innerHTML.includes("最多添加 4 张"));
   assert.equal(r.nodes.get("#chatInput").value, "Keep this question");
   await r.paste([{ ...pastedImage, type: "image/svg+xml" }]);
   assert.ok(r.panel.innerHTML.includes("仅支持 PNG"));

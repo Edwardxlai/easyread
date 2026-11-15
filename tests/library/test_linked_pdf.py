@@ -34,6 +34,19 @@ class LinkedPDFTest(unittest.TestCase):
     def linked(self):
         return self.lib.import_pdf_path(self.pdf, link=True)[0]
 
+    def test_filename_title_survives_translation_and_duplicate_import(self):
+        for link in (False, True):
+            with self.subTest(link=link):
+                lib = Library(self.root / ("linked" if link else "copied"))
+                ws, _ = lib.import_pdf_path(self.pdf, {"title_en": "Paper title"}, link=link, keep_filename=True)
+                ws.update("paper", lambda paper: paper["meta"].update(title_zh="Translated title"))
+                _, fresh = lib.create_from_pdf(self.data, "renamed.pdf")
+                self.assertFalse(fresh)
+                item = lib.summary(ws)
+                self.assertEqual(item["display_title"], self.pdf.name)
+                self.assertEqual(item["title_en"], "Paper title")
+                self.assertEqual(item["title_zh"], "Translated title")
+
     def test_link_import_uses_external_pdf_without_creating_source_copy(self):
         ws, fresh = self.lib.import_pdf_path(self.pdf, link=True)
         self.assertTrue(fresh)
