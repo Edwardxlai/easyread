@@ -16,6 +16,7 @@ from ..translate import page_check
 from ..app.i18n import tr
 from ..app.log import log
 from .store import SCHEMA, DataReadError, Workspace, dir_lock, empty_discussion, empty_reader, now_iso, read_json, write_json_atomic
+from .passage_search import PassageIndex
 
 
 
@@ -25,6 +26,7 @@ def sha256_bytes(data: bytes) -> str:
 
 class Library:
     def __init__(self, root: Path):
+        self.passage_index = PassageIndex()
         self.root = Path(root).resolve()
         self.root.mkdir(parents=True, exist_ok=True)
 

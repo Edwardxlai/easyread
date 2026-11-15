@@ -278,7 +278,7 @@
       if (e.key === "Escape") e.target.blur();
       return;
     }
-    if (PR.$(".dialog-backdrop.open")) return;
+    if (PR.$(".dialog-backdrop.open, #libraryAsk[open]")) return;
     const rows = PR.$$(".row");
     const idx = rows.findIndex((r) => r.dataset.id === L.selected);
     if (e.key === "/" || (e.key === "k" && (e.ctrlKey || e.metaKey))) { e.preventDefault(); PR.$("#q").focus(); }

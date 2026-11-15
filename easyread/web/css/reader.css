@@ -8,6 +8,7 @@
   --margin-w: 272px;
   --gap: 44px;
   --side-w: min(44vw, 720px);
+  --reader-reserved: min(var(--side-w), calc(100vw - 420px));
 }
 html { scroll-padding-top: calc(var(--bar-h) + 24px); }
 body { font-size: 15px; }

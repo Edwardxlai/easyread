@@ -94,7 +94,7 @@ def run():
                         assert frame.locator('img').evaluate('(image) => image.complete && image.naturalWidth === 0')
                     if STYLE_URL in CASES[case]:
                         expect(frame.locator('link[rel="stylesheet"]')).to_have_attribute('href', STYLE_URL)
-                    page.locator('#bar [data-act="notes"]').click()
+                    page.locator('#bar [data-act="dock"]').click()
                     card = page.locator('#notespanel .card[data-note="' + note['id'] + '"]')
                     expect(card).to_contain_text(NOTE)
                     # The card must scroll from the top back to the original sentence.

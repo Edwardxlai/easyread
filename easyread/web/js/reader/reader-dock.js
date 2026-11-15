@@ -1,4 +1,4 @@
-/* Two stacked groups of tabs share the reader's existing right-hand space. */
+/* Two tab groups can share the dock vertically or horizontally. */
 (function (PR) {
   "use strict";
   const dock = PR.$("#readerDock"), toggle = PR.$('[data-act="dock"]');
@@ -27,7 +27,7 @@
   PR.side = null;
   PR.dockVisible = key => shown.has(key);
   const owner = key => groups.findIndex(g => g.tabs.includes(key));
-  const allowed = key => (key !== "pages" || PR.feature("pages")) &&
+  const allowed = key => (key !== "pages" || (PR.feature("pages") && PR.state.paper?.meta?.source_type !== "web")) &&
     (key !== "chat" || (PR.feature("chat") && PR.chatView?.()));
   function title(key) {
     const block = PR.blockById?.[key.slice(4)];
@@ -53,7 +53,7 @@
     for (const [key, node] of views) node.hidden = !next.has(key);
     groups.forEach(g => {
       g.el.hidden = !g.active;
-      if (!g.active) return;
+      if (!g.active) { g.el.querySelector(".dock-tabs").replaceChildren(); return; }
       const node = view(g.active);
       // Keep editors and PDF scrollers mounted when another tab gets focus.
       if (node.parentNode !== g.content) g.content.append(node);
@@ -127,6 +127,13 @@
       if (owner(key) >= 0) b.insertAdjacentHTML("beforeend", PR.icon("check", "sm"));
       return b;
     }));
+    if (g.tabs.length > 1 || !divider.hidden) {
+      for (const [axis, label] of [["columns", PR.t("左右分栏")], ["rows", PR.t("上下分栏")]]) {
+        const b = document.createElement("button"); b.type = "button";
+        b.dataset.split = axis; b.textContent = label;
+        g.menu.firstElementChild.append(b);
+      }
+    }
     g.menu.showPopover({ source: g.add });
     const r = g.add.getBoundingClientRect(), m = g.menu.getBoundingClientRect();
     g.menu.style.left = Math.max(6, Math.min(r.left, innerWidth - m.width - 6)) + "px";
@@ -137,6 +144,13 @@
     const group = e.target.closest(".dock-group"); if (!group) return;
     const index = Number(group.dataset.group), g = groups[index];
     if (e.target.closest(".dock-add")) { e.preventDefault(); return togglePicker(g); }
+    const split = e.target.closest("[data-split]");
+    if (split && g.menu.contains(split)) {
+      g.menu.hidePopover();
+      setDirection(split.dataset.split === "columns");
+      if (divider.hidden) place(g.active, 1 - index);
+      divider.focus(); return;
+    }
     const choice = e.target.closest("[data-open]");
     if (choice && g.menu.contains(choice)) {
       const key = choice.dataset.open; g.menu.hidePopover(); current = index;
@@ -174,7 +188,11 @@
     }
     const r = el.getBoundingClientRect();
     const canSplit = !groups[1 - index].active && (!tabDrag || g.tabs.length > 1);
-    return { el, index, edge: canSplit ? (e.clientY < r.top + r.height / 2 ? "top" : "bottom") : null };
+    if (!canSplit) return { el, index };
+    const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+    const lateral = y > .32 && y < .68 && (x < .25 || x > .75);
+    const edge = lateral ? (x < .5 ? "left" : "right") : (y < .5 ? "top" : "bottom");
+    return { el, index, edge };
   }
   function clearCue() { groups.forEach(g => g.el.removeAttribute("data-drop")); }
   dock.addEventListener("dragover", e => {
@@ -198,9 +216,9 @@
     } else if (owner(key) < 0) return;
     e.preventDefault(); e.stopPropagation();
     if (target.edge && (owner(key) !== target.index || groups[target.index].tabs.length > 1)) {
-      resize(50);
+      setDirection(target.edge === "left" || target.edge === "right");
       const empty = 1 - target.index;
-      if ((target.edge === "top") !== (empty === 0)) {
+      if ((target.edge === "top" || target.edge === "left") !== (empty === 0)) {
         [groups[0].tabs, groups[1].tabs] = [groups[1].tabs, groups[0].tabs];
         [groups[0].active, groups[1].active] = [groups[1].active, groups[0].active];
         place(key, target.index);
@@ -211,15 +229,23 @@
     ratio = Math.max(20, Math.min(80, value)); dock.style.setProperty("--dock-first", ratio + "%");
     divider.setAttribute("aria-valuenow", String(Math.round(ratio)));
   }
+  function setDirection(columns) {
+    dock.classList.toggle("columns", columns);
+    divider.setAttribute("aria-orientation", columns ? "vertical" : "horizontal");
+    divider.setAttribute("aria-label", columns ? PR.t("调整面板宽度") : PR.t("调整面板高度"));
+    resize(50);
+  }
   resize(ratio);
   divider.addEventListener("pointerdown", e => { divider.setPointerCapture(e.pointerId); e.preventDefault(); });
   divider.addEventListener("pointermove", e => {
     if (!divider.hasPointerCapture(e.pointerId)) return;
-    const rect = dock.getBoundingClientRect(); resize(100 * (e.clientY - rect.top) / rect.height);
+    const rect = dock.getBoundingClientRect();
+    resize(100 * (dock.classList.contains("columns") ? (e.clientX - rect.left) / rect.width : (e.clientY - rect.top) / rect.height));
   });
   divider.addEventListener("keydown", e => {
-    if (!["ArrowUp", "ArrowDown"].includes(e.key)) return;
-    e.preventDefault(); resize(ratio + (e.key === "ArrowDown" ? 5 : -5));
+    const keys = dock.classList.contains("columns") ? ["ArrowLeft", "ArrowRight"] : ["ArrowUp", "ArrowDown"];
+    if (!keys.includes(e.key)) return;
+    e.preventDefault(); resize(ratio + (e.key === keys[1] ? 5 : -5));
   });
   PR.refreshDockResource = () => {
     for (const key of shown) if (isResource(key)) PR.renderDockResource(key, view(key));

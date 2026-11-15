@@ -11,6 +11,18 @@ module.exports = async function readerDock(page) {
   };
   await page.locator('#pageview .pv-scroll img').first().waitFor();
   await pick(groups.first(), 'notes');
+  // A full-width dock must still leave its outer grip reachable to shrink it again.
+  const dock = page.locator('#readerDock'), grip = page.locator('.panel-grip');
+  const handle = await grip.boundingBox();
+  await page.mouse.move(handle.x + handle.width / 2, handle.y + 100);
+  await page.mouse.down(); await page.mouse.move(1, handle.y + 100, { steps: 12 }); await page.mouse.up();
+  assert.ok((await dock.boundingBox()).x < 3, 'The dock can cover the entire reader');
+  await groups.first().locator('.dock-add').click();
+  await groups.first().locator('[data-split=columns]').click();
+  const pdf = await page.locator('#pageview').boundingBox(), note = await page.locator('#notespanel').boundingBox();
+  assert.ok(pdf.x < note.x && Math.abs(pdf.y - note.y) < 2, 'PDF and notes are side by side');
+  await groups.last().locator('[data-key=notes]').dragTo(groups.first().locator('.dock-head'));
+  await grip.dblclick();
   await page.locator('#notespanel [data-np=paper]').click();
   const original = await page.locator('#paperNote').inputValue();
   assert.equal(await page.locator('#pnMindmap').isVisible(), false, 'The sidebar note is writing-only');

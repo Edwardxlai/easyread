@@ -1,0 +1,14 @@
+#libraryAsk { width: min(640px, calc(100% - 32px)); max-height: 80vh; box-sizing: border-box;
+  padding: 22px; border: 1px solid var(--rule); border-radius: 12px;
+  color: var(--ink); background: var(--surface); box-shadow: var(--shadow); }
+#libraryAsk::backdrop { background: rgba(25, 24, 22, .35); }
+#libraryAsk form { display: grid; gap: 10px; }
+#libraryAsk .ask-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+#libraryAsk h2 { margin: 0; font-size: 20px; }
+#libraryAsk textarea { resize: vertical; width: 100%; }
+.ask-status:not(:empty), .ask-answer:not(:empty) { margin-top: 16px; }
+.ask-answer { white-space: pre-wrap; line-height: 1.65; }
+.ask-sources { margin: 14px 0 0; padding-left: 24px; }
+.ask-sources:empty { display: none; }
+.ask-sources li + li { margin-top: 10px; }
+.ask-sources small { display: block; color: var(--ink-2); line-height: 1.5; }

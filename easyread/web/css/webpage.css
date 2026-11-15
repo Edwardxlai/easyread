@@ -3,7 +3,7 @@
 .web-native #stage { display:none; }
 .web-article #bar [data-act="pages"], .web-article .pgmark { display:none; }
 @media (min-width:1180px) {
-  .web-article.side-open #webSnapshot { width:calc(100% - var(--side-w)); }
+  .web-article.side-open #webSnapshot { width:calc(100% - var(--reader-reserved)); }
 }
 @media print {
   .web-article #webSnapshot { margin:0; width:100%; }

@@ -4,6 +4,8 @@
   border-left: 1px solid var(--rule); display: grid; grid-template-rows: minmax(0, 1fr);
 }
 #readerDock.split { grid-template-rows: minmax(0, var(--dock-first, 50%)) 6px minmax(0, 1fr); }
+#readerDock.split.columns { grid-template-rows: minmax(0, 1fr); grid-template-columns: minmax(0, var(--dock-first, 50%)) 6px minmax(0, 1fr); }
+#readerDock.columns .dock-divider { cursor: col-resize; }
 .dock-group { display: flex; flex-direction: column; min-width: 0; min-height: 0; position: relative; }
 .dock-head { display: flex; align-items: center; gap: 5px; min-height: 36px; padding: 0 7px;
   border-bottom: 1px solid var(--rule); font: 400 13px/1.4 var(--ui); background: var(--surface-2); }
@@ -52,9 +54,11 @@
 }
 .dock-group[data-drop="top"]::after { bottom: 50%; }
 .dock-group[data-drop="bottom"]::after { top: 50%; }
+.dock-group[data-drop="left"]::after { right: 50%; }
+.dock-group[data-drop="right"]::after { left: 50%; }
 body.side-open.np-open { --side-w: inherit; }
 @media (min-width: 761px) and (max-width: 1179px) {
-  body.side-open #stage { width: calc(100vw - var(--side-w) - 24px); margin: 0 0 0 12px;
+  body.side-open #stage { width: calc(100vw - var(--reader-reserved) - 24px); margin: 0 0 0 12px;
     grid-template-columns: 8px minmax(0, 1fr) 8px; }
 }
 @media (max-width: 760px) { #readerDock { width: 100vw; } }

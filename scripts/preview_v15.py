@@ -16,7 +16,7 @@ PAPER = "demo-dpo"
 MODEL = "preview-model"
 
 
-def seed(home):
+def seed(home, real_models=False):
     library = home / "library"
     library.mkdir(parents=True, exist_ok=True)
     dest = library / PAPER
@@ -37,6 +37,10 @@ def seed(home):
             paper.rename(dest)
     cfg = home / "config.json"
     if not cfg.exists():
+        if real_models:
+            cfg.write_text(json.dumps({"auto_translate": False, "check_updates": False, "engine": "codex",
+                                       "chat": {"default": "gpt"}}), encoding="utf-8")
+            return
         model = {"id": "preview", "name": "本地模拟模型", "engine": "openai",
                  "model": MODEL, "base_url": "http://127.0.0.1", "preset": ""}
         settings = {"auto_translate": False, "check_updates": False, "engine": "openai",
@@ -84,10 +88,12 @@ def import_model_versions(home, cache):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=18815)
+    parser.add_argument("--full", action="store_true", help="Run the normal app in an isolated library, with real model calls")
     parser.add_argument("--cli", choices=("local", "none", "one", "many"), default="local")
     parser.add_argument("--model-cache", type=Path, help="Replay Claude model IDs from an EasyRead .models-seen.json")
     args = parser.parse_args()
-    home = ROOT / "outputs" / "v15-preview" / f"{args.cli}-{args.port}"
+    scenario = "full" if args.full else args.cli
+    home = ROOT / "outputs" / "v15-preview" / f"{scenario}-{args.port}"
     os.environ.update(EASYREAD_HOME=str(home), EASYREAD_LIBRARY=str(home / "library"))
     sys.path.insert(0, str(ROOT))
     from easyread.app import config
@@ -96,6 +102,24 @@ def main():
     from easyread.server import server
     from easyread.server.launch import _Server
     from easyread.server.presence import Presence
+
+    if args.full:
+        from bs4 import BeautifulSoup
+        from easyread.library.library import Library
+        from easyread.server.launch import serve
+        from easyread.weblog import snapshot
+        seed(home, real_models=True)
+        url = "https://example.invalid/easyread/choice-pairs"
+        html = ("<html><head><title>从两份回答里选一份 · 测试样文</title></head><body><article>"
+                "<h1>从两份回答里选一份 · 测试样文</h1><p>For each prompt, two candidate completions are shown to a reviewer. "
+                "The reviewer marks the better response. These pairwise rankings can train a language model "
+                "to favor the chosen completion over the rejected one without fitting a separate reward predictor.</p>"
+                "<p>This locally authored example is included for testing cross-document search. It is not a research publication.</p>"
+                "</article></body></html>")
+        with patch.object(snapshot, "fetch", lambda _: snapshot.freeze(BeautifulSoup(html, "html.parser"), url)):
+            Library(home / "library").import_reference(url, "web")
+        serve(args.port)
+        return
 
     def discover(cfg, fresh=False):
         simulated = {"none": (), "one": ("codex",), "many": ("claude", "codex", "opencode")}

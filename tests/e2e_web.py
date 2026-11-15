@@ -231,7 +231,7 @@ def run():
                 page.locator('[data-web-layout="native"]').click()
                 select(start='intro', last=3); mark('green')
                 page.set_viewport_size({'width': 390, 'height': 844})
-                page.locator('#bar [data-act="notes"]').click(); page.wait_for_selector('body.np-open')
+                page.locator('#bar [data-act="dock"]').click(); page.wait_for_selector('body.np-open')
                 assert page.locator('#webSnapshot').is_visible()
                 assert not errors, errors
                 browser.close()
