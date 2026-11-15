@@ -29,7 +29,11 @@ function reader(mode = "server") {
     return nodes.get(selector);
   }
   let reading = "head", selected = null;
+  const visibleTabs = new Set();
   const PR = {
+    openSide: key => visibleTabs.add(key),
+    closeDockTab: key => visibleTabs.delete(key),
+    dockVisible: key => visibleTabs.has(key),
     t: (s, v) => (v ? s.replace(/\{(\w+)\}/g, (m, k) => v[k]) : s),
     state: { paper: { meta: { pages: [{ img: "pages/one.webp" }, { img: "pages/two.webp" }] } }, layout: {} },
     $: node, on(name, fn) { events.set(name, fn); }, store: { mode }, imageUrl: img => "/p/paper/" + img,
