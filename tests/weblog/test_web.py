@@ -116,7 +116,7 @@ class WebTest(unittest.TestCase):
 
     def test_offline_export_contains_snapshot(self):
         ws = self.imported()
-        exported = build(ws).read_text()
+        exported = build(ws).read_text(encoding='utf-8')
         self.assertIn('web_snapshot', exported)
         self.assertIn('webSnapshot', exported)
         self.assertNotIn('src="/web/', exported)
