@@ -66,6 +66,18 @@ function render(blocks, options = {}) {
   return paperEl.innerHTML;
 }
 
+test("table body preserves nested row labels without indenting headings or numeric columns", () => {
+  const block = {id: "t1", type: "table", page: 1, head: [["Label", "N"]],
+    rows: [["排序", "N"], ["  按价格", "  10"], ["    升序", "8"], ["下一页", "3"]]};
+  const html = render([block]);
+  assert.match(html, /<td>排序<\/td>/);
+  assert.ok(html.includes("<td>\u00a0\u00a0按价格</td>"));
+  assert.ok(html.includes("<td>" + "\u00a0".repeat(4) + "升序</td>"));
+  assert.match(html, /<td>下一页<\/td>/);
+  assert.equal(block.rows[1][0], "  按价格");
+  assert.ok(!html.includes("\u00a0\u00a010"));
+});
+
 test("translated figures pair original and translation without OCR text; stale results fall back", () => {
   const b = {id: 'f1', type: 'figure', page: 1, src: 'original.webp', image_en: 'Input', image_zh: '入力',
     translated_image: {src: 'translated.webp', source: 'original.webp', target: 'ja', image_en: 'Input', image_zh: '入力'}};

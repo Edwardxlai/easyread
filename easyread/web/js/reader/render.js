@@ -114,7 +114,14 @@
         end--;
       }
     }
-    return {head, rows: rows.slice(0, end), notes};
+    // HTML collapses leading ASCII spaces. Preserve row-label indentation in the
+    // display copy shared by the reader, the figure/table preview and offline HTML.
+    const displayRows = rows.slice(0, end).map(row => {
+      const label = row[0];
+      if (typeof label !== "string" || !/^ {2,}\S/.test(label)) return row;
+      return [label.replace(/^ +/, spaces => "\u00a0".repeat(spaces.length)), ...row.slice(1)];
+    });
+    return {head, rows: displayRows, notes};
   };
   PR.tableNotesHtml = (notes, b) => notes.map(note => '<div class="caption table-note">' +
     PR.md(note, PR.footnoteOptions(b.id)) + "</div>").join("");
