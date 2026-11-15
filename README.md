@@ -125,6 +125,8 @@ easyread
 
 浏览器会打开 `http://127.0.0.1:8765`。服务只监听本机。
 
+部署时可设置环境变量 `EASYREAD_TARGET=zh-Hant`，让默认译文使用繁体中文。设置页保存过的译文语言优先。
+
 ## 桌面版（Electron）
 
 桌面版复用同一套本地 Python 服务和 Web 界面，由 Electron 负责启动服务并显示窗口。开发环境需要 Node.js 22+、Python 3.10+ 和 PyInstaller：

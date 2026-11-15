@@ -109,6 +109,8 @@ pip install git+https://github.com/Edwardxlai/easyread
 easyread
 ```
 
+Set `EASYREAD_TARGET=zh-Hant` in the deployment environment to use Traditional Chinese as the default translation language. A language saved in Settings takes precedence.
+
 Your browser opens `http://127.0.0.1:8765`. The server only listens on localhost.
 
 ## Usage
