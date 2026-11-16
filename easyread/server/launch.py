@@ -18,6 +18,8 @@ from ..library.store import now_iso, read_json, write_json_atomic
 
 
 class _Server(ThreadingHTTPServer):
+    # 打开页面时浏览器一次请求几十个脚本和样式；默认只排 5 个连接，多出来的要等系统一秒后重连（隔着反向代理时很明显）
+    request_queue_size = 64
     # Windows 上 SO_REUSEADDR 会让两个进程同时占住 8765，浏览器随机连到其中一个（比如旧版本）
     allow_reuse_address = os.name != "nt"
 
