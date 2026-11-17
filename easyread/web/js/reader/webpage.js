@@ -158,8 +158,10 @@
         const entry = runs.get(run.id);
         if (!entry) continue;
         const value = override != null ? (i === 0 ? override : "") : (run.zh ?? run.en);
-        if (entry.zh.textContent !== value) entry.zh.textContent = value;
-        if (entry.en.textContent !== run.en) entry.en.textContent = run.en;
+        // Compare the source, not textContent: KaTeX produces a structured DOM
+        // and marks may have been inserted into it since the last update.
+        if (entry.zhValue !== value) { entry.zh.innerHTML = PR.webMathHtml(value); entry.zhValue = value; }
+        if (entry.enValue !== run.en) { entry.en.innerHTML = PR.webMathHtml(run.en); entry.enValue = run.en; }
         entry.zh.hidden = !translated || view === "original";
         entry.en.hidden = translated && view === "translation" && !hosts.get(b.id)?.classList.contains("show-en");
         entry.en.style.display = view === "both" ? "block" : "contents";
@@ -222,6 +224,15 @@
   function bind() {
     const d = doc();
     d.documentElement.dataset.easyreadDocument = "";
+    // The frame is scriptless and has its own CSS. Copy the reader's KaTeX
+    // stylesheet, including the embedded fonts in single-file offline exports.
+    const katexStyle = document.querySelector('link[href$="/vendor/katex/katex.min.css"]') ||
+      Array.from(document.querySelectorAll("style")).find(el => el.textContent.includes(".katex-version"));
+    if (katexStyle) {
+      const copy = katexStyle.cloneNode(true);
+      if (copy.tagName === "LINK") copy.href = katexStyle.href;
+      d.head.append(copy);
+    }
     const style = d.createElement("style"); style.textContent = FRAME_STYLE; d.head.append(style);
     const showSelection = PR.debounce(() => {
       if (dirty && !selection()?.toString()) updateText();
