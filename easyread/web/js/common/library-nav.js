@@ -27,9 +27,9 @@
     // Cache only list summaries, never the API token or document contents.
     rememberList(data) {
       if (!data || !Array.isArray(data.items)) return;
-      const fields = ["id", "title_zh", "title_en", "short_zh", "target", "authors", "affiliation", "year", "date", "venue", "arxiv", "url", "doi", "pages", "done_pages", "en_pages", "abstract", "meta_override", "tags", "status", "starred", "added", "last_opened", "progress", "notes", "highlights", "open_questions", "discussions", "has_paper_note", "job", "thumb"];
+      const fields = ["id", "title_zh", "title_en", "short_zh", "target", "authors", "affiliation", "year", "date", "venue", "arxiv", "url", "doi", "pages", "done_pages", "en_pages", "abstract", "meta_override", "tags", "labels", "status", "starred", "added", "last_opened", "progress", "notes", "highlights", "open_questions", "discussions", "has_paper_note", "job", "thumb"];
       const items = data.items.map((item) => Object.fromEntries(fields.filter((k) => Object.prototype.hasOwnProperty.call(item, k)).map((k) => [k, item[k]])));
-      const text = JSON.stringify({ version: 1, t: Date.now(), data: { items, engine: data.engine, engine_label: data.engine_label, version: data.version, trash: data.trash } });
+      const text = JSON.stringify({ version: 1, t: Date.now(), data: { items, labels: data.labels, engine: data.engine, engine_label: data.engine_label, version: data.version, trash: data.trash } });
       try {
         if (!items.length || text.length > SNAPSHOT_LIMIT) localStorage.removeItem(SNAPSHOT_KEY);
         else localStorage.setItem(SNAPSHOT_KEY, text);

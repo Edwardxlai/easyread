@@ -10,7 +10,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from easyread.library import cloudlib, cloudlib_detect
+from easyread.library import cloudlib, cloudlib_detect, paper_labels
 from easyread.app import config
 from easyread.library.cloudlib_lock import LibraryMarker
 from easyread.library.library import Library
@@ -91,6 +91,8 @@ print(json.dumps({"errors": errors, "times": times, "status": location.status, "
         for pid in ("paper001", "paper002", "paper003"):
             paper(self.src, pid)
         paper(self.src / ".trash", "deleted01")
+        paper_labels.create(self.src, "Reusable tag")
+        paper_labels.edit(self.src, Library(self.src).ws("paper001"), {"add": ["Applied tag"]})
         result = self.migrate()
         self.assertEqual(result["copied"], 3)
         self.assertEqual(config.load()["library_dir"], str(self.dst))

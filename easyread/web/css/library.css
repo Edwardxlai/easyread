@@ -10,6 +10,7 @@
 
 .lib { display: grid; grid-template-columns: 216px minmax(0, 1fr) 0; height: 100vh; padding-top: var(--bar-h); transition: grid-template-columns .25s ease; }
 .lib.has-detail { grid-template-columns: 216px minmax(0, 1fr) 400px; }
+#libraryNavBtn { display: none; }
 
 /* 侧栏 */
 .side { border-right: 1px solid var(--rule); padding: 16px 10px 40px; overflow-y: auto; }
@@ -61,7 +62,8 @@
 
 /* 详情 */
 .detail { border-left: 1px solid var(--rule); background: var(--surface); overflow-y: auto; overflow-x: hidden; }
-.detail-inner { padding: 22px 24px 50px; width: 400px; }
+.lib:not(.has-detail) > .detail { display: none; }
+.detail-inner { padding: 22px 24px 50px; width: min(400px, 100vw); }
 .detail .cover { display: flex; gap: 16px; }
 .detail .cover .thumb { width: 92px; height: 120px; flex: none; }
 .detail .cover .actions { display: flex; flex-direction: column; gap: 8px; min-width: 0; flex: 1; }
@@ -111,11 +113,27 @@
 @media (max-width: 1100px) {
   .lib, .lib.has-detail { grid-template-columns: 0 minmax(0, 1fr) 0; }
   .side { display: none; }
+  #libraryNavBtn { display: inline-flex; }
+  .lib.library-nav-open .side {
+    display: block; position: fixed; inset: var(--bar-h) auto 0 0; width: min(280px, 85vw);
+    background: var(--bg); box-shadow: var(--shadow-lg); z-index: 25;
+  }
   .lib > .main { grid-column: 2; }  /* 侧栏 display:none 后不占格子，不钉住的话 main 会掉进 0 宽的第一列，整页空白 */
   .lib.has-detail .detail { position: fixed; right: 0; top: var(--bar-h); bottom: 0; width: min(400px, 100vw); box-shadow: var(--shadow-lg); z-index: 20; }
 }
+@media (max-width: 1000px) {
+  body { --bar-h: 88px; }
+  .topbar { flex-wrap: wrap; align-content: center; gap: 4px 6px; padding: 4px 10px; }
+  .topbar::after { content: ""; flex-basis: 100%; height: 0; order: 1; }
+  .topbar .search { order: 2; margin: 0; min-width: 0; width: auto; flex: 1 1 0; }
+  .topbar .search input { min-width: 0; }
+  #libraryNavBtn, #libraryAskBtn { order: 2; }
+}
+@media (max-width: 360px) {
+  .topbar { column-gap: 4px; }
+  .topbar .btn.icon { width: 28px; }
+}
 @media (max-width: 640px) {
-  .topbar .search { margin-left: 8px; width: auto; flex: 1; }
   .topbar .search kbd, #importBtn span { display: none; }
   .row { grid-template-columns: 40px minmax(0, 1fr); }
   .row .side-info { display: none; }
@@ -230,8 +248,12 @@
 
 /* 侧栏（sidebar.js）：置顶 / 分类 / 最近阅读 */
 .side h3 { display: flex; align-items: center; justify-content: space-between; }
-.side .h-add { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; color: var(--ink-3); }
+.side .h-add { flex: none; width: 24px; height: 24px; padding: 0; border-radius: 6px; display: grid; place-items: center; color: var(--ink-3); }
 .side .h-add:hover { background: var(--accent-soft-2); color: var(--ink); }
+.side [data-label-toggle] { flex: 1; width: auto; min-width: 0; height: 24px; padding: 0; gap: 4px; border-radius: 4px; font: inherit; letter-spacing: inherit; color: inherit; }
+.side [data-label-toggle] svg.i { width: 13px; height: 13px; }
+.side [data-label-toggle][aria-expanded="false"] svg.i { transform: rotate(-90deg); }
+.side h3 button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .side .sgroup { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; }
 .side { overflow-x: hidden; }
 .side .srow { box-sizing: border-box; position: relative; display: flex; align-items: center; gap: 9px; width: 100%; height: 32px; padding: 0 8px 0 10px; border-radius: 8px; color: var(--ink-2); font-size: 13.5px; text-align: left; text-decoration: none; cursor: pointer; user-select: none; }
@@ -266,6 +288,38 @@
 .detail .catchip.add:hover { color: var(--accent); outline-color: var(--accent); }
 .detail #catInput { border: 0; outline: 0; background: var(--surface); font-size: 12.5px; width: 150px; color: var(--ink); box-shadow: inset 0 0 0 1px var(--accent); }
 .detail #catInput[hidden], .detail .catchip[hidden] { display: none; }
+
+.side .srow[data-paper-label] .n { display: inline; }
+.side .h-add[data-label-create]:disabled { opacity: .45; }
+#viewTitle[title]:not([title=""]) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.paper-label { max-width: 100%; color: var(--accent); background: var(--accent-soft); }
+.paper-label svg { flex: none; width: 11px; height: 11px; }
+.paper-label span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.detail .paper-labels { margin: 12px 0 16px; }
+.detail .paper-labels h4 { margin: 0 0 8px; }
+.detail .paper-labels .tags { margin: 0 0 8px; }
+.label-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.label-picker, .label-rule-editor { width: min(400px, calc(100vw - 24px)); padding: 16px; }
+.label-picker .label-paper-title { overflow-wrap: anywhere; }
+.label-picker fieldset { min-width: 0; padding: 0; margin: 12px 0 0; border: 0; }
+.label-picker .label-input-row { display: flex; align-items: center; gap: 8px; }
+.label-picker .label-input-row input { min-width: 0; flex: 1; }
+.label-picker .label-input-row button { flex-shrink: 0; }
+.label-picker .label-options { max-height: 36vh; overflow-y: auto; padding: 6px 0; margin: 6px 0 0; }
+.label-choice { display: flex; align-items: center; gap: 4px; border-radius: 6px; }
+.label-choice label { display: flex; flex: 1; min-width: 0; align-items: center; gap: 9px; padding: 6px 8px; cursor: pointer; }
+.label-choice label span { min-width: 0; overflow-wrap: anywhere; }
+.label-rule-summary { display: block; margin-top: 3px; color: var(--ink-2); line-height: 1.45; white-space: pre-line; }
+.label-choice:hover, .label-choice:focus-within { background: var(--accent-soft); }
+.label-choice button { flex: none; color: var(--ink-2); }
+.label-picker .label-options input { flex: none; accent-color: var(--accent); }
+.label-picker .err, .label-rule-editor .err { font-size: 12px; color: var(--danger); overflow-wrap: anywhere; }
+.label-picker fieldset:disabled { opacity: .65; }
+.label-rule-editor .cf-title { overflow-wrap: anywhere; }
+.label-rule-editor textarea { display: block; min-height: 96px; }
+body:has(> .label-rule-editor[open]) > .label-picker[open],
+body:has(> .label-rule-editor[open]) > .label-picker[open]::backdrop { visibility: hidden; }
+
 .lib { position: relative; transition: none; }
 .side-grip { position: absolute; top: var(--bar-h); bottom: 0; left: calc(var(--side-w, 248px) - 3px); width: 6px; cursor: col-resize; z-index: 5; }
 .side-grip:hover, body.resizing .side-grip { background: linear-gradient(90deg, transparent 2px, var(--accent) 2px, var(--accent) 4px, transparent 4px); }

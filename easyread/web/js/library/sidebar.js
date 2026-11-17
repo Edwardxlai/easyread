@@ -40,7 +40,7 @@
     const d = pinnedRow ? 0 : T.depth(c);
     const slot = pinnedRow ? "" : PR.foldSlot(kids, open), tree = pinnedRow ? "" : " tree";
     if (ui.renaming === c && !pinnedRow) return '<div class="srow tree editing"' + lvl(d) + ">" + slot + PR.icon("folder", "sm") + '<input class="side-input" data-rename="' + PR.esc(c) + '" value="' + PR.esc(T.leaf(c)) + '" maxlength="' + T.MAX_NAME + '"></div>';
-    return '<div class="srow' + tree + (L.tag === c ? " on" : "") + '" data-cat="' + PR.esc(c) + '"' + (pinnedRow ? " data-pinrow" : "") + lvl(d) + ' title="' + PR.esc(T.label(c)) + '">' + slot + PR.icon("folder", "sm") +
+    return '<div class="srow' + tree + (L.view === "all" && L.tag === c ? " on" : "") + '" data-cat="' + PR.esc(c) + '"' + (pinnedRow ? " data-pinrow" : "") + lvl(d) + ' title="' + PR.esc(T.label(c)) + '">' + slot + PR.icon("folder", "sm") +
       '<span class="t">' + PR.esc(pinnedRow ? T.label(c) : T.leaf(c)) + '</span><span class="n">' + count((i) => L.inCat(i, c)) + "</span>" + more + "</div>";
   }
   const addRow = (d) => '<div class="srow tree editing"' + lvl(d) + ">" + PR.foldSlot(false) + PR.icon("folder", "sm") + '<input class="side-input" data-new placeholder="' + (ui.addUnder ? PR.t("子分类名，回车") : PR.t("分类名，回车")) + '" maxlength="' + T.MAX_PATH + '"></div>';
@@ -70,18 +70,26 @@
       return view ? viewRow(view, true) : "";
     }).join("");
     let h = pinned ? '<h3>' + PR.t("置顶") + '</h3><div class="sgroup">' + pinned + "</div>" : "";
-    h += '<h3>' + PR.t("分类") + '<button class="h-add" data-add title="' + PR.t("新建分类") + '">' + PR.icon("plus", "sm") + "</button></h3><div class=\"sgroup\" data-drop-zone>" +
+    h += '<h3>' + PR.t("分类") + '<button type="button" class="h-add" data-add title="' + PR.t("新建分类") + '">' + PR.icon("plus", "sm") + "</button></h3><div class=\"sgroup\" data-drop-zone>" +
       BUILTIN.filter(([k]) => k === "all" || (!L.side.hidden.includes(k) && !isPinned("v:" + k))).map((v) => viewRow(v)).join("") +
       AUTO.filter(([k, , , fn]) => count(fn) && !L.side.hidden.includes(k)).map((v) => viewRow(v)).join("") +
       catTree(cats) +
       (ui.adding && !ui.addUnder ? addRow(0) : "") +
       (!ui.adding ? '<button class="srow tree hint-row" data-add>' + PR.foldSlot(false) + PR.icon("plus", "sm") + '<span class="t">' + (cats.length ? PR.t("新建分类") : PR.t("新建分类，把论文拖进来")) + "</span></button>" : "") + "</div>";
     const recent = L.items.filter((i) => i.last_opened && !isPinned("p:" + i.id)).sort((a, b) => String(b.last_opened).localeCompare(String(a.last_opened)));
-    if (recent.length) {
-      const shown = recent.slice(0, ui.recentOpen ? RECENT_MAX : RECENT_SHORT);
-      h += '<h3>' + PR.t("最近阅读") + '</h3><div class="sgroup">' + shown.map((i) => paperRow(i)).join("") +
-        (recent.length > RECENT_SHORT ? '<button class="srow toggle-more" data-recent>' + (ui.recentOpen ? PR.t("收起") : PR.t("展开更多（{n}）", { n: Math.min(recent.length, RECENT_MAX) - RECENT_SHORT })) + "</button>" : "") + "</div>";
+    if (recent.length || L.loadStatus === "ready") {
+      const rows = recent.slice(0, ui.recentOpen ? RECENT_MAX : RECENT_SHORT).map((i) => paperRow(i));
+      if (!rows.length) {
+        const empty = L.items.some((i) => i.last_opened) ? PR.t("最近读过的论文已置顶") : PR.t("暂无阅读记录");
+        rows.push('<div class="empty">' + empty + '</div>');
+      }
+      if (recent.length > RECENT_SHORT) {
+        const label = ui.recentOpen ? PR.t("收起") : PR.t("展开更多（{n}）", { n: Math.min(recent.length, RECENT_MAX) - RECENT_SHORT });
+        rows.push('<button type="button" class="srow toggle-more" data-recent>' + label + '</button>');
+      }
+      h += '<h3>' + PR.t("最近阅读") + '</h3><div class="sgroup" id="recentPaperList">' + rows.join("") + '</div>';
     }
+    if (L.labelSidebar) h += L.labelSidebar();
     if (L.trashCount) h += '<div class="sgroup side-trash"><button class="srow" data-trash>' + PR.icon("trash", "sm") + '<span class="t">' + PR.t("回收站") + '</span><span class="n">' + L.trashCount + "</span></button></div>";
     box.innerHTML = h;
     const inp = PR.$(".side-input", box);
@@ -138,6 +146,20 @@
 
   /* ---------- 事件 ---------- */
   const side = PR.$("#side");
+  const library = PR.$(".lib"), sideButton = PR.$("#libraryNavBtn");
+  function showSide(open) {
+    library.classList.toggle("library-nav-open", open);
+    sideButton.setAttribute("aria-expanded", String(open));
+  }
+  sideButton.innerHTML = PR.icon("book", "sm");
+  sideButton.onclick = () => showSide(!library.classList.contains("library-nav-open"));
+  document.addEventListener("click", (e) => {
+    if (library.classList.contains("library-nav-open") && !e.target.closest("#side, #libraryNavBtn, #ctxmenu")) showSide(false);
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && library.classList.contains("library-nav-open")) showSide(false);
+  });
+
   side.addEventListener("click", (e) => {
     if (e.target.closest(".side-input")) return;
     const m = e.target.closest("[data-more]");
@@ -150,7 +172,7 @@
     if (!row) return;
     if (row.dataset.view) { L.view = row.dataset.view; L.tag = null; L.render(); }
     else if (row.dataset.cat) {
-      L.tag = L.tag === row.dataset.cat ? null : row.dataset.cat; L.view = "all";
+      L.tag = L.view === "all" && L.tag === row.dataset.cat ? null : row.dataset.cat; L.view = "all";
       // 双击（第二下）：筛选回到双击前，切换折叠。第一下已经重画了侧栏，dblclick 落不到原来的行上，所以按 click 的 detail 认
       if (e.detail === 2 && row.querySelector("[data-fold]")) return L.toggleFold(row.dataset.cat);
       L.render();

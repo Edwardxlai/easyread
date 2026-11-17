@@ -7,7 +7,7 @@ import threading
 import time
 from uuid import uuid4
 
-from ..chat import chat_models
+from ..chat import chat_models, paper_labeling
 from ..app import config
 from ..translate import langs, translate, instructions
 from ..engines import usage
@@ -251,10 +251,6 @@ class Jobs:
         else:
             # Legacy queued explicit requests may not have started yet.
             pages = wanted if planned and not job.get("cap_check") else [n for n in wanted if n not in skip]
-        if not pages:
-            self._write(ws, state="done", message=tr("选定范围已整理完") if read else tr("选定范围已译完"))
-            return
-
         cap = cfg.get("page_cap", 60)
         if type(cap) is not int or cap < 0:
             cap = 60  # 手改配置写错时仍按默认上限保护，不把错误值当作不限。
@@ -278,14 +274,23 @@ class Jobs:
 
         started = time.time()
         try:
-            failed = translate.translate_pages(ws, cfg, pages, cancel, report, meter, read)
+            failed = translate.translate_pages(ws, cfg, pages, cancel, report, meter, read) if pages else {}
+            if not read:
+                # On resume the selected pages may already be saved, with tagging still pending.
+                completed = set(pages).difference(failed) if pages else wanted
+                paper_labeling.after_translation(self.lib, ws, cfg, cancel, completed, meter=meter,
+                                                 report=lambda message: self._write(ws, message=message))
         finally:  # 取消、出错也把已经花掉的记上
             run = meter.snapshot()
             self._write(ws, timing=timeline.snapshot())
             if run["calls"]:
                 ws.update("job", lambda j: j.update(usage=run, usage_total=usage.merge(j.get("usage_total"), run)))
+        if cancel.is_set():
+            raise Cancelled()
         minutes = max(1, round((time.time() - started) / 60))
-        if failed:
+        if not pages:
+            self._write(ws, state="done", message=tr("选定范围已整理完") if read else tr("选定范围已译完"))
+        elif failed:
             first = next(iter(failed.values()))
             self._write(ws, state="partial", failed={str(k): v for k, v in failed.items()}, error=first,
                         message=(tr("{ok} 页好了，", ok=len(pages) - len(failed)) if len(failed) < len(pages) else "")

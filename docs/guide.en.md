@@ -107,6 +107,16 @@ Your browser opens `http://127.0.0.1:8765`. The server only listens on localhost
 3. Translation runs in the background page by page. Translated parts are readable immediately; untranslated pages show the original. Importing more than 5 PDFs at once asks before translating them all (the default is "Import only"); "Stop translation" at the top of the list stops every running job and keeps what is already translated.
 4. Click a paragraph for its action bar; select text to highlight, note or ask. Shortcuts are listed and editable under Settings → Shortcuts; the question mark at top right has help and updates.
 
+### Tag papers
+
+- **Recent** appears below the categories in the library sidebar. Open a paper in the reader to add it to your reading history. Pinned papers appear at the top of the sidebar.
+- Select the **Tags** heading below **Recent** to expand or collapse the list. The browser remembers your choice after a refresh. Use **+** beside the heading to create a tag. Select a tag to filter papers. The number beside each tag shows how many papers carry it.
+- Open a paper's details and select **Edit tags…**. Check any existing tags you want to apply, or type a name and select **Create and add**. Uncheck a tag to remove it from the paper, then select **Save tags**.
+- In **Edit tags…**, right-click a tag or choose **Rules** beside it to view and edit its library-wide criteria. A new tag and its rule are saved together. You can also right-click an existing tag in the sidebar to open its rule.
+- Select **Tag with AI** to check existing rules against the title, abstract and available body text using your default Ask AI model. For long papers, EasyRead samples both passages relevant to the rules and passages from across the paper. An empty rule uses the tag name. The app applies all matches directly.
+- On the first successful paper translation, including a page selection, the translation model also classifies the paper. It checks existing tags and their rules first and applies every match. It considers creating tags with rules only when none of the existing tags fit. The app records the completed check per paper for subsequent translation jobs.
+- Select **Create tags with AI** to preview up to three suggested tags and their matching rules. Choose **Rules** to edit a suggestion. Check the tags you want and select **Save selected tags** to create and apply them. Cancel discards the suggestions.
+
 ## Reading with an AI agent
 
 EasyRead ships with a CLI, so agents like Claude Code or Codex can read your notes and questions in a conversation, write answers next to the right paragraphs, or translate / re-translate pages themselves. The skill is in [`skill/paper-reading/SKILL.md`](../skill/paper-reading/SKILL.md); put that folder in `~/.claude/skills/` or `~/.codex/skills/`.

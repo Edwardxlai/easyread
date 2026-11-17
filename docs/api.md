@@ -24,7 +24,14 @@ EasyRead 运行时把地址写在数据目录的 `.server.json`（默认 `~/Easy
 | 方法 | 路径 | 用途 |
 | --- | --- | --- |
 | GET | `/api/version` | `{"api": 1, "version": "1.3.1"}`；`api` 是本页约定的版本，`version` 是应用版本 |
-| GET | `/api/library` | 文献库列表 `items`（每篇的 `id`、标题、作者、DOI、进度、笔记数等）和写操作要用的 `token` |
+| GET | `/api/library` | 文献库列表 `items`、可用标签列表 `labels` 和写操作要用的 `token`。每篇的 `labels` 列出它当前的标签 |
+| GET | `/api/library/labels` | 读取可用标签的 `labels` 数组，每项包含 `name` 和 `rule`。可用 `?name=标签名` 只读取一个标签，未找到时返回空数组。空规则使用标签名判断 |
+| POST | `/api/library/labels` | 传 `{"name": "研究方法"}` 新建可复用的标签。返回保存的标签名 `name` |
+| POST | `/api/library/labels/rule` | 传 `name` 和 `rule` 修改已有标签的全库规则。可传打开编辑器时的 `previous_rule`，如规则已被改成其他内容，保存会返回错误。成功时返回保存的名称和规则 |
+| POST | `/api/p/{id}/labels` | `add` 和 `remove` 分别接收要添加和移除的标签名数组。可用 `new_rules` 提供本次创建的标签规则，键是标签名。返回本篇的 `labels` 和这次新增的 `added` |
+| POST | `/api/p/{id}/labels/auto` | 使用默认问答模型按规则匹配已有标签，返回实际新增的 `added` 数组 |
+| POST | `/api/p/{id}/labels/suggest` | 预览最多三个 AI 建议的标签。`suggestions` 数组每项包含 `name` 和 `rule`。勾选的建议通过论文标签接口的 `add` 和 `new_rules` 一起保存 |
+| POST | `/api/p/{id}/labels/generate` | 使用默认问答模型生成最多三个可复用标签及规则，保存并应用到本篇。返回实际应用的新标签 `added` |
 | POST | `/api/import?name=<文件名>&translate=0\|1` | 请求体是 PDF 原始字节，请求头带 `X-Token`。返回 `{"id", "new", "queued"}`；已有同一 PDF 时 `new` 为 false |
 | GET | `/api/p/{id}/part/paper` | `{"data": paper.json, "version": …}`：标题、段落原文和译文 |
 | GET | `/api/p/{id}/part/reader` | `{"data": reader.json, "version": …}`：划线、批注、整篇心得 |

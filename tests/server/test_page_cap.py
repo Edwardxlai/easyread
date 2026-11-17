@@ -58,6 +58,8 @@ class PageCapTest(unittest.TestCase):
         self.assertEqual(ws.load("job")["translation_extra"], "")
 
     def fake_engine(self, cfg, prompt, cwd, images=None, cancel=None, meter=None):
+        if "Check all existing labels first" in prompt:
+            return '{"selected":[],"labels":[]}'
         match = re.search(r"这次只(?:处理|翻译)第 ([\d, ]+) 页", prompt)
         pages = [int(n) for n in match[1].split(",")]
         self.calls.append({"pages": pages, "cfg": cfg, "root": str(cwd)})

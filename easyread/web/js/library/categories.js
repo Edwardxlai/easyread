@@ -61,7 +61,7 @@
     L.side.hidden = L.side.hidden.map(mvKey);
     L.side.collapsed = L.side.collapsed.map(mv);
     L.side.expanded = L.side.expanded.map(mv);
-    if (L.tag && T.under(L.tag, from)) L.tag = mv(L.tag);
+    if (L.view === "all" && L.tag && T.under(L.tag, from)) L.tag = mv(L.tag);
     L.saveSide();
     patchMany(L.items.filter((i) => L.inCat(i, from)).map((i) => [i.id, { tags: Array.from(new Set(i.tags.map(mv))) }]));
   };
@@ -79,7 +79,7 @@
     L.side.hidden = L.side.hidden.filter((k) => !goneKey(k));
     L.side.collapsed = L.side.collapsed.filter((c) => !gone(c));
     L.side.expanded = L.side.expanded.filter((c) => !gone(c));
-    if (L.tag && gone(L.tag)) L.tag = null;
+    if (L.view === "all" && L.tag && gone(L.tag)) L.tag = null;
     L.saveSide();
     patchMany(L.items.filter((i) => L.inCat(i, name)).map((i) => [i.id, { tags: i.tags.filter((t) => !gone(t)) }]));
   };

@@ -1,7 +1,7 @@
 /* 文献库：列表、筛选、排序、键盘操作、状态轮询。 */
 (function (PR) {
   "use strict";
-  const L = (PR.lib = { items: [], loadStatus: "loading", loadError: "", view: "all", tag: null, q: "", sort: PR.ls.get("easyread-sort", "opened"), selected: null, engine: "claude", picked: new Set(), picking: false });
+  const L = (PR.lib = { items: [], labels: [], loadStatus: "loading", loadError: "", view: "all", tag: null, q: "", sort: PR.ls.get("easyread-sort", "opened"), selected: null, engine: "claude", picked: new Set(), picking: false });
   const prefs = PR.ls.get("easyread-prefs", {});
   PR.applyTheme(prefs.theme);
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => PR.applyTheme(PR.ls.get("easyread-prefs", {}).theme));
@@ -41,7 +41,9 @@
 
   let pollT, loadSeq = 0, loadController, retryMs = 1500, restorePending = true, restoreView = null;
   const viewKey = () => JSON.stringify([L.view, L.tag, L.q, L.sort, L.selected]);
-  const validData = (d) => d && Array.isArray(d.items) && d.items.every((i) => i && typeof i.id === "string" && Array.isArray(i.tags));
+  const validLabels = (names) => names === undefined || (Array.isArray(names) && names.every((name) => typeof name === "string"));
+  const validData = (d) => d && validLabels(d.labels) && Array.isArray(d.items) &&
+    d.items.every((i) => i && typeof i.id === "string" && Array.isArray(i.tags) && validLabels(i.labels));
   // Only this read request has a deadline; never retry an import or another write.
   L.load = async function () {
     const seq = ++loadSeq;
@@ -94,9 +96,10 @@
     }
   };
   function apply(d, cached = false) {
+    const labels = d.labels || [];
     const changed = cached || L.loadStatus !== "ready" ||
-      JSON.stringify([L.items, L.engine, L.engineLabel, L.firstRun, L.version, L.trashCount]) !==
-      JSON.stringify([d.items, d.engine, d.engine_label, d.first_run, d.version, d.trash || 0]);
+      JSON.stringify([L.items, L.engine, L.engineLabel, L.firstRun, L.version, L.trashCount, L.labels]) !==
+      JSON.stringify([d.items, d.engine, d.engine_label, d.first_run, d.version, d.trash || 0, labels]);
     L.lastData = d;  // 切换界面语言前存一份，刷新后先拿它画列表，不闪空白（lang-toggle.js）
     L.loadStatus = cached ? "loading" : "ready"; L.loadError = "";
     if (!cached) PR.token = d.token;
@@ -106,6 +109,8 @@
     L.version = d.version;
     L.trashCount = d.trash || 0;
     L.items = d.items;
+    L.labels = labels;
+    if (L.view === "label" && !labels.includes(L.tag)) { L.view = "all"; L.tag = null; }
     if (!cached) {
       if (PR.libraryLocationNotice) PR.libraryLocationNotice(d);
       PR.libraryNav.rememberList(d);
@@ -124,8 +129,9 @@
     const view = L.VIEWS.find((v) => v[0] === L.view) || L.VIEWS[0];
     const q = L.q.trim().toLowerCase();
     let list = L.items.filter(view[3]);
-    if (L.tag) list = list.filter((i) => L.inCat(i, L.tag));  // 含子分类里的
-    if (q) list = list.filter((i) => [i.display_title, i.title_zh, i.title_en, i.authors, i.venue, i.arxiv, i.abstract, (i.tags || []).join(" "), i.year]
+    if (L.view === "label") list = list.filter((i) => (i.labels || []).includes(L.tag));
+    else if (L.tag) list = list.filter((i) => L.inCat(i, L.tag));
+    if (q) list = list.filter((i) => [i.display_title, i.title_zh, i.title_en, i.authors, i.venue, i.arxiv, i.abstract, (i.tags || []).concat(i.labels || []).join(" "), i.year]
       .join(" ").toLowerCase().includes(q));
     const key = { opened: (i) => i.last_opened || i.added, added: (i) => i.added, year: (i) => String(i.year || ""), title: (i) => PR.titles(i).main };
     const k = key[L.sort] || key.opened;
@@ -158,7 +164,8 @@
     const tt = PR.titles(i), title = tt.main;
     const sub = tt.sub ? '<div class="t2" lang="' + tt.subLang + '">' + PR.titleHtml(tt.sub) + "</div>" : "";
     const bits = [i.authors && PR.esc(i.authors.split(",").slice(0, 3).join(",") + (i.authors.split(",").length > 3 ? PR.t(" 等") : "")), i.year, i.venue || i.arxiv].filter(Boolean);
-    const tags = (i.tags || []).map((t) => '<span class="chip cat" title="' + PR.esc(PR.catTree.label(t)) + '">' + PR.icon("folder", "sm") + PR.esc(PR.catTree.leaf(t)) + "</span>").join("");
+    const categoryChips = (i.tags || []).map((t) => '<span class="chip cat" title="' + PR.esc(PR.catTree.label(t)) + '">' + PR.icon("folder", "sm") + PR.esc(PR.catTree.leaf(t)) + "</span>").join("");
+    const labelChips = L.labelChips ? L.labelChips(i) : "";
     const thumb = i.thumb ? '<div class="thumb" style="background-image:url(' + i.thumb + ')"></div>' : '<div class="thumb blank">' + PR.icon("pdf") + "</div>";
     const notes = i.notes + i.highlights ? '<span class="stat">' + PR.icon("note", "sm") + (i.notes + i.highlights) + (i.open_questions ? " · " + PR.t("{n} 问待答", { n: i.open_questions }) : "") + "</span>" : "";
     const prog = i.progress ? '<div class="meter" title="' + PR.t("阅读进度 {p}%", { p: Math.round(i.progress * 100) }) + '"><i style="width:' + Math.round(i.progress * 100) + '%"></i></div>' : "";
@@ -166,7 +173,7 @@
     return '<div class="row' + (L.selected === i.id ? " on" : "") + (picked ? " picked" : "") + '" data-id="' + i.id + '" role="option" draggable="true"' + (L.picking ? ' aria-selected="' + picked + '"' : "") + ">" +
       '<span class="pick" data-pick title="' + PR.t("勾选（批量操作）") + '">' + PR.icon("check", "sm") + "</span>" + thumb +
       '<div><div class="t1">' + (i.starred ? '<span class="star">' + PR.icon("star") + "</span>" : "") + "<span>" + PR.titleHtml(title) + "</span></div>" + sub +
-      '<div class="t3">' + bits.map((b) => "<span>" + PR.esc(String(b)) + "</span>").join("<span>·</span>") + tags + "</div></div>" +
+      '<div class="t3">' + bits.map((b) => "<span>" + PR.esc(String(b)) + "</span>").join("<span>·</span>") + categoryChips + labelChips + "</div></div>" +
       '<div class="side-info">' + statusPill(i) + prog + L.jobLine(i) + notes + "</div></div>";
   }
 
@@ -174,7 +181,9 @@
     PR.renderSide();
     const list = filtered();
     const view = L.VIEWS.find((v) => v[0] === L.view) || L.VIEWS[0];
-    PR.$("#viewTitle").textContent = L.tag ? PR.catTree.label(L.tag) : L.view === "all" ? PR.t("全部论文") : view[1];
+    const title = PR.$("#viewTitle");
+    title.textContent = L.view === "label" ? L.tag : L.tag ? PR.catTree.label(L.tag) : L.view === "all" ? PR.t("全部论文") : view[1];
+    title.title = L.view === "label" ? L.tag : "";
     PR.$("#count").textContent = PR.t("{n} 篇", { n: list.length });
     PR.renderBatch && PR.renderBatch(list);
     PR.renderStopAll && PR.renderStopAll();
@@ -190,6 +199,7 @@
   }
   function emptyHtml() {
     if (!L.items.length && L.loadStatus !== "ready") return '<div class="empty-state" role="status">' + loadHtml() + "</div>";
+    if (L.view === "label" && !L.q) return '<div class="empty-state">' + PR.t("这个标签下还没有论文。") + "</div>";
     if (L.items.length) return '<div class="empty-state"><div class="big">' + PR.t("没有符合条件的论文") + "</div>" + PR.t("换个关键词或筛选试试。") + "</div>";
     const ok = L.engineReady;
     return '<div class="welcome">' + PR.logo("hero") + "<h2>" + PR.t("把英文论文，读成舒服的中文") + "</h2>" +
@@ -231,8 +241,9 @@
   function restoreReturn() {
     const state = PR.libraryNav.restore();
     if (!state) return;
-    L.view = L.VIEWS.some((v) => v[0] === state.view) ? state.view : "all";
-    L.tag = state.tag && L.cats().includes(state.tag) ? state.tag : null;
+    const label = state.view === "label" && L.labels.includes(state.tag);
+    L.view = label || L.VIEWS.some((v) => v[0] === state.view) ? state.view : "all";
+    L.tag = label || (state.view === "all" && L.cats().includes(state.tag)) ? state.tag : null;
     L.q = state.q;
     L.sort = ["opened", "added", "year", "title"].includes(state.sort) ? state.sort : "opened";
     PR.$("#q").value = L.q;
@@ -274,17 +285,17 @@
   PR.$("#sort").addEventListener("change", (e) => { L.sort = e.target.value; PR.ls.set("easyread-sort", L.sort); L.render(); });
 
   document.addEventListener("keydown", (e) => {
+    if (PR.$(".dialog-backdrop.open, dialog[open]")) return;
     if (e.target.closest("input, textarea, select, [contenteditable]")) {
       if (e.key === "Escape") e.target.blur();
       return;
     }
-    if (PR.$(".dialog-backdrop.open, #libraryAsk[open]")) return;
     const rows = PR.$$(".row");
     const idx = rows.findIndex((r) => r.dataset.id === L.selected);
     if (e.key === "/" || (e.key === "k" && (e.ctrlKey || e.metaKey))) { e.preventDefault(); PR.$("#q").focus(); }
     else if (e.key === "ArrowDown" || e.key === "j") { e.preventDefault(); const r = rows[Math.min(rows.length - 1, idx + 1)]; if (r) { L.select(r.dataset.id); r.scrollIntoView({ block: "nearest" }); } }
     else if (e.key === "ArrowUp" || e.key === "k") { e.preventDefault(); const r = rows[Math.max(0, idx - 1)]; if (r) { L.select(r.dataset.id); r.scrollIntoView({ block: "nearest" }); } }
-    else if (e.key === "Enter" && L.selected) L.openReader(L.selected);
+    else if (e.key === "Enter" && L.selected && !e.target.closest("button, a")) L.openReader(L.selected);
     else if (e.key === "Escape") L.select(null);
     else if (e.key === "s" && L.selected) { const it = L.byId(L.selected); L.patch(it.id, { starred: !it.starred }); }
   });
@@ -295,7 +306,8 @@
   // 等侧栏、详情这些脚本都加载完再取数据：数据先到、脚本还没到时会出错
   document.addEventListener("DOMContentLoaded", () => {
     PR.loadPrefs().then((p) => { if (p.reader && p.reader.theme) PR.applyTheme(p.reader.theme); PR.useServerUi(p); L.useServerSide(p); }).catch(() => {});
-    const cached = PR.libraryNav.cachedList();
+    const snapshot = PR.libraryNav.cachedList();
+    const cached = validData(snapshot) ? snapshot : null;
     if (cached) { apply(cached, true); restoreReturn(); }
     try {
       const snap = JSON.parse(sessionStorage.getItem("easyread-lib-snap") || "null");
