@@ -13,6 +13,18 @@ function markup(realKatex = false) {
   return PR;
 }
 
+test("web text renders inline and display math but leaves site text inert", () => {
+  const PR = markup(true);
+  const input = String.raw`Text $x^2$ and $$\frac{1}{2}$$. **literal** ` +
+    '`$code$` [link](https://example.com/) <img src=x>';
+  const html = PR.webMathHtml(input);
+  assert.equal((html.match(/class="katex"/g) || []).length, 2);
+  assert.match(html, /class="katex-display"/);
+  assert.ok(html.includes('**literal** `$code$` [link](https://example.com/) &lt;img src=x&gt;'));
+  assert.ok(!html.includes('<img'));
+  assert.equal(PR.webMathHtml('Prices: $100 to $200.'), 'Prices: $100 to $200.');
+});
+
 test("title formulas render with real KaTeX while citations and HTML stay inert", () => {
   const PR = markup(true);
   PR.refById = { 13: { text: "Reference thirteen" } };

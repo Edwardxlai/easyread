@@ -73,8 +73,18 @@
     if (PR.webAnnotationRoots) {
       for (const side of [n.side || "zh", n.side === "en" ? "zh" : "en"]) {
         const roots = PR.webAnnotationRoots(n, side);
-        const i = roots?.length ? findQuote(fullText(roots), n.quote, n.prefix, n.suffix, n.start) : -1;
+        const text = roots?.length ? fullText(roots) : "";
+        let i = findQuote(text, n.quote, n.prefix, n.suffix, n.start);
         if (i >= 0) return { el: roots, i };
+        // Older web highlights may include literal $TeX$. Match their displayed
+        // equivalent after math rendering without rewriting the saved note.
+        if (roots?.length && PR.webMathHtml && /\$|\\[([]/.test(n.quote)) {
+          const probe = (roots[0].ownerDocument || document).createElement("span");
+          const visible = value => { probe.innerHTML = PR.webMathHtml(value || ""); return fullText(probe); };
+          const quote = visible(n.quote);
+          i = findQuote(text, quote, visible(n.prefix), visible(n.suffix), n.start);
+          if (i >= 0 && quote !== n.quote) return { el: roots, i, length: quote.length };
+        }
       }
     }
     const math = document.getElementById("b-" + n.anchor)?.querySelector(".math-body");
@@ -116,7 +126,7 @@
       seen.add(id);
       const at = locate(p);
       if (!at) { miss.add(id); continue; }
-      wrap(at.el, at.i, at.i + p.quote.length, attrs);
+      wrap(at.el, at.i, at.i + (at.length ?? p.quote.length), attrs);
     }
     seen.forEach((id) => (miss.has(id) ? lost.add(id) : lost.delete(id)));
     PR.applyMirrors && PR.applyMirrors(scope);
@@ -249,7 +259,7 @@
 
   function resolveHighlight(part) {
     const at = locate(part);
-    return at && { part, el: Array.isArray(at.el) ? at.el[0] : at.el, text: fullText(at.el), start: at.i, end: at.i + part.quote.length };
+    return at && { part, el: Array.isArray(at.el) ? at.el[0] : at.el, text: fullText(at.el), start: at.i, end: at.i + (at.length ?? part.quote.length) };
   }
 
   function paintHighlight(note, intent) {

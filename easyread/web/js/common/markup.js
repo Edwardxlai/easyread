@@ -87,6 +87,16 @@
     });
   };
 
+  // Web snapshots already have their own HTML formatting. Only replace math;
+  // do not interpret Markdown, links or code that happen to occur in their text.
+  PR.webMathHtml = function (text) {
+    const saved = tokens(String(text == null ? "" : text), false);
+    return PR.esc(saved.text).replace(saved.inline, (match, index) => {
+      const token = saved.values[index];
+      return token.code || token.link ? PR.esc(token.raw) : tokenHtml(token, false);
+    });
+  };
+
   const superscriptNumber = /^[⁰¹²³⁴⁵⁶⁷⁸⁹]{1,3}/;
   function noteNumber(b) {
     if (b.type !== "para") return "";
