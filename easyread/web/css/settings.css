@@ -183,3 +183,27 @@ label.check input { accent-color: var(--accent); width: 15px; height: 15px; marg
 .translation-extra textarea { display:block; width:100%; margin-top:10px; resize:vertical; }
 .translation-extra .hint { margin:8px 0 0; }
 
+/* 阅读字体设置与自定义字体选择 */
+.font-box { margin: 4px 0 12px; padding: 12px 14px; border-radius: 10px; background: var(--bg); box-shadow: inset 0 0 0 1px var(--rule); display: grid; gap: 10px; }
+.font-custom-head { display: flex; align-items: center; gap: 8px; }
+.font-custom-head .input { flex: 1; min-width: 0; }
+.font-status { font-size: 12px; color: var(--ink-3); }
+.font-status.ok { color: var(--ok); }
+.font-status.warn { color: var(--mine); }
+.font-picker { display: grid; gap: 6px; }
+.font-picker-bar { display: flex; align-items: center; gap: 8px; }
+.font-picker-bar .input { flex: 1; min-width: 0; height: 30px; font-size: 12.5px; }
+.font-picker-count { font-size: 11.5px; color: var(--ink-3); white-space: nowrap; }
+.font-list { max-height: 152px; overflow-y: auto; border: 1px solid var(--rule); border-radius: 8px; background: var(--surface); padding: 4px; display: grid; gap: 2px; }
+.font-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; padding: 5px 9px; border-radius: 6px; text-align: left; font-size: 13px; color: var(--ink-2); }
+.font-item:hover { background: var(--accent-soft); color: var(--ink); }
+.font-item.on { background: var(--accent-soft-2); color: var(--accent); font-weight: 600; }
+.font-item small { font-size: 11.5px; color: var(--ink-3); white-space: nowrap; }
+.font-checks { display: flex; flex-wrap: wrap; gap: 6px 20px; }
+.font-checks label.check { margin-top: 0; }
+.font-checks label.check.dim { opacity: .5; }
+.font-preview { padding: 10px 12px; border-radius: 8px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--rule); display: grid; gap: 4px; }
+.font-preview .fp-zh { font: 14.5px/1.75 var(--reader-zh); color: var(--ink); }
+.font-preview .fp-en { font: 13px/1.6 var(--reader-en); color: var(--ink-2); }
+.font-preview .fp-code { font: 12px/1.5 var(--reader-code); color: var(--ink); background: var(--accent-soft); padding: 1px 5px; border-radius: 4px; justify-self: start; }
+

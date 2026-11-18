@@ -12,24 +12,26 @@
 
   PR.opt = (list, val) => list.map(([v, l]) => '<option value="' + PR.esc(v) + '"' + (String(v) === String(val) ? " selected" : "") + ">" + PR.esc(l) + "</option>").join("");
 
-  PR.openSettings = async function (tab) {
+  PR.openSettings = async function (tab, opts) {
     await modelSaveQueue;
     const [d, chat] = await Promise.all([PR.api("/api/config"), PR.api("/api/chat/models").catch(() => null)]);
     if (!PR.token) PR.token = (await PR.api("/api/library")).token;
     Object.assign(st, { tab: typeof tab === "string" && tab !== "engine" ? tab : "chat", cfg: d.config, presets: d.presets, groups: d.groups || [], chat,
       fetchMsg: null, apiTyping: false, advOpen: false, ui: { features: Object.assign({}, PR.features), keys_on: PR.keysOn, keys: Object.assign({}, PR.keymap) },
-      theme: PR.ls.get("easyread-prefs", {}).theme || "auto", recording: null, editing: null, form: null, chatKeys: null, type: null, transChecked: false });
+      theme: PR.ls.get("easyread-prefs", {}).theme || "auto", recording: null, editing: null, form: null, chatKeys: null, type: null, transChecked: false,
+      selectCustomFont: !!(opts && opts.selectCustomFont), fontQuery: "" });
     render();
     dlg().classList.add("open");
+    if (st.tab === "reading") PR.settingsTabs.reading?.onOpen?.(st, dlg());
     // 每次打开都问一次（后端有缓存，很快）：刚装好或更新了 Claude Code / Codex，版本号和模型名单马上跟上
     const r = await PR.api("/api/engines").catch(() => null);
     if (r && (JSON.stringify([r.found, r.models]) !== JSON.stringify([st.found, st.models]))) {
       st.found = r.found; st.sources = r.sources; st.models = r.models;
-      if (dlg().classList.contains("open")) { sync(); render(); }
+      if (dlg().classList.contains("open") && st.tab === "chat") { sync(); render(); }
     }
   };
   window.addEventListener("focus", async () => {
-    if (!dlg().classList.contains("open")) return;
+    if (!dlg().classList.contains("open") || st.tab !== "chat") return;
     const r = await PR.api("/api/engines").catch(() => null);
     if (r && JSON.stringify([r.models, r.found]) !== JSON.stringify([st.models, st.found])) {
       sync(); st.models = r.models; st.found = r.found; st.sources = r.sources; render();
@@ -145,11 +147,19 @@
     backdropPress = false;
     if (closeBackdrop || e.target.closest("#setCancel")) { st.recording = null; return dlg().classList.remove("open"); }
     const tb = e.target.closest("[data-set-tab]");
-    if (tb) { sync(); st.tab = tb.dataset.setTab; st.recording = null; st.editing = null; render(); return; }
+    if (tb) {
+      sync(); st.tab = tb.dataset.setTab; st.recording = null; st.editing = null; render();
+      if (st.tab === "reading") PR.settingsTabs.reading?.onOpen?.(st, dlg());
+      return;
+    }
     if (e.target.closest("#showLog")) { const r = await PR.api("/api/log"); PR.showText(PR.t("运行日志"), r.text + "\n\n" + PR.t("（完整日志：{path}）", { path: r.path })); return; }
     if (e.target.closest("#setSave")) { try { await save(); } catch (err) { PR.toast(PR.t("保存失败：{msg}", { msg: PR.esc(err.message) })); } return; }
     const t = PR.settingsTabs[st.tab];
     if (t && t.click && (await t.click(e, st, dlg()))) render();
+  });
+  dlg().addEventListener("input", (e) => {
+    const t = PR.settingsTabs[st.tab];
+    if (t && t.input && t.input(e, st, dlg())) render();
   });
   dlg().addEventListener("change", (e) => {
     const t = PR.settingsTabs[st.tab];

@@ -144,7 +144,7 @@ JSON 里 TeX 的反斜杠要写两个（`\\frac`）。`\f` `\b` `\t` `\n` `\r` �
 | 文件 | 内容 |
 |---|---|
 | `config.json` | 设置：翻译引擎、各家 API Key（`openai.keys`，按服务商分开存）、问 AI 的模型名单和默认模型（`chat.models`、`chat.default`） |
-| `prefs.json` | 界面偏好：阅读页字号、版心、主题、划线笔（`reader`），功能开关和快捷键总开关（`ui`），改过的键位（`keys`） |
+| `prefs.json` | 界面偏好：阅读页字号、版心、字体及自定义字体选项（`reader`），功能开关和快捷键总开关（`ui`），改过的键位（`keys`） |
 | `easyread.log` | 服务日志，设置底部“查看运行日志”能看到 |
 
 ## 图：裁图和图内文字

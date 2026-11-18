@@ -19,7 +19,7 @@
 .pn-content { flex: 1; min-height: 0; overflow: hidden; }
 .pn-rich-pane, .pn-source, .pn-rich { height: 100%; }
 .pn-rich-pane { overflow: auto; }
-.pn-prose { min-height: 100%; padding: 14px 16px 36px; outline: none; zoom: var(--note-zoom, 1); font: 15px/1.9 var(--serif-zh); overflow-wrap: anywhere; }
+.pn-prose { min-height: 100%; padding: 14px 16px 36px; outline: none; zoom: var(--note-zoom, 1); font: 15px/1.9 var(--reader-zh); overflow-wrap: anywhere; }
 .pn-prose p { margin: 0 0 .8em; }
 .pn-prose:has(> p:only-child > br.ProseMirror-trailingBreak:only-child)::before { content: attr(data-placeholder); color: var(--ink-2); font: 13px/1.8 var(--ui); float: left; height: 0; pointer-events: none; }
 .pn-prose h1, .pn-prose h2, .pn-prose h3, .pn-prose h4, .pn-prose h5, .pn-prose h6 { font-family: var(--ui); line-height: 1.5; margin: 1em 0 .5em; }
@@ -31,7 +31,7 @@
 .pn-prose li p { margin: .2em 0; }
 .pn-prose blockquote { border-left: 3px solid var(--accent); padding: 2px 12px; margin: .8em 0; color: var(--ink-2); }
 .pn-prose pre { background: var(--surface-2); padding: 10px; border-radius: 6px; overflow: auto; }
-.pn-prose code { font: .9em/1.65 var(--mono); background: var(--surface-2); border-radius: 3px; padding: 1px 3px; }
+.pn-prose code { font: .9em/1.65 var(--reader-code); background: var(--surface-2); border-radius: 3px; padding: 1px 3px; }
 .pn-prose pre code { background: none; padding: 0; }
 .pn-prose table { border-collapse: collapse; width: 100%; font-size: 13px; }
 .pn-prose th, .pn-prose td { border: 1px solid var(--rule-2); padding: 5px 8px; min-width: 50px; }
@@ -44,7 +44,7 @@
 .pn-prose li[data-checked] { display: flex; gap: 8px; align-items: baseline; }
 .pn-prose li[data-checked] > label { flex: none; }
 .pn-prose li[data-checked] > div { flex: 1; min-width: 0; }
-.pn-workspace #paperNote { display: block; height: 100%; min-height: 0; border-radius: 0; box-shadow: none; padding: 12px; zoom: var(--note-zoom, 1); font: 13px/1.85 var(--mono), var(--sans-zh); overflow: auto; }
+.pn-workspace #paperNote { display: block; height: 100%; min-height: 0; border-radius: 0; box-shadow: none; padding: 12px; zoom: var(--note-zoom, 1); font: 13px/1.85 var(--reader-code), var(--reader-zh); overflow: auto; }
 .pn-workspace #paperNote:focus { box-shadow: none; outline: none; }
 .pn-map-svg .markmap-node foreignObject { cursor: pointer; }
 .pn-formula { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; border-bottom: 1px solid var(--rule); padding: 7px; font-size: 12px; }

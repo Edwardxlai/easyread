@@ -24,7 +24,7 @@
 <link rel="stylesheet" href="/web/css/page-cap.css">
 <link rel="stylesheet" href="/web/css/usage.css">
 <link rel="stylesheet" href="/web/css/reader-dock.css">
-<script>try{var p=JSON.parse((localStorage.getItem("easyread-prefs")||localStorage.getItem("coread-prefs"))||"{}");var d=p.theme==="dark"||(p.theme!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.dataset.theme=d?"dark":"light"}catch(e){}</script>
+<script>try{var p=JSON.parse((localStorage.getItem("easyread-prefs")||localStorage.getItem("coread-prefs"))||"{}");var d=p.theme==="dark"||(p.theme!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches);var r=document.documentElement;r.dataset.theme=d?"dark":"light";var f=p.font==="custom"?String(p.customFont||"").replace(/["';{}\\\r\n\0<>]/g,"").trim():"";var q=f?f.split(",").map(function(s){s=s.trim();return s?'"'+s+'"':""}).filter(Boolean).join(", "):"";var e=p.fontEn!==false,c=p.fontCode!==false;if(p.font==="sans"){r.style.setProperty("--reader-zh","var(--sans-zh)");r.style.setProperty("--reader-en",e?"var(--sans-en)":"var(--serif-en)");r.style.setProperty("--reader-table",e?"var(--sans-en), var(--sans-zh)":"var(--serif-en-latin), var(--sans-zh)")}else if(q){r.style.setProperty("--reader-zh",q+", var(--serif-zh)");r.style.setProperty("--reader-en",e?q+", var(--serif-en)":"var(--serif-en)");r.style.setProperty("--reader-code",c?q+", var(--mono)":"var(--mono)");r.style.setProperty("--reader-table",e?q+", var(--serif-en), var(--serif-zh)":"var(--serif-en-latin), "+q+", var(--serif-zh)")}}catch(e){}</script>
 </head>
 <body>
 <div id="progress" aria-hidden="true"><i></i></div>
