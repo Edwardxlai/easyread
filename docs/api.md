@@ -24,7 +24,7 @@ EasyRead 运行时把地址写在数据目录的 `.server.json`（默认 `~/Easy
 | 方法 | 路径 | 用途 |
 | --- | --- | --- |
 | GET | `/api/version` | `{"api": 1, "version": "1.3.1"}`；`api` 是本页约定的版本，`version` 是应用版本 |
-| GET | `/api/library` | 文献库列表 `items`、可用标签列表 `labels` 和写操作要用的 `token`。每篇的 `labels` 列出它当前的标签 |
+| GET | `/api/library` | 文献库列表 `items`、可用标签列表 `labels` 和写操作要用的 `token`。每篇的 `labels` 列出它当前的标签。`label_features` 返回布尔开关 `ai_label_match` 和 `ai_label_create`，两项默认关闭 |
 | GET | `/api/library/labels` | 读取可用标签的 `labels` 数组，每项包含 `name` 和 `rule`。可用 `?name=标签名` 只读取一个标签，未找到时返回空数组。空规则使用标签名判断 |
 | POST | `/api/library/labels` | 传 `{"name": "研究方法"}` 新建可复用的标签。返回保存的标签名 `name` |
 | POST | `/api/library/labels/rule` | 传 `name` 和 `rule` 修改已有标签的全库规则。可传打开编辑器时的 `previous_rule`，如规则已被改成其他内容，保存会返回错误。成功时返回保存的名称和规则 |
@@ -40,6 +40,8 @@ EasyRead 运行时把地址写在数据目录的 `.server.json`（默认 `~/Easy
 | GET | `/open?sha256=<完整 SHA-256>&block=<段落 id>` | 按指纹打开论文；也可用 `id=<论文 id>`。找到就跳到阅读页，找不到回文献库 |
 
 `/api/p/{id}/state` 是阅读页自己用的：会把论文标记成"打开过"、触发补图，外部工具读数据请用上面的 `part/*`。
+
+用户可在「设置 → 侧边栏 → 论文标签」更改开关。`labels/auto` 需要开启 `ai_label_match`，`labels/suggest` 和 `labels/generate` 需要开启 `ai_label_create`。对应开关关闭时返回 HTTP 400。手动标签和规则接口始终可用。
 
 写操作（POST）都要带 `X-Token` 请求头，值从 `/api/library` 取；token 每次启动都会变。
 

@@ -1,9 +1,11 @@
 import json
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from easyread.app import prefs
 from easyread.server.jobs import Jobs
 from easyread.engines.engines import EngineError
 from easyread.library import paper_labels
@@ -20,6 +22,9 @@ class JobsTest(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.lib = Library(Path(self.tmp.name))
+        pref_path = patch.object(prefs, "path", return_value=self.lib.root / ".prefs.json")
+        pref_path.start()
+        self.addCleanup(pref_path.stop)
         root = self.lib.root / "paper0001"
         root.mkdir()
         self.ws = Workspace(root)
@@ -131,6 +136,7 @@ class JobsTest(unittest.TestCase):
         return {}
 
     def test_translation_auto_labels_once_and_prefers_existing_rules(self):
+        prefs.save({"library": {"ai_label_match": True, "ai_label_create": True}})
         for name, rule in (("VR", "Studies of virtual reality"), ("Surveys", "Studies that report a survey")):
             paper_labels.create(self.lib.root, name)
             paper_labels.set_rule(self.lib, {"name": name, "rule": rule})
@@ -164,6 +170,7 @@ class JobsTest(unittest.TestCase):
             self.assertEqual(self.ws.load("item")["labels"], ["VR"])
 
     def test_translation_labels_retry_after_failure_and_create_only_without_matches(self):
+        prefs.save({"library": {"ai_label_match": True, "ai_label_create": True}})
         paper_labels.create(self.lib.root, "Field trials")
         cfg = {"engine": "codex", "codex": {}}
         result = '{"selected":[],"labels":[{"name":"Virtual groups","rule":"Studies group behavior in virtual environments"}]}'
@@ -185,6 +192,7 @@ class JobsTest(unittest.TestCase):
                          "Studies group behavior in virtual environments")
 
     def test_translation_tagging_skips_read_mode_and_failed_translation(self):
+        prefs.save({"library": {"ai_label_match": True, "ai_label_create": True}})
         cfg = {"engine": "codex", "codex": {}}
         with patch("easyread.server.jobs.config.load", return_value=cfg), \
                 patch("easyread.server.jobs.translate.translate_pages", side_effect=self._save_translated_page) as translate, \
@@ -198,7 +206,61 @@ class JobsTest(unittest.TestCase):
             self.assertEqual(self.ws.load("job")["state"], "partial")
             model.assert_not_called()
 
+    def test_translation_skips_disabled_tools_then_uses_only_enabled_actions(self):
+        from easyread.chat import paper_labeling
+
+        cfg = {"engine": "codex", "codex": {}}
+        self.ws.update("paper", lambda p: p.update(translation={"done_pages": [1]}, meta={"title_en": "Survey"}))
+        proposed = [{"name": "New", "rule": "A rule"}]
+
+        def classify():
+            paper_labeling.after_translation(self.lib, self.ws, cfg, threading.Event(), [1], report=lambda message: None)
+
+        with patch.object(paper_labeling, "_ask", return_value={"selected": [], "labels": proposed}) as ask:
+            classify()
+            prefs.save({"library": {"ai_label_match": True}})
+            classify()  # A match-only pass with no candidates can wait for a future translation.
+            ask.assert_not_called()
+            self.assertNotIn(paper_labels.TRANSLATION_DONE, self.ws.load("item") or {})
+            paper_labels.create(self.lib.root, "Survey")
+
+            def disable(*args, **kwargs):
+                prefs.save({"library": {"ai_label_match": False}})
+                return {"selected": [1]}
+
+            ask.side_effect = disable
+            classify()
+            self.assertNotIn(paper_labels.TRANSLATION_DONE, self.ws.load("item") or {})
+            self.assertFalse((self.ws.load("item") or {}).get("labels"))
+            ask.side_effect = None
+            prefs.save({"library": {"ai_label_match": True}})
+            classify()  # Matching alone ignores unsolicited proposals and records a completed check.
+            self.assertEqual(self.ws.load("item")["labels"], [])
+            self.assertTrue(self.ws.load("item")[paper_labels.TRANSLATION_DONE])
+            classify()
+            self.assertEqual(ask.call_count, 2)
+            self.assertEqual(set(paper_labels.available(self.lib)), {"survey"})
+
+    def test_creation_only_vetoes_redundant_tags_and_can_create_for_an_uncovered_paper(self):
+        prefs.save({"library": {"ai_label_create": True}})
+        paper_labels.create(self.lib.root, "VR")
+        proposal = [{"name": "Group surveys", "rule": "Reports group survey results"}]
+        for name, selected, expected in (("covered", [1], []), ("uncovered", [], ["Group surveys"])):
+            root = self.lib.root / name
+            root.mkdir()
+            write_json_atomic(root / "paper.json", {"meta": {"pages": [{"n": 1}], "page_count": 1}})
+            ws = Workspace(root)
+            with self.subTest(name=name), patch("easyread.server.jobs.config.load", return_value={"engine": "codex", "codex": {}}), \
+                    patch("easyread.server.jobs.translate.translate_pages", side_effect=self._save_translated_page), \
+                    patch("easyread.chat.paper_labeling._ask", return_value={"selected": selected, "labels": proposal}) as ask:
+                self.jobs.enqueue(ws, pages=[1])
+                self.drain()
+                ask.assert_called_once()
+                self.assertEqual(ws.load("item")["labels"], expected)
+                self.assertTrue(ws.load("item")[paper_labels.TRANSLATION_DONE])
+
     def test_rule_changes_during_translation_keep_valid_matches_and_leave_tagging_retryable(self):
+        prefs.save({"library": {"ai_label_match": True}})
         for name in ("Changed", "Removed", "Stable"):
             paper_labels.create(self.lib.root, name)
         paper_labels.edit(self.lib.root, self.ws, {"add": ["Removed"]})
@@ -224,6 +286,7 @@ class JobsTest(unittest.TestCase):
             translate.assert_called_once()
 
     def test_cancel_during_tagging_preserves_translated_page_and_skips_label_writes(self):
+        prefs.save({"library": {"ai_label_create": True}})
         def classify(*args, **kwargs):
             self.jobs.cancel(self.ws.id)
             return '{"selected":[],"labels":[{"name":"Late","rule":"Should not be applied"}]}'
@@ -241,6 +304,7 @@ class JobsTest(unittest.TestCase):
     def test_offline_cli_can_retry_pending_tags_without_retranslating(self):
         from argparse import Namespace
         from easyread.app import cli
+        prefs.save({"library": {"ai_label_match": True, "ai_label_create": True}})
         self.ws.update("paper", lambda p: p.update(meta={"title_en": "Survey", "pages": [{"n": 1}]},
                                                     translation={"done_pages": [1]}))
         with patch.object(cli, "find", return_value=self.ws), patch.object(cli, "running_server", return_value=None), \

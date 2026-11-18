@@ -176,6 +176,7 @@ class Handler(BaseHTTPRequestHandler):
             cfg = config.load()
             items = lib.list()
             return self._json(200, {"items": items, "labels": paper_labels.summarize(lib.root, items),
+                                    "label_features": prefs.paper_label_features(),
                                     "token": app.token, "jobs": app.jobs.small_status(),
                                     "library_status": app.location.status, "other_device": app.location.marker.other_device(),
                                     "engine": cfg.get("engine"), "engine_label": cli_models.engine_label(cfg),

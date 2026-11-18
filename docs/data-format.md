@@ -109,7 +109,7 @@ JSON 里 TeX 的反斜杠要写两个（`\\frac`）。`\f` `\b` `\t` `\n` `\r` �
 ```
 
 `tags` 保存原有分类路径。`labels` 保存论文的多个标签名，旧条目缺少该字段时视为未设置标签。
-`translation_labels_done: true` 表示该论文已完成随翻译运行的标签判断。后续的选页、重译和续跑会读取该标记。
+`translation_labels_done: true` 表示该论文已完成随翻译运行的标签判断。后续的选页、重译和续跑会读取该标记。两个 AI 标签开关都关闭时会跳过判断，不写标记。开关保存在界面偏好的 `library.ai_label_match` 和 `library.ai_label_create`，缺省均为 `false`。
 
 ## job.json（后台任务状态）
 

@@ -5,6 +5,37 @@ const { createInterface } = require('node:readline');
 const assert = require('node:assert/strict');
 const { chromium } = require(process.env.PLAYWRIGHT || 'playwright');
 
+async function checkTagSettings(page) {
+  const row = page.locator('.row[data-id="sample-paper"]');
+  const detail = page.locator('#detail');
+  await row.click();
+  assert.equal(await detail.locator('[data-label-auto], [data-label-generate]').count(), 0);
+  for (const [match, create] of [[true, false], [true, true], [false, true], [false, false]]) {
+    await page.locator('#settingsBtn').click();
+    await page.locator('[data-set-tab="library"]').click();
+    for (const [id, checked] of [['ai_label_match', match], ['ai_label_create', create]]) {
+      const input = page.locator('[data-label-feature="' + id + '"]');
+      if (await input.isChecked() === checked) continue;
+      await Promise.all([
+        page.waitForResponse(r => r.url().endsWith('/api/prefs') && r.request().method() === 'POST' && r.ok()),
+        input.setChecked(checked),
+      ]);
+    }
+    await page.locator('#setCancel').click();  // Sidebar switches are saved immediately.
+    await page.reload();
+    await row.click();
+    await detail.locator('[data-label-edit]:enabled').waitFor();
+    assert.equal(await detail.locator('[data-label-auto]').count(), Number(match));
+    assert.equal(await detail.locator('[data-label-generate]').count(), Number(create));
+    await row.click({ button: 'right' });
+    const menu = page.locator('#ctxmenu.open');
+    assert.equal(await menu.getByRole('button', { name: 'AI 打标签', exact: true }).count(), Number(match));
+    assert.equal(await menu.getByRole('button', { name: 'AI 新建标签', exact: true }).count(), Number(create));
+    await page.keyboard.press('Escape');
+  }
+  await row.click();
+}
+
 async function main() {
   const root = path.resolve(__dirname, '../..');
   const python = process.env.PYTHON || (process.platform === 'win32'
@@ -45,6 +76,7 @@ async function main() {
     await toggle.press('Enter');
     assert.equal(await toggle.getAttribute('aria-expanded'), 'true');
     assert.ok(await page.locator('#paperLabelList').evaluate(list => !list.hidden));
+    await checkTagSettings(page);
     const reader = page.locator('#detail a[href^="/read/sample-paper"]');
     await Promise.all([page.waitForURL('**/read/sample-paper*'), reader.click()]);
     await page.waitForLoadState('load');

@@ -10,6 +10,7 @@
   const key = (text) => normalize(text).toLowerCase();
   const write = (path, body) => PR.api(path, { method: "POST", body });
   const pathFor = (id) => "/api/p/" + encodeURIComponent(id) + "/labels";
+  const enabledTools = () => PR.PAPER_LABEL_TOOLS.filter((tool) => L.labelFeatures[tool.id] === true);
 
   L.labelChips = (item) => assigned(item).map((label) =>
     '<span class="chip paper-label" title="' + PR.esc(label) + '">' + PR.icon("tag", "sm") +
@@ -37,15 +38,14 @@
     const busy = pending.get(item.id);
     const disabled = L.loadStatus === "ready" ? "" : " disabled";
     const chips = L.labelChips(item);
-    const aiButton = (action, label, progress, title) => '<button type="button" class="btn sm line" data-label-' + action +
-      ' title="' + PR.esc(title) + '"' + (busy ? ' disabled' : disabled) + '>' +
-      (busy === action ? '<span class="spin" aria-hidden="true"></span>' + progress : PR.icon("sparkle", "sm") + label) + '</button>';
+    const aiButton = ({ action, name, progress, description }) => '<button type="button" class="btn sm line" data-label-' + action +
+      ' title="' + PR.esc(description) + '"' + (busy ? ' disabled' : disabled) + '>' +
+      (busy === action ? '<span class="spin" aria-hidden="true"></span>' + progress : PR.icon("sparkle", "sm") + name) + '</button>';
     return '<section class="paper-labels"><h4>' + PR.t("标签") + '</h4>' +
       (chips ? '<div class="tags">' + chips + '</div>' : '') +
       '<div class="label-actions"><button type="button" class="btn sm line" data-label-edit' + disabled + '>' +
       PR.icon("tag", "sm") + PR.t("编辑标签…") + '</button>' +
-      aiButton("auto", PR.t("AI 打标签"), PR.t("正在识别标签…"), PR.t("用默认问答模型按规则匹配已有标签")) +
-      aiButton("generate", PR.t("AI 新建标签"), PR.t("正在生成标签…"), PR.t("查看 AI 建议的标签和规则，选择后保存")) +
+      enabledTools().map(aiButton).join("") +
       '</div></section>';
   };
 
@@ -245,7 +245,7 @@
   }
 
   async function runAI(item, mode) {
-    if (pending.has(item.id)) return;
+    if (pending.has(item.id) || !enabledTools().some((tool) => tool.action === mode)) return;
     const generating = mode === "generate";
     if (!generating && !L.labels.length) return PR.toast(PR.t("请先创建至少一个论文标签"));
     pending.set(item.id, mode);
@@ -276,8 +276,7 @@
     const aiDisabled = inactive || pending.has(item.id);
     return [
       { label: PR.t("编辑标签…"), icon: "tag", disabled: inactive, fn: () => openPicker(item) },
-      { label: PR.t("AI 打标签"), icon: "sparkle", disabled: aiDisabled, fn: () => runAI(item, "auto") },
-      { label: PR.t("AI 新建标签"), icon: "sparkle", disabled: aiDisabled, fn: () => runAI(item, "generate") },
+      ...enabledTools().map((tool) => ({ label: tool.name, icon: "sparkle", disabled: aiDisabled, fn: () => runAI(item, tool.action) })),
     ];
   };
 

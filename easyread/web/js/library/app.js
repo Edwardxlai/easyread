@@ -1,7 +1,7 @@
 /* 文献库：列表、筛选、排序、键盘操作、状态轮询。 */
 (function (PR) {
   "use strict";
-  const L = (PR.lib = { items: [], labels: [], loadStatus: "loading", loadError: "", view: "all", tag: null, q: "", sort: PR.ls.get("easyread-sort", "opened"), selected: null, engine: "claude", picked: new Set(), picking: false });
+  const L = (PR.lib = { items: [], labels: [], labelFeatures: {}, loadStatus: "loading", loadError: "", view: "all", tag: null, q: "", sort: PR.ls.get("easyread-sort", "opened"), selected: null, engine: "claude", picked: new Set(), picking: false });
   const prefs = PR.ls.get("easyread-prefs", {});
   PR.applyTheme(prefs.theme);
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => PR.applyTheme(PR.ls.get("easyread-prefs", {}).theme));
@@ -97,9 +97,10 @@
   };
   function apply(d, cached = false) {
     const labels = d.labels || [];
+    const labelFeatures = d.label_features || {};
     const changed = cached || L.loadStatus !== "ready" ||
-      JSON.stringify([L.items, L.engine, L.engineLabel, L.firstRun, L.version, L.trashCount, L.labels]) !==
-      JSON.stringify([d.items, d.engine, d.engine_label, d.first_run, d.version, d.trash || 0, labels]);
+      JSON.stringify([L.items, L.engine, L.engineLabel, L.firstRun, L.version, L.trashCount, L.labels, L.labelFeatures]) !==
+      JSON.stringify([d.items, d.engine, d.engine_label, d.first_run, d.version, d.trash || 0, labels, labelFeatures]);
     L.lastData = d;  // 切换界面语言前存一份，刷新后先拿它画列表，不闪空白（lang-toggle.js）
     L.loadStatus = cached ? "loading" : "ready"; L.loadError = "";
     if (!cached) PR.token = d.token;
@@ -110,6 +111,8 @@
     L.trashCount = d.trash || 0;
     L.items = d.items;
     L.labels = labels;
+    L.labelFeatures = labelFeatures;
+    L.syncLabelSwitches?.();
     if (L.view === "label" && !labels.includes(L.tag)) { L.view = "all"; L.tag = null; }
     if (!cached) {
       if (PR.libraryLocationNotice) PR.libraryLocationNotice(d);

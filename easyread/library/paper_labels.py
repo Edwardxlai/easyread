@@ -220,7 +220,7 @@ def _apply_names(ws, names: list[str], *, finish_translation: bool = False) -> l
 
 
 def apply_matches(root, ws, matches: list[Label], *, translation_catalog=None, assigned=None) -> list[str]:
-    if not matches:
+    if not matches and translation_catalog is None:
         return []
     with dir_lock(root, name=_LOCK):
         labels = _registry(root)
