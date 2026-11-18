@@ -42,9 +42,11 @@ async function reader(threads = [], options = {}) {
     esc: text => String(text || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"), icon: () => "", logo: () => "", md: text => text, mdBlocks: text => text,
     throttle: fn => fn, debounce: fn => fn, usageChip: () => "", usagePop: () => "", toast() {},
   };
-  if (options.markup) vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../../easyread/web/js/common/markup.js"), "utf8"), {
-    window: { PR }, katex: require("../../easyread/web/vendor/katex/katex.min.js"),
-  });
+  if (options.markup) {
+    const ctx = { window: { PR }, URL, katex: require("../../easyread/web/vendor/katex/katex.min.js") };
+    vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../../easyread/web/vendor/markdown-it.js"), "utf8"), ctx);
+    vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../../easyread/web/js/common/markup.js"), "utf8"), ctx);
+  }
   vm.runInNewContext(source("chat-effort"), { window: { PR } });
   vm.runInNewContext(source("chat-images") + "\n" + source("chat-documents") + "\n" + source("chat"), {
     window: { PR, addEventListener() {} },

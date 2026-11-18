@@ -228,7 +228,13 @@ textarea.editor { display: block; width: 100%; resize: none; overflow: hidden; b
 .card .body table.tbl, .inline-note table.tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; line-height: 1.5; margin: 0; }
 .card .body table.tbl th, .card .body table.tbl td, .inline-note table.tbl th, .inline-note table.tbl td { padding: 4px 8px; white-space: normal; word-break: break-word; }
 .card .body blockquote, .inline-note blockquote { margin: .4em 0; padding: .3em .7em; border-left: 2px solid var(--accent); background: var(--accent-soft); color: var(--ink-2); border-radius: 0 4px 4px 0; font-size: 13px; }
-.card .body blockquote p, .inline-note blockquote p { margin: 0; }
+.card .body blockquote p, .inline-note blockquote p { margin: 0 0 .35em; }
+.card .body blockquote p:last-child, .inline-note blockquote p:last-child { margin-bottom: 0; }
+.card .body hr, .inline-note hr { border: 0; border-top: 1px solid var(--rule); margin: .7em 0; }
+.card .body pre, .inline-note pre { max-width: 100%; overflow-x: auto; padding: .6em .8em; margin: .45em 0; background: var(--accent-soft); border-radius: 6px; text-align: left; }
+.card .body pre code, .inline-note pre code { display: block; padding: 0; background: none; white-space: pre; font-size: .86em; line-height: 1.55; }
+.card .body .md-h, .inline-note .md-h { font-weight: 600; font-family: var(--ui); font-size: 1em; margin: .6em 0 .25em; }
+.card .body .md-h:first-child, .inline-note .md-h:first-child { margin-top: 0; }
 .card.clamp .body { max-height: 12em; overflow: hidden; -webkit-mask-image: linear-gradient(#000 70%, transparent); mask-image: linear-gradient(#000 70%, transparent); }
 .card .more { font-size: 12px; color: var(--accent); margin-top: 2px; }
 .card:hover, .card.linked { color: var(--ink); }
