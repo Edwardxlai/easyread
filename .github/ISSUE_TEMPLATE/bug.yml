@@ -1,5 +1,5 @@
 name: 报告 Bug
-description: 已有功能报错、显示异常或结果与预期不符
+description: 已有功能报错、显示异常或结果与预期不符。各项均为选填。
 title: "[Bug] "
 labels: ["bug"]
 body:
@@ -7,40 +7,30 @@ body:
     id: version
     attributes:
       label: EasyRead 版本
-      description: 源码运行可填分支或提交号，查不到可填「未知」。
-    validations:
-      required: true
+      description: 源码运行可填分支或提交号。
   - type: dropdown
     id: os
     attributes:
       label: 操作系统
       options: [Windows, macOS, Linux, 其他]
-    validations:
-      required: true
   - type: dropdown
     id: installation
     attributes:
       label: 安装或使用方式
       options: [桌面安装包, 源码启动, pip 安装, 在线演示, 其他或不确定]
-    validations:
-      required: true
   - type: textarea
     id: steps
     attributes:
       label: 出问题前做了什么？
       description: 从哪个页面开始，做了哪几步？偶发问题可以描述最近一次。
       placeholder: 例如，打开一篇论文，展开笔记侧栏，再把窗口缩窄。
-    validations:
-      required: true
   - type: textarea
     id: result
     attributes:
       label: 你看到了什么，原本希望看到什么？
       placeholder: 例如，工具栏最右侧的按钮被遮住了，缩窄窗口后应该仍能访问它。
-    validations:
-      required: true
   - type: textarea
     id: evidence
     attributes:
-      label: 补充线索（选填）
+      label: 补充线索
       description: 排版问题可附截图。论文相关问题可给出页码和可公开的样例，翻译问题可注明引擎、模型或贴相关日志。上传前请遮住密钥和私人内容。
