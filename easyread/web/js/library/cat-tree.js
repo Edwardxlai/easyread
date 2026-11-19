@@ -45,11 +45,12 @@
      返回 {type:"cat", c, depth, kids, open} / {type:"paper", item, cat, depth} / {type:"more", cat, n, depth} */
   T.rows = function (cats, items, o) {
     const open = o.open || (() => false), skip = o.skip || (() => false), full = o.full || (() => false);
+    const direct = o.tags ? (c) => items.filter((i) => o.tags(i).includes(c)) : (c) => T.direct(items, c);
     const limit = o.limit || Infinity;
     const out = [];
     const walk = (par) => T.children(cats, par).forEach((c) => {
       if (skip(c)) return;
-      const depth = T.depth(c), papers = T.direct(items, c);
+      const depth = T.depth(c), papers = direct(c);
       const kids = T.hasChildren(cats, c) || papers.length > 0, isOpen = kids && open(c);
       out.push({ type: "cat", c, depth, kids, open: isOpen });
       if (!isOpen) return;

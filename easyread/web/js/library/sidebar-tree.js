@@ -25,11 +25,13 @@
   /* o.catRow(c, kids, open)、o.addRow(depth)：sidebar.js 给；o.skip(c)：隐藏、置顶的分类不画；o.addUnder：正在它下面新建子分类，先展开 */
   PR.sideTreeHtml = function (cats, o) {
     const byTitle = (a, b) => PR.titles(a).short.localeCompare(PR.titles(b).short, PR.lang);
-    const items = L.items.filter((i) => (i.tags || []).length).sort(byTitle);
-    const rows = T.rows(cats, items, { open: (c) => L.isOpen(c) || o.addUnder === c, skip: o.skip, limit: LIMIT, full: (c) => full.has(c) });
+    const tags = o.tags || ((i) => i.tags || []);
+    const items = L.items.filter((i) => tags(i).length).sort(byTitle);
+    const key = (c) => o.tags ? "/" + c : c;
+    const rows = T.rows(cats, items, { tags: o.tags, open: (c) => L.isOpen(key(c)) || o.addUnder === c, skip: o.skip, limit: LIMIT, full: (c) => full.has(key(c)) });
     return rows.map((r) => {
       if (r.type === "paper") return leafRow(r.item, r.depth);
-      if (r.type === "more") return moreRow(r.cat, r.n, r.depth);
+      if (r.type === "more") return moreRow(key(r.cat), r.n, r.depth);
       return o.catRow(r.c, r.kids, r.open) + (o.addUnder === r.c ? o.addRow(r.depth + 1) : "");
     }).join("");
   };

@@ -127,9 +127,13 @@ class Migration:
                     return item
                 ws.update("item", apply)
                 prepared = (ws.load("paper") or {}).get("meta", {}).get("pages")
-                active = (ws.load("job") or {}).get("state") in ("queued", "running")
+                active = (ws.load("job") or {}).get("state") in ("queued", "running", "confirm")
                 if not prepared and not active:
-                    jobs.enqueue(ws, translate_after=False)
+                    try:
+                        jobs.enqueue(ws, translate_after=False)
+                    except ValueError:
+                        if (ws.load("job") or {}).get("state") not in ("queued", "running", "confirm"):
+                            raise
                 self._set(**{"imported" if fresh else "existing": self.status["imported" if fresh else "existing"] + 1})
             self._save_cats(cats)
             stopped = self.cancel.is_set()

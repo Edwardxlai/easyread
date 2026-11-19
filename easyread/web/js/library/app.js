@@ -2,6 +2,11 @@
 (function (PR) {
   "use strict";
   const L = (PR.lib = { items: [], loadStatus: "loading", loadError: "", view: "all", tag: null, q: "", sort: PR.ls.get("easyread-sort", "opened"), selected: null, engine: "claude", picked: new Set(), picking: false });
+  const emptyFolderSync = { folders: [], active: false };
+  L.folderSync = emptyFolderSync;
+  L.folderTags = (item) => Array.from(new Set((item.folder_files || []).map((file) => file.folder)
+    .filter((folder) => folder && !folder.startsWith("/"))));
+  L.inFolder = (item, folder) => L.folderTags(item).some((tag) => PR.catTree.under(tag, folder));
   const prefs = PR.ls.get("easyread-prefs", {});
   PR.applyTheme(prefs.theme);
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => PR.applyTheme(PR.ls.get("easyread-prefs", {}).theme));
@@ -94,9 +99,10 @@
     }
   };
   function apply(d, cached = false) {
+    const sync = Array.isArray(d.folder_sync?.folders) ? d.folder_sync : emptyFolderSync;
     const changed = cached || L.loadStatus !== "ready" ||
-      JSON.stringify([L.items, L.engine, L.engineLabel, L.firstRun, L.version, L.trashCount]) !==
-      JSON.stringify([d.items, d.engine, d.engine_label, d.first_run, d.version, d.trash || 0]);
+      JSON.stringify([L.items, L.engine, L.engineLabel, L.firstRun, L.version, L.trashCount, L.folderSync]) !==
+      JSON.stringify([d.items, d.engine, d.engine_label, d.first_run, d.version, d.trash || 0, sync]);
     L.lastData = d;  // 切换界面语言前存一份，刷新后先拿它画列表，不闪空白（lang-toggle.js）
     L.loadStatus = cached ? "loading" : "ready"; L.loadError = "";
     if (!cached) PR.token = d.token;
@@ -106,6 +112,8 @@
     L.version = d.version;
     L.trashCount = d.trash || 0;
     L.items = d.items;
+    L.folderSync = sync;
+    if (L.view === "folder" && !sync.folders.includes(L.tag)) { L.view = "all"; L.tag = null; }
     if (!cached) {
       if (PR.libraryLocationNotice) PR.libraryLocationNotice(d);
       PR.libraryNav.rememberList(d);
@@ -117,15 +125,15 @@
   function schedule() {
     clearTimeout(pollT);
     const busy = L.items.some((i) => i.job && ["queued", "running"].includes(i.job.state));
-    pollT = setTimeout(() => L.load(), busy ? 2500 : 15000);
+    pollT = setTimeout(() => L.load(), busy || L.folderSync.active ? 2500 : 15000);
   }
 
   function filtered() {
     const view = L.VIEWS.find((v) => v[0] === L.view) || L.VIEWS[0];
     const q = L.q.trim().toLowerCase();
     let list = L.items.filter(view[3]);
-    if (L.tag) list = list.filter((i) => L.inCat(i, L.tag));  // 含子分类里的
-    if (q) list = list.filter((i) => [i.display_title, i.title_zh, i.title_en, i.authors, i.venue, i.arxiv, i.abstract, (i.tags || []).join(" "), i.year]
+    if (L.tag) list = list.filter((i) => L.view === "folder" ? L.inFolder(i, L.tag) : L.inCat(i, L.tag));  // 含子分类里的
+    if (q) list = list.filter((i) => [i.display_title, i.title_zh, i.title_en, i.authors, i.venue, i.arxiv, i.abstract, (i.tags || []).concat(L.folderTags(i)).join(" "), i.year]
       .join(" ").toLowerCase().includes(q));
     const key = { opened: (i) => i.last_opened || i.added, added: (i) => i.added, year: (i) => String(i.year || ""), title: (i) => PR.titles(i).main };
     const k = key[L.sort] || key.opened;
@@ -158,7 +166,7 @@
     const tt = PR.titles(i), title = tt.main;
     const sub = tt.sub ? '<div class="t2" lang="' + tt.subLang + '">' + PR.titleHtml(tt.sub) + "</div>" : "";
     const bits = [i.authors && PR.esc(i.authors.split(",").slice(0, 3).join(",") + (i.authors.split(",").length > 3 ? PR.t(" 等") : "")), i.year, i.venue || i.arxiv].filter(Boolean);
-    const tags = (i.tags || []).map((t) => '<span class="chip cat" title="' + PR.esc(PR.catTree.label(t)) + '">' + PR.icon("folder", "sm") + PR.esc(PR.catTree.leaf(t)) + "</span>").join("");
+    const tags = Array.from(new Set((i.tags || []).concat(L.folderTags(i)))).map((t) => '<span class="chip cat" title="' + PR.esc(PR.catTree.label(t)) + '">' + PR.icon("folder", "sm") + PR.esc(PR.catTree.leaf(t)) + "</span>").join("");
     const thumb = i.thumb ? '<div class="thumb" style="background-image:url(' + i.thumb + ')"></div>' : '<div class="thumb blank">' + PR.icon("pdf") + "</div>";
     const notes = i.notes + i.highlights ? '<span class="stat">' + PR.icon("note", "sm") + (i.notes + i.highlights) + (i.open_questions ? " · " + PR.t("{n} 问待答", { n: i.open_questions }) : "") + "</span>" : "";
     const prog = i.progress ? '<div class="meter" title="' + PR.t("阅读进度 {p}%", { p: Math.round(i.progress * 100) }) + '"><i style="width:' + Math.round(i.progress * 100) + '%"></i></div>' : "";
@@ -190,6 +198,7 @@
   }
   function emptyHtml() {
     if (!L.items.length && L.loadStatus !== "ready") return '<div class="empty-state" role="status">' + loadHtml() + "</div>";
+    if (L.view === "folder" && !L.q) return '<div class="empty-state">' + PR.t("此文件夹还没有导入的 PDF。") + "</div>";
     if (L.items.length) return '<div class="empty-state"><div class="big">' + PR.t("没有符合条件的论文") + "</div>" + PR.t("换个关键词或筛选试试。") + "</div>";
     const ok = L.engineReady;
     return '<div class="welcome">' + PR.logo("hero") + "<h2>" + PR.t("把英文论文，读成舒服的中文") + "</h2>" +
@@ -231,8 +240,9 @@
   function restoreReturn() {
     const state = PR.libraryNav.restore();
     if (!state) return;
-    L.view = L.VIEWS.some((v) => v[0] === state.view) ? state.view : "all";
-    L.tag = state.tag && L.cats().includes(state.tag) ? state.tag : null;
+    const folder = state.view === "folder" && L.folderSync.folders.includes(state.tag);
+    L.view = folder || L.VIEWS.some((v) => v[0] === state.view) ? state.view : "all";
+    L.tag = folder || (state.view === "all" && state.tag && L.cats().includes(state.tag)) ? state.tag : null;
     L.q = state.q;
     L.sort = ["opened", "added", "year", "title"].includes(state.sort) ? state.sort : "opened";
     PR.$("#q").value = L.q;

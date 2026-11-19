@@ -46,7 +46,7 @@
       (hiddenN ? '<span class="pick-hidden" title="' + PR.t("在别的分类或搜索结果里勾的，也会一起处理") + '">' + PR.t("（{n} 篇不在当前列表）", { n: hiddenN }) + "</span>" : "") +
       '<span class="grow"></span><div class="batch-tools"' + (n ? "" : " data-empty") + ">" +
       tool("cat", PR.t("加入分类"), "folder") +
-      (L.tag || L.view === "starred" ? tool("uncat", PR.t("移出“{name}”", { name: L.tag ? PR.catTree.leaf(L.tag) : PR.t("星标") }), "x") : "") +
+      (canRemoveCurrent() ? tool("uncat", PR.t("移出“{name}”", { name: L.tag ? PR.catTree.leaf(L.tag) : PR.t("星标") }), "x") : "") +
       tool("status", PR.t("切换状态"), "book") +
       tool("translate", PR.t("翻译"), "sparkle") +
       (pickedItems().some(L.modelBusy) ? tool("stop", PR.t("停止翻译"), "stop") : "") +
@@ -97,8 +97,9 @@
       { label: PR.t("新建分类并放进去…"), icon: "plus", fn: () => newCat(addTo) },
     ]);
   }
+  function canRemoveCurrent() { return (L.tag && L.view === "all") || L.view === "starred"; }
   function removeCurrent() {
-    if (L.tag) return removeFrom(L.tag);
+    if (L.tag && L.view === "all") return removeFrom(L.tag);
     setFields({ starred: false }, PR.t("{n} 篇已取消星标", { n: L.picked.size }))();
     L.endPick();
   }
@@ -187,7 +188,7 @@
     const at = { x: e.clientX, y: e.clientY };
     PR.menu(at, [
       { label: PR.t("加入分类…"), icon: "folder", fn: () => catMenu(at) },
-      ...(L.tag || L.view === "starred" ? [{ label: PR.t("移出“{name}”", { name: L.tag ? PR.catTree.leaf(L.tag) : PR.t("星标") }), icon: "x", fn: removeCurrent }] : []),
+      ...(canRemoveCurrent() ? [{ label: PR.t("移出“{name}”", { name: L.tag ? PR.catTree.leaf(L.tag) : PR.t("星标") }), icon: "x", fn: removeCurrent }] : []),
       { label: PR.t("切换状态…"), icon: "book", fn: () => statusMenu(at) },
       { label: PR.t("翻译"), icon: "sparkle", fn: () => translateAll(at) },
       ...(pickedItems().some(L.modelBusy) ? [{ label: PR.t("停止翻译"), icon: "stop", fn: () => PR.stopJobs(pickedItems(), at) }] : []),

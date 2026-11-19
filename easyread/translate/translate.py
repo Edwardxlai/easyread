@@ -38,7 +38,8 @@ def prepare(ws: Workspace) -> None:
     try:  # 本地拖进来的 PDF：从第一页的 arXiv 编号或 DOI 补上作者、年份、出处
         first = ws.root / "extract" / "page-001.txt"
         if first.exists():
-            extra = sources.enrich(first.read_text(encoding="utf-8", errors="replace"), ws.load("paper").get("meta", {}))
+            online = (ws.load("item") or {}).get("network_metadata") is not False
+            extra = sources.enrich(first.read_text(encoding="utf-8", errors="replace"), ws.load("paper").get("meta", {}), online=online)
     except Exception:  # noqa: BLE001
         log.exception("补元数据失败 %s", ws.id)
 

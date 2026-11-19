@@ -89,3 +89,30 @@ test("missing, mismatched and corrupted contexts and blocked storage fall back t
   await blocked.boot(); blocked.PR.lib.openReader("p1");
   assert.equal(blocked.location.pathname, "/read/p1"); assert.equal(blocked.location.search, "");
 });
+
+test("a mapped folder and its namesake category filter independently and survive reader navigation", async () => {
+  const items = papers();
+  items[19].folder_files = [{ folder: "分类/子目录", name: "sample.pdf" }];
+  const folder_sync = { folders: ["分类", "分类/子目录"], active: true };
+  const p = page().library(items);
+  p.setLibraryRead(() => ({ items, folder_sync, engine: "none" }));
+  await p.boot();
+  Object.assign(p.PR.lib, { view: "folder", tag: "分类" });
+  assert.deepEqual(Array.from(p.PR.lib.filtered(), i => i.id), ["p19"]);
+  p.PR.lib.view = "all";
+  assert.equal(p.PR.lib.filtered().length, 19);
+  p.PR.lib.view = "folder";
+  p.PR.lib.openReader("p19");
+  const r = page(p.location.href, p.storage);
+  r.PR.libraryNav.readerBack("p19");
+  const home = page("http://127.0.0.1:8765" + r.node("#backBtn").href, p.storage).library(items);
+  home.setLibraryRead(() => ({ items, folder_sync, engine: "none" }));
+  await home.boot();
+  assert.equal(home.PR.lib.view, "folder");
+  assert.equal(home.PR.lib.tag, "分类");
+  assert.equal(home.PR.lib.selected, "p19");
+  home.setLibraryRead(() => ({ items, engine: "none" }));
+  await home.PR.lib.load();
+  assert.equal(home.PR.lib.view, "all");
+  assert.equal(home.PR.lib.tag, null);
+});

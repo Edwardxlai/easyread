@@ -5,7 +5,7 @@
 (function (PR) {
   "use strict";
   const dlg = () => PR.$("#settingsDlg");
-  const ALL_TABS = [["chat", PR.t("模型")], ["reading", PR.t("阅读")], ["library", PR.t("侧边栏")], ["cloud", PR.t("云文献库")], ["keys", PR.t("快捷键")]];
+  const ALL_TABS = [["chat", PR.t("模型")], ["reading", PR.t("阅读")], ["library", PR.t("侧边栏")], ["folderSync", PR.t("文件夹同步")], ["cloud", PR.t("云文献库")], ["keys", PR.t("快捷键")]];
   const tabs = () => ALL_TABS.filter(([k]) => PR.settingsTabs[k]);  // “侧边栏”页只在文献库页面有
   PR.settingsTabs = PR.settingsTabs || {};
   const st = (PR.settingsState = { tab: "chat", cfg: null, presets: [], groups: [], found: null, chat: null, ui: null });
@@ -18,7 +18,8 @@
     if (!PR.token) PR.token = (await PR.api("/api/library")).token;
     Object.assign(st, { tab: typeof tab === "string" && tab !== "engine" ? tab : "chat", cfg: d.config, presets: d.presets, groups: d.groups || [], chat,
       fetchMsg: null, apiTyping: false, advOpen: false, ui: { features: Object.assign({}, PR.features), keys_on: PR.keysOn, keys: Object.assign({}, PR.keymap) },
-      theme: PR.ls.get("easyread-prefs", {}).theme || "auto", recording: null, editing: null, form: null, chatKeys: null, type: null, transChecked: false });
+      theme: PR.ls.get("easyread-prefs", {}).theme || "auto", recording: null, editing: null, form: null, chatKeys: null, type: null, transChecked: false,
+      folderSync: null, folderSyncError: "", folderSyncDraft: {}, folderSyncEditing: null, folderSyncDefaultDraft: null });
     render();
     dlg().classList.add("open");
     // 每次打开都问一次（后端有缓存，很快）：刚装好或更新了 Claude Code / Codex，版本号和模型名单马上跟上
@@ -65,7 +66,8 @@
       return '<div class="actions set-foot"><button class="btn" data-cm="cancel">' + (adding ? PR.t("取消") : PR.t("完成")) +
         '</button>' + (adding ? '<button class="btn accent" data-cm="ok">' + PR.t("添加模型") + '</button>' : "") + '</div>';
     }
-    return '<div class="actions set-foot"><button class="linkish" id="showLog">' + PR.t("运行日志") + '</button><span class="grow"></span><button class="btn" id="setCancel">' + (st.tab === "chat" ? PR.t("关闭") : PR.t("取消")) + '</button>' + (st.tab === "chat" ? "" : '<button class="btn primary" id="setSave">' + PR.t("保存") + "</button>") + "</div>";
+    const instant = st.tab === "chat" || st.tab === "folderSync";
+    return '<div class="actions set-foot"><button class="linkish" id="showLog">' + PR.t("运行日志") + '</button><span class="grow"></span><button class="btn" id="setCancel">' + (instant ? PR.t("关闭") : PR.t("取消")) + '</button>' + (instant ? "" : '<button class="btn primary" id="setSave">' + PR.t("保存") + "</button>") + "</div>";
   }
 
   function saveStatusHtml() {

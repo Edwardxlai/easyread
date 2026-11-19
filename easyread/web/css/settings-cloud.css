@@ -25,6 +25,10 @@
 .cloud-progress { display: flex; align-items: center; gap: 8px; }
 .cloud-notice { display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin: 12px 0; border: 1px solid #ac822c; border-radius: 8px; font-size: 13px; color: var(--ink); background: color-mix(in srgb, #d7a333 12%, var(--bg)); }
 .cloud-notice span { flex: 1; }
+.folder-sync-option { display: flex; align-items: center; gap: 6px; color: var(--ink-2); font-size: 13px; }
+.folder-sync-settings .cloud-card-acts { flex-wrap: wrap; justify-content: flex-end; max-width: 100%; }
+.folder-sync-settings .cloud-card-acts .folder-sync-option { flex-basis: 100%; justify-content: flex-end; }
+.sync-draft-options { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 12px 0; }
 @media (max-width: 600px) {
   .cloud-card { flex-wrap: wrap; }
   .cloud-card-acts { width: 100%; justify-content: flex-end; }
