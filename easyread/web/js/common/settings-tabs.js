@@ -38,7 +38,7 @@
       return true;
     },
     change(e, s) {
-      if (e.target.matches(".reading-font") && e.detail) Object.assign(s.type, e.detail);
+      if (e.detail && e.target.matches(".reading-font")) Object.assign(s.type, e.detail);
       const t = e.target.dataset.type;
       if (t === "view") { s.type.mode = e.target.value === "both" ? "bi" : "zh"; if (e.target.value !== "both") s.type.lead = e.target.value; }  // 和阅读页顶栏一样：mode + lead
       else if (t) s.type[t] = t === "margin" ? e.target.value === "true" : ["fs", "measure", "lh"].includes(t) ? +e.target.value : e.target.value;
