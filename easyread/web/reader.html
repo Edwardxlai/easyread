@@ -20,6 +20,7 @@
 <link rel="stylesheet" href="/web/vendor/note-libraries.css">
 <link rel="stylesheet" href="/web/css/paper-note-editor.css">
 <link rel="stylesheet" href="/web/css/reader-chat.css">
+<link rel="stylesheet" href="/web/css/chat-sources.css">
 <link rel="stylesheet" href="/web/css/settings.css">
 <link rel="stylesheet" href="/web/css/page-cap.css">
 <link rel="stylesheet" href="/web/css/usage.css">
@@ -90,6 +91,20 @@
 <section id="chatpanel" class="side-panel" aria-label="问 AI"></section>
 <aside id="readerDock" aria-label="阅读侧栏" hidden></aside>
 <div class="dialog-backdrop" id="readerDlg"><div class="dialog" role="dialog"></div></div>
+<dialog id="chatSources" aria-labelledby="chatSourcesTitle">
+  <header><h2 id="chatSourcesTitle">参考范围</h2><button type="button" class="btn sm" data-cancel>取消</button></header>
+  <div class="source-modes" role="radiogroup" aria-labelledby="chatSourcesTitle">
+    <label><input type="radio" name="source-mode" value="paper" checked>当前论文</label>
+    <label><input type="radio" name="source-mode" value="manual">手动选择</label>
+  </div>
+  <section data-picker hidden>
+    <input class="input" data-search type="search" aria-label="搜索分类或论文标题" placeholder="搜索分类或论文标题">
+    <label class="source-all"><input type="checkbox" data-all>全选当前列表</label>
+    <div class="source-list"></div>
+    <span class="hint" data-count></span>
+  </section>
+  <footer><span class="hint" role="status"></span><button class="btn accent" type="button" data-apply>使用此范围</button></footer>
+</dialog>
 <div class="dialog-backdrop" id="settingsDlg"><div class="dialog" role="dialog" aria-label="设置"></div></div>
 <div class="dialog-backdrop" id="textDlg"><div class="dialog wide" role="dialog"></div></div>
 
@@ -110,6 +125,7 @@
 <script src="/web/js/common/translation-task.js"></script>
 <script src="/web/js/common/features.js"></script>
 <script src="/web/js/common/reader-typography.js"></script>
+<script src="/web/js/common/font-picker.js"></script>
 <script src="/web/js/common/usage.js"></script>
 <script src="/web/js/common/page-cap.js"></script>
 <script src="/web/js/common/theme.js"></script>
@@ -152,6 +168,8 @@
 <script src="/web/js/reader/chat-effort.js"></script>
 <script src="/web/js/reader/chat-images.js"></script>
 <script src="/web/js/reader/chat-documents.js"></script>
+<script src="/web/js/library/cat-tree.js"></script>
+<script src="/web/js/reader/chat-sources.js"></script>
 <script src="/web/js/reader/chat.js"></script>
 <script src="/web/js/reader/chat-export.js"></script>
 <script src="/web/js/common/save-export.js"></script>

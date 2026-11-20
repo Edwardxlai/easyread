@@ -75,13 +75,22 @@
       if (!st.model || !st.models.some((m) => m.id === st.model)) st.model = st.def;
       if (!modelsOnly) {
         if (st.cur && !st.threads.some((t) => t.id === st.cur)) st.cur = null;
-        if (st.cur) { st.answerStyle = styleOfThread(thread()); st.chatOptions = { ...(thread().chat_options || {}) }; }
+        if (st.cur) { st.scope = lastScope(thread()); st.answerStyle = styleOfThread(thread()); st.chatOptions = { ...(thread().chat_options || {}) }; }
       }
       st.loaded = true;
     } catch (e) { PR.toast(PR.t("读不到对话记录：{msg}", { msg: PR.esc(e.message) })); }
   }
   PR.on("settings-saved", () => { if (st.loaded) load(true, true).then(render); });
 
+  function lastScope(t) {
+    const messages = t?.messages || [];
+    const at = messages.findLastIndex(m => m.role === "user");
+    const scope = messages[at]?.library_scope;
+    if (!scope || Array.isArray(scope.papers)) return scope || null;
+    // Older automatic searches can be continued with the papers actually cited.
+    const papers = [...new Set((messages[at + 1]?.sources || []).map(s => s.paper))];
+    return papers.length ? {papers} : null;
+  }
   const thread = () => st.threads.find((t) => t.id === st.cur) || null;
   const modelOf = (id) => st.models.find((m) => m.id === id) || st.models[0] || { label: PR.t("模型") };
 
@@ -124,14 +133,15 @@
   }
   function msgHtml(m) {
     if (m.role === "user") {
-      return '<div class="cm user"><div class="bubble">' + PR.md(m.content, { cite: false, xref: false }) + "</div>" + imagesHtml(m.images || [], false) + fileDraft.html(m.documents || [], false) +
+      return '<div class="cm user"><div class="bubble">' + PR.md(m.content, { cite: false, xref: false }) + "</div>" + (m.library_scope ? '<small class="hint">' + PR.esc(PR.chatSources.scopeName(m.library_scope)) + '</small>' : '') + imagesHtml(m.images || [], false) + fileDraft.html(m.documents || [], false) +
         ((m.refs && m.refs.length ? m.refs : m.anchor ? [m] : []).filter((r) => PR.blockById[r.anchor])
           .map((r) => '<button class="cm-ctx" data-c="go" data-anchor="' + PR.esc(r.anchor) + '">' + PR.icon("link", "sm") + "<span>" + PR.esc(ctxLabel(r)) + "</span></button>").join("")) + "</div>";
     }
     const live = st.streaming && st.streaming.msg === m;
     return '<div class="cm ai' + (m.error ? " err" : "") + '" data-id="' + PR.esc(m.id || "") + '"><div class="who"><span class="av">' + PR.icon("sparkle", "sm") + "</span>" + PR.esc(m.model || "AI") +
       (STYLES.indexOf(m.answer_style) > 0 ? '<span class="cm-style">' + styleLabel(m.answer_style) + "</span>" : "") + (live ? ' <span class="spin"></span>' : "") + "</div>" +
-      '<div class="body">' + (m.error ? PR.esc(m.error) : m.content ? PR.mdBlocks(m.content) : '<p class="thinking"><i></i><i></i><i></i></p>') + "</div>" +
+      '<div class="body">' + (m.error ? PR.esc(m.error) : m.content ? PR.chatSources.body(m) : '<p class="thinking"><i></i><i></i><i></i></p>') + "</div>" +
+      PR.chatSources.references(m) +
       (!live && !m.error && m.id ? '<div class="acts"><button data-c="copy">' + PR.icon("copy", "sm") + PR.t("复制") + "</button>" + (PR.canChat() ? '<button data-c="pin" title="' + PR.t("作为 AI 讨论放到这段旁边") + '">' + PR.icon("note", "sm") + PR.t("放到页边") + "</button>" : "") +
         (PR.canChat() ? '<button data-c="export-md">' + PR.icon("download", "sm") + PR.t("导出 Markdown") + '</button>' : '') +
         (m.usage && m.usage.calls ? '<span class="cm-usage" title="' + PR.t("输入 {input}（缓存命中 {cached}），输出 {output}", { input: PR.fmtTokens(m.usage.input), cached: PR.fmtTokens(m.usage.cached), output: PR.fmtTokens(m.usage.output) }) + '">' + PR.fmtTokens(m.usage.input + m.usage.output) + " token</span>" : "") + "</div>" : "") + "</div>";
@@ -169,6 +179,8 @@
     return '<div class="ch-compose" data-drop-file="' + PR.t("松开以添加附件") + '" data-drop-quote="' + PR.t("松开以引用选段") + '">' + (chips ? '<div class="ch-chips">' + chips + "</div>" : "") +
       fileDraft.html(st.documents, true) + (fileStatus ? '<div class="ch-attach-status" role="status">' + PR.esc(fileStatus) + '</div>' : '') +
       imagesHtml(st.images, true) + (imageStatus ? '<div class="ch-attach-status" role="' + (st.imageError ? 'alert' : 'status') + '">' + PR.esc(imageStatus) + '</div>' : '') +
+      '<button class="ch-pill ch-scope" type="button" data-c="scope" aria-haspopup="dialog"' + (st.streaming ? " disabled" : "") + '>' +
+      PR.t("参考范围") + " · " + PR.esc(PR.chatSources.scopeName(st.scope)) + PR.icon("chevron", "sm") + '</button>' +
       '<textarea id="chatInput" rows="1" aria-label="' + PR.t("提问，可粘贴图片") + '" placeholder="' + (st.images.length ? PR.t("补充问题，或直接发送图片…") : PR.t("输入问题，或粘贴截图…")) + '">' + PR.esc(st.draft) + "</textarea>" +
       '<div class="ch-bar"><button class="ch-model" data-c="menu" title="' + PR.t("换模型和思考强度") + '"' + (st.streaming ? ' disabled' : '') + '>' + PR.esc(m.label) + PR.chatEffort.suffix(st, m) + PR.icon("chevron", "sm") + "</button>" + style + attach + styleMenu + menu +
       '<span class="grow"></span>' + PR.usageChip(st.limits, thread() && thread().messages, st.usageOpen) +
@@ -191,7 +203,7 @@
   function renderLive() {
     const node = st.streaming && PR.$("#chatList .cm.ai:last-child .body");
     if (!node) return;
-    node.innerHTML = st.streaming.msg.content ? PR.mdBlocks(st.streaming.msg.content) : '<p class="thinking"><i></i><i></i><i></i></p>';
+    node.innerHTML = st.streaming.msg.content ? PR.chatSources.body(st.streaming.msg) : '<p class="thinking"><i></i><i></i><i></i></p>';
     const box = PR.$("#chatList");
     if (box.scrollHeight - box.scrollTop - box.clientHeight < 160) box.scrollTop = box.scrollHeight;
   }
@@ -219,7 +231,8 @@
     t.answer_style = answerStyle;
     t.model = modelId;
     t.chat_options = chatOptions;
-    const user = { role: "user", content: text, anchor: c ? c.anchor : null, quote: c ? c.quote : "", note: noteId || null, refs, answer_style: answerStyle, images, documents: documents.map(file => ({ name: file.name })) };
+    const sourceScope = only ? null : st.scope;
+    const user = { role: "user", library_scope: sourceScope, content: text, anchor: c ? c.anchor : null, quote: c ? c.quote : "", note: noteId || null, refs, answer_style: answerStyle, images, documents: documents.map(file => ({ name: file.name })) };
     const msg = { role: "assistant", content: "", model: modelOf(modelId).label, answer_style: answerStyle };
     t.messages.push(user, msg);
     const ctrl = new AbortController();
@@ -232,7 +245,7 @@
     try {
       const res = await fetch("/api/p/" + PR.pid + "/chat", {
         method: "POST", signal: ctrl.signal, headers: { "Content-Type": "application/json", "X-Token": PR.token || "" },
-        body: JSON.stringify({ context_scope: refs.length ? "selection" : "paper", thread: t.local ? null : t.id, text, anchor: user.anchor, quote: user.quote, refs, note: noteId || null, model: modelId, answer_style: answerStyle, chat_options: chatOptions, images, documents }),
+        body: JSON.stringify({ library_scope: sourceScope, context_scope: refs.length ? "selection" : "paper", thread: t.local ? null : t.id, text, anchor: user.anchor, quote: user.quote, refs, note: noteId || null, model: modelId, answer_style: answerStyle, chat_options: chatOptions, images, documents }),
       });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "HTTP " + res.status);
       const reader = res.body.getReader(), dec = new TextDecoder();
@@ -247,6 +260,7 @@
           if (!line.trim()) continue;
           const ev = JSON.parse(line);
           if (ev.thread && (!t.id || t.local)) { t.id = ev.thread; delete t.local; st.cur = ev.thread; }
+          if (ev.sources) { msg.sources = ev.sources; msg.missing = ev.missing; }
           if (ev.documents) user.documents = ev.documents;
           if (ev.model) msg.model = ev.model;
           if (ev.answer_style) msg.answer_style = t.answer_style = ev.answer_style;
@@ -287,11 +301,12 @@
     const c = b.dataset.c;
     const row = b.closest(".ch-thread[data-t]");
     if (c === "close") return PR.toggleChat(false);
+    if (c === "scope" && !st.streaming) return PR.chatSources.open(st.scope, value => { st.scope = value; render(); focusInput(); });
     if (c === "attach") return PR.$("#chatFileInput")?.click();
     if (c === "unfile") { st.documents.splice(Number(b.dataset.i), 1); st.fileError = ""; return render(); }
     if (c === "unimage") { st.images.splice(Number(b.dataset.i), 1); st.imageError = ""; render(); return focusInput(); }
     if (c === "list") { st.listOpen = !st.listOpen; st.menuOpen = st.styleOpen = false; return render(); }
-    if (c === "new") { if (st.streaming) return; st.chatOptions = {}; st.effortOpen = false; st.cur = null; st.listOpen = false; st.model = st.def; st.answerStyle = "standard"; st.styleOpen = false; st.refs = []; resetAttachments(); st.draft = ""; if (PR.$("#chatInput")) PR.$("#chatInput").value = ""; render(); return focusInput(); }
+    if (c === "new") { if (st.streaming) return; st.chatOptions = {}; st.scope = null; st.effortOpen = false; st.cur = null; st.listOpen = false; st.model = st.def; st.answerStyle = "standard"; st.styleOpen = false; st.refs = []; resetAttachments(); st.draft = ""; if (PR.$("#chatInput")) PR.$("#chatInput").value = ""; render(); return focusInput(); }
     if (c === "style") { if (st.streaming) return; st.styleOpen = !st.styleOpen; st.menuOpen = st.listOpen = st.usageOpen = false; return render(); }
     if (c === "style-pick") {
       if (st.streaming) return;
@@ -325,7 +340,7 @@
       if (!(await PR.confirm({ title: PR.t("删除这个对话？"), body: PR.t("「{title}」。已经放到页边的讨论不受影响。", { title: t.title }), ok: PR.t("删除"), danger: true, at: row }))) return;
       if (!t.local) await PR.api("/api/p/" + PR.pid + "/chat/delete", { method: "POST", body: { thread: t.id } });
       st.threads = st.threads.filter((x) => x !== t);
-      if (st.cur === t.id) { resetAttachments(); st.cur = null; st.answerStyle = "standard"; }
+      if (st.cur === t.id) { resetAttachments(); st.cur = null; st.scope = null; st.answerStyle = "standard"; }
       return render();
     }
     const card = b.closest(".cm.ai");
@@ -347,6 +362,7 @@
     const t = thread();
     if (t && t.model && st.models.some((m) => m.id === t.model)) st.model = t.model;
     st.answerStyle = styleOfThread(t);
+    st.scope = lastScope(t);
     st.chatOptions = { ...((t && t.chat_options) || {}) }; st.effortOpen = false;
     render();
   });

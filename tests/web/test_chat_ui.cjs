@@ -29,6 +29,7 @@ async function reader(threads = [], options = {}) {
     },
   });
   nodes.set("#chatpanel", panel);
+  nodes.set("#chatSources", { querySelector: () => ({}) });
   const PR = {
     t: (s, v) => v ? s.replace(/\{(\w+)\}/g, (m, k) => v[k]) : s,
     state: {}, store: { mode: "server" }, pid: "test", token: "test-token", side: null,
@@ -48,7 +49,7 @@ async function reader(threads = [], options = {}) {
     vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../../easyread/web/js/common/markup.js"), "utf8"), ctx);
   }
   vm.runInNewContext(source("chat-effort"), { window: { PR } });
-  vm.runInNewContext(source("chat-images") + "\n" + source("chat-documents") + "\n" + source("chat"), {
+  vm.runInNewContext(source("chat-images") + "\n" + source("chat-documents") + "\n" + source("chat-sources") + "\n" + source("chat"), {
     window: { PR, addEventListener() {} },
     document: { addEventListener(name, fn) { if (!listeners.has(name)) listeners.set(name, []); listeners.get(name).push(fn); } },
     navigator: { clipboard: { async writeText(text) { copied.push(text); } } },

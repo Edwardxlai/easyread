@@ -22,7 +22,14 @@ def get(app, path: str):
 def post(app, path: str, body: dict):
     source, where, base = str(body.get("source") or "zotero"), str(body.get("path") or ""), str(body.get("base") or "")
     if path == "/api/migrate/scan":
-        return _mig(app).scan(source, where, base)
+        result = _mig(app).scan(source, where, base)
+        if source == "folder":
+            result["watch"] = app.folder_watch.options(result["path"])
+        return result
+    if path == "/api/migrate/watch":
+        app.folder_watch.configure(where, body.get("enabled") is True, body.get("link") is True,
+                                   body.get("keep_filename") is True)
+        return {"ok": True}
     if path == "/api/migrate/start":
         return _mig(app).start(source, where, base, with_tags=body.get("tags", True) is not False,
                                fetch=body.get("fetch") is True, link=body.get("link") is True,
@@ -33,4 +40,4 @@ def post(app, path: str, body: dict):
 
 
 GET = {"/api/zotero/detect", "/api/migrate/status"}
-POST = {"/api/migrate/scan", "/api/migrate/start", "/api/migrate/stop"}
+POST = {"/api/migrate/watch", "/api/migrate/scan", "/api/migrate/start", "/api/migrate/stop"}

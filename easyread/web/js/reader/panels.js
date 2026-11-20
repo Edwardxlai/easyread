@@ -25,6 +25,7 @@
     root.style.setProperty("--lh", p.lh);
     root.style.setProperty("--measure", p.measure + "em");
     PR.applyTheme(p.theme);
+    PR.applyReadingFont(p, root);
     body.classList.toggle("font-sans", p.font === "sans");
     body.classList.toggle("mode-bi", p.mode === "bi");
     body.classList.toggle("no-margin", !p.margin);
@@ -57,7 +58,7 @@
     PR.$("#settings").innerHTML =
       '<div class="row view-row-narrow">' + PR.viewSegHtml(true) + "</div>" +
       slider("fs", PR.t("字号"), " px") + slider("measure", PR.t("版心"), PR.t(" 字")) + slider("lh", PR.t("行距"), "") +
-      '<div class="row"><span>' + PR.t("字体") + "</span>" + segHtml("font", [["serif", PR.t("宋体")], ["sans", PR.t("黑体")]]) + "</div>" +
+      '<div class="row"><span>' + PR.t("字体") + "</span>" + PR.readingFontField(PR.prefs) + "</div>" +
       '<div class="row"><span>' + PR.t("边注") + "</span>" + segHtml("margin", [[true, PR.t("显示")], [false, PR.t("收起")]]) + "</div>" +
       '<div class="row hintrow"><button class="linkish" data-reset-type>' + PR.t("恢复默认") + '</button><span class="grow"></span>' +
       (PR.store.mode === "server" ? '<button class="linkish" data-open-settings="reading">' + PR.t("更多设置…") + "</button>" : "") + "</div>";
@@ -69,6 +70,12 @@
   PR.$("#settings").addEventListener("input", (e) => {
     const r = e.target.closest("[data-r]");
     if (r) PR.setPref(r.dataset.r, +r.value, true);
+  });
+  PR.$("#settings").addEventListener("change", (e) => {
+    if (e.target.matches(".reading-font") && e.detail) {
+      PR.prefs.customFont = e.detail.customFont;
+      PR.setPref("font", e.detail.font, true);
+    }
   });
   PR.$("#settings").addEventListener("click", (e) => {
     const os = e.target.closest("[data-open-settings]");
@@ -120,7 +127,7 @@
     if (act === "settings") { PR.renderSettings(); PR.$("#settings").classList.toggle("open"); }
   });
   document.addEventListener("mousedown", (e) => {
-    if (!e.target.closest("#settings, [data-act=settings]")) PR.$("#settings").classList.remove("open");
+    if (!e.target.closest("#settings, .reading-font-list, [data-act=settings]")) PR.$("#settings").classList.remove("open");
     if (!e.target.closest("#popover, a.cite, a.xref, mark.hl, .stale-tag, #blockbar")) PR.hidePopover();
   });
   PR.on("status", ({ s, text }) => {

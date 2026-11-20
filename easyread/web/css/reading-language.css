@@ -14,7 +14,7 @@ body.en-only .view-seg { display: none; }
 /* 译文在前：标题里的原文一行放在译文下面，小一号 */
 body:not(.original-first) #paper .heading-original {
   display: block; margin: .25em 0 0; padding: 0; border: 0;
-  font: italic .74em/1.4 var(--serif-en); color: var(--ink-3); font-weight: 400;
+  font: italic .74em/1.4 var(--reader-en); color: var(--ink-3); font-weight: 400;
 }
 body:not(.original-first) #paper .heading-original .num { display: none; }
 
@@ -37,7 +37,7 @@ body.original-first #paper .blk-heading .paired-translation {
   font-size: .74em; line-height: 1.4; font-weight: 400; color: var(--ink-3);
 }
 body.original-first #paper .blk-heading .paired-translation .num { display: none; }
-body.original-first .paper-head h1 { font-family: var(--serif-en); }
+body.original-first .paper-head h1 { font-family: var(--reader-en); }
 body.original-first .paper-head .title-en { font-family: inherit; font-style: normal; }
 
 /* Aa 只管排版：标签列按最长的标签自适应，中英文界面都不挤 */
@@ -47,6 +47,7 @@ html[lang="en"] #settings.menu { width: 330px; }
 html[lang="en"] #settings.menu .row:not(.hintrow) { grid-template-columns: 6.6em minmax(0, 1fr); }
 #settings.menu .row > span { width: auto; white-space: nowrap; }
 #settings.menu .row > .seg { justify-self: end; }
+#settings.menu .row > select.input { justify-self: end; width: 100%; min-width: 0; height: 30px; font-size: 12.5px; text-overflow: ellipsis; }
 #settings.menu .slider { grid-template-columns: 5.2em minmax(0, 1fr) 4.2em !important; }
 html[lang="en"] #settings.menu .slider { grid-template-columns: 6.6em minmax(0, 1fr) 4.2em !important; }
 #settings.menu .slider input { width: 100%; min-width: 0; margin: 0; }

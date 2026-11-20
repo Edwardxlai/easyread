@@ -1,0 +1,26 @@
+#chatSources {
+  box-sizing: border-box; width: min(470px, calc(100vw - 28px)); max-height: 84dvh; overflow: auto;
+  border: 1px solid var(--rule); border-radius: 12px; padding: 20px; background: var(--surface); color: var(--ink);
+}
+#chatSources::backdrop { background: rgba(25, 24, 22, .35); }
+#chatSources header, #chatSources footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+#chatSources h2 { font-size: 18px; margin: 0; }
+#chatSources [hidden] { display: none; }
+#chatSources footer, #chatSources section, .source-modes { margin-top: 14px; }
+.source-modes { display: flex; gap: 20px; }
+.source-modes label, .source-all, .source-heading, .source-papers label { display: flex; align-items: center; gap: 8px; }
+#chatSources label { cursor: pointer; }
+#chatSources input:is([type=checkbox],[type=radio]) { margin: 0; flex: none; accent-color: var(--accent); }
+#chatSources input[type=search] { width: 100%; box-sizing: border-box; }
+.source-all { margin: 10px 0 6px; font-size: 13px; }
+.source-list { max-height: 42dvh; overflow: auto; margin-bottom: 6px; border-block: 1px solid var(--rule); }
+.source-group + .source-group { border-top: 1px solid var(--rule); }
+.source-heading { padding: 3px 2px; }
+.source-heading button { display: flex; align-items: center; gap: 5px; flex: 1; text-align: left; overflow-wrap: anywhere; background: transparent; border: 0; color: var(--ink); font: inherit; font-weight: 600; padding: 5px 0; cursor: pointer; }
+.source-heading button[aria-expanded=false] svg { transform: rotate(-90deg); }
+.source-papers { margin-left: 22px; padding-bottom: 4px; }
+.source-papers label { padding: 5px 2px; line-height: 1.4; overflow-wrap: anywhere; }
+.ch-scope { margin: 0 0 4px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cm-sources { font-size: 12px; margin: 6px 0; }
+.cm-sources ol { padding-left: 22px; }
+.cm-sources a { color: var(--accent); }
