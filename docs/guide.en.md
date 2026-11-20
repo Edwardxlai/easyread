@@ -107,6 +107,12 @@ Your browser opens `http://127.0.0.1:8765`. The server only listens on localhost
 3. Translation runs in the background page by page. Translated parts are readable immediately; untranslated pages show the original. Importing more than 5 PDFs at once asks before translating them all (the default is "Import only"); "Stop translation" at the top of the list stops every running job and keeps what is already translated.
 4. Click a paragraph for its action bar; select text to highlight, note or ask. Shortcuts are listed and editable under Settings → Shortcuts; the question mark at top right has help and updates.
 
+### Automatically import downloaded PDFs
+
+Open **Settings → Folder sync**, enable the default folder for **All**, choose a directory, and save. With EasyRead running, PDFs downloaded there appear in All. To browse by project, add named folders instead. Their subfolders appear in the library sidebar.
+
+Each folder has independent controls for automatic import, translation, and online metadata lookup. The first scan after enabling a folder only imports existing PDFs. A batch of more than five new or replaced PDFs is also imported without translation. Identical PDFs share one paper, including notes and translations. Moving or deleting an automatically imported file outside EasyRead leaves its library copy available.
+
 ## Reading with an AI agent
 
 EasyRead ships with a CLI, so agents like Claude Code or Codex can read your notes and questions in a conversation, write answers next to the right paragraphs, or translate / re-translate pages themselves. The skill is in [`skill/paper-reading/SKILL.md`](../skill/paper-reading/SKILL.md); put that folder in `~/.claude/skills/` or `~/.codex/skills/`.

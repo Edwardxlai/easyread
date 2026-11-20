@@ -23,6 +23,7 @@ from . import settings_api, library_api, jobs_api, paper_api, wsock
 from .babeldoc_api import BabelDocJobs
 from ..app.log import log, tail
 from ..bulk import api as bulk_api
+from ..bulk.folder_sync import FolderSync
 from .jobs import Jobs
 from ..library.library import Library, sha256_bytes
 from ..app.i18n import tr
@@ -48,6 +49,7 @@ class App:
         self.babeldoc = BabelDocJobs()
         self.token = os.urandom(12).hex()
         self.location = library_api.LibraryLocation(self)
+        self.folder_sync = FolderSync(self)
         self.presence = None  # presence.Presence，serve() 里设
 
 
@@ -113,14 +115,19 @@ class Handler(BaseHTTPRequestHandler):
         # A failed first preparation still leaves a library entry. Re-importing
         # that PDF must retry preparation instead of silently skipping it.
         paper = ws.load("paper") or {}
-        active = (ws.load("job") or {}).get("state") in ("queued", "running")
-        queued = fresh or (not paper.get("meta", {}).get("pages") and not active)
+        active = (ws.load("job") or {}).get("state") in ("queued", "running", "confirm")
+        queued = (fresh or not paper.get("meta", {}).get("pages")) and not active
         if queued:
             if translate_after and not read:
                 langs.remember(ws, target)  # 导入框里选的译文语言
             if paper.get("meta", {}).get("source_type") == "web":
                 scope = "all"
-            self.app.jobs.enqueue(ws, translate_after=translate_after, scope=scope, read=read, model=model, translation_extra=translation_extra)
+            try:
+                self.app.jobs.enqueue(ws, translate_after=translate_after, scope=scope, read=read, model=model, translation_extra=translation_extra)
+            except ValueError:
+                if (ws.load("job") or {}).get("state") not in ("queued", "running", "confirm"):
+                    raise
+                queued = False
         result = {"id": ws.id, "new": fresh, "queued": queued}
         if citation:
             try:
@@ -147,10 +154,17 @@ class Handler(BaseHTTPRequestHandler):
             log.exception("请求出错 %s", self.path)
             self._json(500, {"error": f"{type(e).__name__}: {e}"})
 
+    def _folder_origin_ok(self):
+        host = self.headers.get("Host") or ""
+        return (host.lower().partition(":")[0] in ("127.0.0.1", "localhost")
+                and self.headers.get("Origin") in (None, f"http://{host}"))
+
     def _get(self):
         url = urlparse(self.path)
         path = unquote(url.path)
         app, lib = self.app, self.app.lib
+        if path == "/api/folder-sync" and not self._folder_origin_ok():
+            return self._json(403, {"error": "bad origin"})
         if path in ("/", "/index.html"):
             return self._page(WEB / "library.html")
         if path in ("/babeldoc", "/web/babeldoc.html"):
@@ -174,7 +188,12 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, bulk_api.get(app, path))
         if path == "/api/library":
             cfg = config.load()
-            return self._json(200, {"items": lib.list(), "token": app.token, "jobs": app.jobs.small_status(),
+            folders, folder_files = app.folder_sync.library()
+            items = lib.list()
+            for item in items:
+                if item["id"] in folder_files:
+                    item["folder_files"] = folder_files[item["id"]]
+            return self._json(200, {"items": items, "folder_sync": folders, "token": app.token, "jobs": app.jobs.small_status(),
                                     "library_status": app.location.status, "other_device": app.location.marker.other_device(),
                                     "engine": cfg.get("engine"), "engine_label": cli_models.engine_label(cfg),
                                     "first_run": config.is_first_run(), "version": __version__, "trash": len(trash.items(lib.root))})
@@ -309,6 +328,8 @@ class Handler(BaseHTTPRequestHandler):
         q = {k: v[0] for k, v in parse_qs(url.query).items()}
         app, lib = self.app, self.app.lib
 
+        if path == "/api/folder-sync" and not self._folder_origin_ok():
+            return self._json(403, {"error": "bad origin"})
         if path in library_api.POST:
             return self._json(200, library_api.post(app, path, json.loads(self._body() or b"{}")))
         if path in jobs_api.POST:  # 一键停止翻译

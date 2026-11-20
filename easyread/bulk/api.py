@@ -12,6 +12,8 @@ def _mig(app) -> Migration:
 
 
 def get(app, path: str):
+    if path == "/api/folder-sync":
+        return app.folder_sync.settings()
     if path == "/api/zotero/detect":
         return {"candidates": locate.candidates()}
     if path == "/api/migrate/status":
@@ -20,6 +22,8 @@ def get(app, path: str):
 
 
 def post(app, path: str, body: dict):
+    if path == "/api/folder-sync":
+        return app.folder_sync.configure(body)
     source, where, base = str(body.get("source") or "zotero"), str(body.get("path") or ""), str(body.get("base") or "")
     if path == "/api/migrate/scan":
         return _mig(app).scan(source, where, base)
@@ -32,5 +36,5 @@ def post(app, path: str, body: dict):
     return None
 
 
-GET = {"/api/zotero/detect", "/api/migrate/status"}
-POST = {"/api/migrate/scan", "/api/migrate/start", "/api/migrate/stop"}
+GET = {"/api/folder-sync", "/api/zotero/detect", "/api/migrate/status"}
+POST = {"/api/folder-sync", "/api/migrate/scan", "/api/migrate/start", "/api/migrate/stop"}

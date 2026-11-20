@@ -268,17 +268,20 @@ def fetch(ref: str) -> tuple[bytes, str, dict]:
     return _from_s2(s2_search_title(ref), f"“{ref}”")
 
 
-def enrich(first_page_text: str, meta: dict) -> dict:
+def enrich(first_page_text: str, meta: dict, *, online: bool = True) -> dict:
     """本地 PDF：从第一页文字里找 arXiv 编号或 DOI，补全元数据。只补空着的字段。"""
     if meta.get("authors") and meta.get("year"):
         return {}
     text = first_page_text[:6000]
-    found: dict = {}
     m = re.search(r"arXiv:\s*(\d{4}\.\d{4,5}(?:v\d+)?)", text)
+    d = DOI_RE.search(text)
+    if not online:
+        ids = {"arxiv": m.group(1) if m else "", "doi": d.group(1) if d else ""}
+        return {k: v for k, v in ids.items() if v and not meta.get(k)}
+    found: dict = {}
     if m:
         found = arxiv_meta(m.group(1))
     else:
-        d = DOI_RE.search(text)
         p = s2_lookup("DOI:" + d.group(1)) if d else None
         if p:
             found = _s2_meta(p)

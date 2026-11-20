@@ -108,7 +108,13 @@
 .or::before, .or::after { content: ""; flex: 1; border-top: 1px solid var(--rule); }
 .inline { display: flex; gap: 8px; }
 
+#libraryNavBtn { display: none; }
 @media (max-width: 1100px) {
+  #libraryNavBtn:not([hidden]) { display: inline-flex; }
+  .lib.library-nav-open .side {
+    display: block; position: fixed; inset: var(--bar-h) auto 0 0; width: min(280px, 85vw);
+    background: var(--bg); box-shadow: var(--shadow-lg); z-index: 25;
+  }
   .lib, .lib.has-detail { grid-template-columns: 0 minmax(0, 1fr) 0; }
   .side { display: none; }
   .lib > .main { grid-column: 2; }  /* 侧栏 display:none 后不占格子，不钉住的话 main 会掉进 0 宽的第一列，整页空白 */
@@ -116,6 +122,8 @@
 }
 @media (max-width: 640px) {
   .topbar .search { margin-left: 8px; width: auto; flex: 1; }
+  body:has(#libraryNavBtn:not([hidden])) .topbar .search,
+  body:has(#libraryNavBtn:not([hidden])) .topbar .search input { min-width: 0; }
   .topbar .search kbd, #importBtn span { display: none; }
   .row { grid-template-columns: 40px minmax(0, 1fr); }
   .row .side-info { display: none; }

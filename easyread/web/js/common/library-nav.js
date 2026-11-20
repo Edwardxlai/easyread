@@ -6,7 +6,7 @@
   const idOk = (id) => typeof id === "string" && /^[a-zA-Z0-9_-]{1,128}$/.test(id);
   const textOk = (s, max) => typeof s === "string" && s.length <= max;
   const valid = (s) => s && s.version === 1 && idOk(s.paper) && textOk(s.view, 40) &&
-    (s.tag === null || textOk(s.tag, 128)) && textOk(s.q, 2000) && textOk(s.sort, 20) &&
+    (s.tag === null || textOk(s.tag, s.view === "folder" ? 4096 : 128)) && textOk(s.q, 2000) && textOk(s.sort, 20) &&
     textOk(s.label, 128) && Number.isFinite(s.scroll) && s.scroll >= 0 &&
     (s.offset === null || Number.isFinite(s.offset));
   function records() {
@@ -27,9 +27,9 @@
     // Cache only list summaries, never the API token or document contents.
     rememberList(data) {
       if (!data || !Array.isArray(data.items)) return;
-      const fields = ["id", "title_zh", "title_en", "short_zh", "target", "authors", "affiliation", "year", "date", "venue", "arxiv", "url", "doi", "pages", "done_pages", "en_pages", "abstract", "meta_override", "tags", "status", "starred", "added", "last_opened", "progress", "notes", "highlights", "open_questions", "discussions", "has_paper_note", "job", "thumb"];
+      const fields = ["id", "title_zh", "title_en", "short_zh", "target", "authors", "affiliation", "year", "date", "venue", "arxiv", "url", "doi", "pages", "done_pages", "en_pages", "abstract", "meta_override", "tags", "folder_files", "status", "starred", "added", "last_opened", "progress", "notes", "highlights", "open_questions", "discussions", "has_paper_note", "job", "thumb"];
       const items = data.items.map((item) => Object.fromEntries(fields.filter((k) => Object.prototype.hasOwnProperty.call(item, k)).map((k) => [k, item[k]])));
-      const text = JSON.stringify({ version: 1, t: Date.now(), data: { items, engine: data.engine, engine_label: data.engine_label, version: data.version, trash: data.trash } });
+      const text = JSON.stringify({ version: 1, t: Date.now(), data: { items, engine: data.engine, engine_label: data.engine_label, version: data.version, trash: data.trash, folder_sync: data.folder_sync } });
       try {
         if (!items.length || text.length > SNAPSHOT_LIMIT) localStorage.removeItem(SNAPSHOT_KEY);
         else localStorage.setItem(SNAPSHOT_KEY, text);

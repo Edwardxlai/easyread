@@ -21,6 +21,15 @@ class FsRetryTest(unittest.TestCase):
                 fs_retry.retry_write(operation)
         self.assertEqual(operation.call_count, 5)
 
+    def test_windows_pending_delete_retries_exclusive_open_and_preserves_persistent_denial(self):
+        denied = PermissionError(errno.EACCES, 'Permission denied')
+        with patch.object(fs_retry.os, 'name', 'nt'), patch.object(fs_retry.time, 'sleep'):
+            self.assertEqual(fs_retry.retry_write(Mock(side_effect=[denied, 42])), 42)
+            persistent = Mock(side_effect=denied)
+            with self.assertRaises(PermissionError):
+                fs_retry.retry_write(persistent)
+            self.assertEqual(persistent.call_count, 5)
+
     def test_existing_lock_is_never_bypassed(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

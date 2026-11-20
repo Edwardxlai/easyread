@@ -25,12 +25,16 @@ EasyRead 运行时把地址写在数据目录的 `.server.json`（默认 `~/Easy
 | --- | --- | --- |
 | GET | `/api/version` | `{"api": 1, "version": "1.3.1"}`；`api` 是本页约定的版本，`version` 是应用版本 |
 | GET | `/api/library` | 文献库列表 `items`（每篇的 `id`、标题、作者、DOI、进度、笔记数等）和写操作要用的 `token` |
+| GET | `/api/folder-sync` | 本机当前文献库的监控目录、默认目录、处理选项和扫描错误 |
+| POST | `/api/folder-sync` | 传 JSON，`action` 取 `add`、`update`、`remove` 或 `set_default`。新增时传 `path` 和可选 `name`，更新时按 `name` 指定映射。独立开关为 `enabled`、`translate`、`network_metadata` |
 | POST | `/api/import?name=<文件名>&translate=0\|1` | 请求体是 PDF 原始字节，请求头带 `X-Token`。返回 `{"id", "new", "queued"}`；已有同一 PDF 时 `new` 为 false |
 | GET | `/api/p/{id}/part/paper` | `{"data": paper.json, "version": …}`：标题、段落原文和译文 |
 | GET | `/api/p/{id}/part/reader` | `{"data": reader.json, "version": …}`：划线、批注、整篇心得 |
 | GET | `/api/p/{id}/part/discussion` | `{"data": discussion.json, "version": …}`：保存到页边的 AI 回答 |
 | GET | `/read/{id}` | 阅读页，可加 `#段落id` 定位 |
 | GET | `/open?sha256=<完整 SHA-256>&block=<段落 id>` | 按指纹打开论文；也可用 `id=<论文 id>`。找到就跳到阅读页，找不到回文献库 |
+
+启用文件夹映射后，`/api/library` 的 `folder_sync.folders` 列出具名目录树，论文条目的 `folder_files` 列出匹配的相对目录和文件名。监控目录的绝对路径只在本机映射设置接口返回。
 
 `/api/p/{id}/state` 是阅读页自己用的：会把论文标记成"打开过"、触发补图，外部工具读数据请用上面的 `part/*`。
 
