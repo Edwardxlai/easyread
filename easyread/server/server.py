@@ -190,6 +190,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, {"found": found, "sources": detect.cli_sources(found), "ready": detect.ready(cfg, found), "engine": cfg.get("engine"), "models": cli_models.listing()})
         if path == "/api/prefs":
             return self._json(200, prefs.load())
+        if path == "/api/fonts":
+            from ..app import fonts
+            return self._json(200, {"fonts": fonts.list_families(fresh=parse_qs(url.query).get("fresh") == ["1"])})
         if path == "/api/chat/models":
             return self._json(200, chat_models.listing(config.load()))
         if path == "/api/log":

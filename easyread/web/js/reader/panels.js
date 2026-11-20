@@ -6,6 +6,7 @@
 
   /* ---------- 偏好 ---------- */
   const DEF = Object.assign({ theme: "auto", mode: "zh", lead: "translation", biOrder: "translation" }, PR.TYPE_DEFAULTS);
+  const esc = (s) => (PR.esc ? PR.esc(s) : String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"));
   /* 1.3.1 测试版存过 readingLanguage（zh / en），换成 lead；传进来的是存下的原样，还没合默认值 */
   PR.migratePrefs = function (p) {
     if (p.lead == null && p.readingLanguage != null) p.lead = p.readingLanguage === "en" ? "original" : "translation";
@@ -19,6 +20,7 @@
     PR.ls.set("easyread-prefs", Object.assign(PR.migratePrefs(PR.ls.get("easyread-prefs", {})), p));
     if (PR.store.mode === "server") PR.savePrefs("reader", p);
   };
+  let lastLangKey = null, needRenderMargin = false;
   PR.applyPrefs = function () {
     const p = PR.prefs, root = document.documentElement;
     root.style.setProperty("--fs", p.fs + "px");
@@ -26,13 +28,25 @@
     root.style.setProperty("--measure", p.measure + "em");
     PR.applyTheme(p.theme);
     body.classList.toggle("font-sans", p.font === "sans");
+    PR.applyFontVars && PR.applyFontVars(p, root);
     body.classList.toggle("mode-bi", p.mode === "bi");
     body.classList.toggle("no-margin", !p.margin);
-    if (PR.applyReadingLanguage) PR.applyReadingLanguage();
+    const langKey = [p.mode, p.lead, p.biOrder].join("|");
+    if (langKey !== lastLangKey) {
+      lastLangKey = langKey;
+      if (PR.applyReadingLanguage) PR.applyReadingLanguage();
+    }
     PR.persistReaderPrefs();
   };
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => PR.applyPrefs());
-  const relayout = PR.debounce(() => { PR.fitWide(); PR.renderMargin(); PR.syncPage && PR.syncPage(true); }, 60);
+  const relayout = PR.debounce(() => {
+    const remargin = needRenderMargin;
+    needRenderMargin = false;
+    PR.fitWide();
+    if (remargin && PR.renderMargin) PR.renderMargin();
+    else if (PR.layoutMargin) PR.layoutMargin();
+    PR.syncPage && PR.syncPage(true);
+  }, 60);
   PR.setPref = function (k, v, quiet) {
     const anchor = PR.readingBlock && PR.readingBlock();
     const node = anchor && (PR.webBlockHost?.(anchor) || document.getElementById("b-" + anchor));
@@ -42,6 +56,7 @@
     if (node) window.scrollBy(0, (PR.webRect?.(node) || node.getBoundingClientRect()).top - before);  // 调字号时阅读位置不跳
     if (!quiet) PR.renderSettings();
     else syncSettings();
+    if (k === "margin") needRenderMargin = true;
     relayout();
   };
   PR.bumpFont = (d) => { PR.setPref("fs", PR.clampFontSize(PR.prefs.fs + d), true); PR.toast(PR.t("字号 {n} px", { n: PR.prefs.fs }), null, 900); };
@@ -53,11 +68,21 @@
     const { min, max, step } = PR.typeRanges[key];
     return '<div class="row slider"><span>' + label + '</span><input type="range" data-r="' + key + '" min="' + min + '" max="' + max + '" step="' + step + '" value="' + PR.prefs[key] + '"><b data-rv="' + key + '">' + PR.prefs[key] + unit + "</b></div>";
   }
+  function fontSelectHtml() {
+    const p = PR.prefs;
+    const customName = PR.sanitizeFontFamily ? PR.sanitizeFontFamily(p.customFont) : String(p.customFont || "").trim();
+    const customLabel = customName ? PR.t("自定义（{name}）", { name: customName }) : PR.t("自定义…");
+    const opts = [["serif", PR.t("宋体")], ["sans", PR.t("黑体")], ["custom", customLabel]];
+    const cur = p.font === "custom" && !customName ? "serif" : (opts.some(([v]) => v === p.font) ? p.font : "serif");
+    return '<select class="input" data-p="font" aria-label="' + esc(PR.t("字体")) + '">' +
+      opts.map(([v, l]) => '<option value="' + esc(v) + '"' + (v === cur ? " selected" : "") + ">" + esc(l) + "</option>").join("") +
+      "</select>";
+  }
   PR.renderSettings = function () {
     PR.$("#settings").innerHTML =
       '<div class="row view-row-narrow">' + PR.viewSegHtml(true) + "</div>" +
       slider("fs", PR.t("字号"), " px") + slider("measure", PR.t("版心"), PR.t(" 字")) + slider("lh", PR.t("行距"), "") +
-      '<div class="row"><span>' + PR.t("字体") + "</span>" + segHtml("font", [["serif", PR.t("宋体")], ["sans", PR.t("黑体")]]) + "</div>" +
+      '<div class="row"><span>' + PR.t("字体") + "</span>" + fontSelectHtml() + "</div>" +
       '<div class="row"><span>' + PR.t("边注") + "</span>" + segHtml("margin", [[true, PR.t("显示")], [false, PR.t("收起")]]) + "</div>" +
       '<div class="row hintrow"><button class="linkish" data-reset-type>' + PR.t("恢复默认") + '</button><span class="grow"></span>' +
       (PR.store.mode === "server" ? '<button class="linkish" data-open-settings="reading">' + PR.t("更多设置…") + "</button>" : "") + "</div>";
@@ -65,10 +90,29 @@
   function syncSettings() {
     PR.$$("#settings [data-r]").forEach((r) => { r.value = PR.prefs[r.dataset.r]; });
     PR.$$("#settings [data-rv]").forEach((b) => { const k = b.dataset.rv; b.textContent = PR.prefs[k] + ({ fs: " px", measure: PR.t(" 字") }[k] || ""); });
+    const fontSel = PR.$('#settings select[data-p="font"]');
+    if (fontSel) fontSel.value = PR.prefs.font === "custom" && !(PR.sanitizeFontFamily ? PR.sanitizeFontFamily(PR.prefs.customFont) : PR.prefs.customFont) ? "serif" : (PR.prefs.font || "serif");
   }
   PR.$("#settings").addEventListener("input", (e) => {
     const r = e.target.closest("[data-r]");
     if (r) PR.setPref(r.dataset.r, +r.value, true);
+  });
+  PR.$("#settings").addEventListener("change", async (e) => {
+    const sel = e.target.closest('select[data-p="font"]');
+    if (!sel) return;
+    if (sel.value === "custom" && !(PR.sanitizeFontFamily ? PR.sanitizeFontFamily(PR.prefs.customFont) : PR.prefs.customFont)) {
+      if (PR.store.mode === "server" && PR.openSettings) {
+        PR.$("#settings").classList.remove("open");
+        PR.openSettings("reading", { selectCustomFont: true });
+      } else if (PR.promptText) {
+        const name = await PR.promptText({ title: PR.t("自定义字体"), body: PR.t("输入本机已安装的字体名称（如 LXGW WenKai、PingFang SC）"), placeholder: "LXGW WenKai", ok: PR.t("应用") });
+        const clean = PR.sanitizeFontFamily ? PR.sanitizeFontFamily(name) : String(name || "").trim();
+        if (clean) { PR.prefs.customFont = clean; PR.setPref("font", "custom"); }
+        else PR.renderSettings();
+      } else PR.renderSettings();
+      return;
+    }
+    PR.setPref("font", sel.value);
   });
   PR.$("#settings").addEventListener("click", (e) => {
     const os = e.target.closest("[data-open-settings]");
@@ -79,7 +123,7 @@
     const order = e.target.closest("[data-order]");
     if (order) return PR.setBiOrder(order.dataset.order);
     const b = e.target.closest("[data-p]");
-    if (!b) return;
+    if (!b || b.tagName === "SELECT") return;
     let v = b.dataset.v;
     if (b.dataset.p === "margin") v = v === "true";
     PR.setPref(b.dataset.p, v);

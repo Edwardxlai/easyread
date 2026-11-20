@@ -30,9 +30,15 @@
 
   --serif-zh: "Noto Serif SC", "Source Han Serif SC", "Source Han Serif CN", "Songti SC", "STSong", serif;
   --sans-zh: "Noto Sans SC", "Source Han Sans SC", "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+  --serif-en-latin: "Source Serif 4", "Source Serif Pro", Charter, "Iowan Old Style", Georgia;
   --serif-en: "Source Serif 4", "Source Serif Pro", Charter, "Iowan Old Style", Georgia, "Noto Serif SC", serif;
+  --sans-en: "Source Sans 3", "Segoe UI", "Helvetica Neue", Arial, var(--sans-zh);
   --ui: "Noto Sans SC", "Segoe UI", "PingFang SC", "Microsoft YaHei UI", system-ui, sans-serif;
   --mono: "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+  --reader-zh: var(--serif-zh);
+  --reader-en: var(--serif-en);
+  --reader-code: var(--mono);
+  --reader-table: var(--serif-en), var(--serif-zh);
   --bar-h: 50px;
 }
 /* 英文界面：西文字体排前面，否则中文字体会把弯引号、撇号画成全角 */
