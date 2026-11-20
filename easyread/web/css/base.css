@@ -30,9 +30,15 @@
 
   --serif-zh: "Noto Serif SC", "Source Han Serif SC", "Source Han Serif CN", "Songti SC", "STSong", serif;
   --sans-zh: "Noto Sans SC", "Source Han Sans SC", "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+  --serif-en-latin: "Source Serif 4", "Source Serif Pro", Charter, "Iowan Old Style", Georgia;
   --serif-en: "Source Serif 4", "Source Serif Pro", Charter, "Iowan Old Style", Georgia, "Noto Serif SC", serif;
+  --sans-en: "Source Sans 3", "Segoe UI", "Helvetica Neue", Arial, var(--sans-zh);
   --ui: "Noto Sans SC", "Segoe UI", "PingFang SC", "Microsoft YaHei UI", system-ui, sans-serif;
   --mono: "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+  --reader-zh: var(--serif-zh);
+  --reader-en: var(--serif-en);
+  --reader-code: var(--mono);
+  --reader-table: var(--serif-en), var(--serif-zh);
   --bar-h: 50px;
 }
 /* 英文界面：西文字体排前面，否则中文字体会把弯引号、撇号画成全角 */
@@ -131,7 +137,7 @@ svg.i.sm { width: 15px; height: 15px; }
   width: 100%; height: 34px; padding: 0 10px; border-radius: 8px; border: 0; outline: 0;
   background: var(--surface); box-shadow: inset 0 0 0 1px var(--rule-2); color: var(--ink);
 }
-select.input:not([multiple]):not([size]) {
+select.input:not([multiple]):not([size]), .input.reading-font {
   appearance: none; padding-inline-end: 34px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='m1.5 1.5 4.5 4.5 4.5-4.5' fill='none' stroke='%2389847d' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat; background-position: right 12px center;
@@ -174,6 +180,14 @@ textarea.input { height: auto; padding: 8px 10px; resize: vertical; line-height:
 .menu-list button:hover, .menu-list a:hover, .menu-list .kb-on { background: var(--accent-soft); color: var(--ink); }
 .menu-list .kbd { margin-left: auto; font: 11px var(--mono); color: var(--ink-3); }
 .menu-list hr { border: 0; border-top: 1px solid var(--rule); margin: 5px 4px; }
+.reading-font { min-width: 0; text-overflow: ellipsis; cursor: pointer; }
+.reading-font[aria-expanded="true"] { cursor: text; box-shadow: inset 0 0 0 1.5px var(--accent); }
+.reading-font-list { min-width: 0; box-sizing: border-box; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.reading-font-list button { justify-content: space-between; font-family: var(--ui); }
+.reading-font-list button span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.reading-font-list button[aria-selected="true"] { color: var(--accent); }
+.reading-font-list .font-empty { padding: 8px 10px; color: var(--ink-3); font-size: 13px; }
+
 
 .dialog-backdrop { position: fixed; inset: 0; z-index: 90; background: rgba(20, 18, 15, .28); display: grid; place-items: center; opacity: 0; pointer-events: none; transition: opacity .18s; }
 .dialog-backdrop.open { opacity: 1; pointer-events: auto; }

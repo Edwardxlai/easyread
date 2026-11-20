@@ -47,7 +47,10 @@
       PR.pdfExport.optionHtml() +
       '<div class="actions"><button class="btn" id="impClose">' + PR.t("关闭") + "</button></div>";
     dlg.classList.add("open");
-    setTimeout(() => { const i = PR.$("#arxivRef"); if (ref) i.value = ref; i.focus(); }, 50);
+    setTimeout(() => {
+      if (!dlg.classList.contains("open")) return;
+      const i = PR.$("#arxivRef"); if (ref) i.value = ref; i.focus();
+    }, 50);
     fillModels(p.model);
   };
 

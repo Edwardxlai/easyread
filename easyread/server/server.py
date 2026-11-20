@@ -23,6 +23,7 @@ from . import settings_api, library_api, jobs_api, paper_api, wsock
 from .babeldoc_api import BabelDocJobs
 from ..app.log import log, tail
 from ..bulk import api as bulk_api
+from ..bulk.folder_watch import FolderWatch
 from .jobs import Jobs
 from ..library.library import Library, sha256_bytes
 from ..app.i18n import tr
@@ -48,6 +49,7 @@ class App:
         self.babeldoc = BabelDocJobs()
         self.token = os.urandom(12).hex()
         self.location = library_api.LibraryLocation(self)
+        self.folder_watch = FolderWatch(self)
         self.presence = None  # presence.Presence，serve() 里设
 
 
@@ -188,6 +190,9 @@ class Handler(BaseHTTPRequestHandler):
             cfg = config.load()
             found = detect.detect(cfg, fresh=parse_qs(url.query).get("fresh") == ["1"])
             return self._json(200, {"found": found, "sources": detect.cli_sources(found), "ready": detect.ready(cfg, found), "engine": cfg.get("engine"), "models": cli_models.listing()})
+        if path == "/api/fonts":
+            from ..app import fonts
+            return self._json(200, {"fonts": fonts.list_families(fresh=parse_qs(url.query).get("fresh") == ["1"])})
         if path == "/api/prefs":
             return self._json(200, prefs.load())
         if path == "/api/chat/models":

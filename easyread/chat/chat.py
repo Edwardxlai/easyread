@@ -178,7 +178,7 @@ def _marks_summary(ws: Workspace) -> str:
 
 
 def prompt(ws: Workspace, messages: list[dict], anchor: str | None, quote: str, engine: str, refs: list[dict] | None = None,
-           answer_style: str = answer_styles.DEFAULT, context_scope: str = "paper") -> str:
+           answer_style: str = answer_styles.DEFAULT, context_scope: str = "paper", evidence: str | None = None) -> str:
     answer_style = answer_styles.parse(answer_style)
     history = messages[-HISTORY:]
     convo = "\n\n".join(("读者" if m["role"] == "user" else "你") + "：" + m["content"] for m in history[:-1])  # i18n-ok
@@ -187,13 +187,16 @@ def prompt(ws: Workspace, messages: list[dict], anchor: str | None, quote: str, 
             if engine == "claude" else "")
     if engine in engines.CLI_ENGINES and engine != "claude":
         tool = "需要看全文或节选中省略的内容时，可以只读当前目录的 paper.json（blocks 里是译文和原文）；读者的全部标记在 reader.json 的 notes 里。\n"  # i18n-ok
-    want, colors = wants_marks(ask)
-    marks = _marks(ws, colors) if want else _marks_summary(ws)
     style = {answer_styles.STE100: answer_styles.STE100_INSTRUCTIONS,
              answer_styles.XRAY: answer_styles.XRAY_INSTRUCTIONS}.get(answer_style) or (
              "用" + langs.reply_lang(ws.load("paper").get("meta")) + "，直接、具体，能举例就举例。\n")  # i18n-ok
+    if evidence is not None:
+        focus = _context(ws, anchor, quote, refs) if anchor or refs else ""
+        return "\n\n".join(filter(None, (style, evidence, focus, convo, ask)))
     if context_scope not in ("paper", "selection"):
         raise ValueError("Invalid paper context scope")
+    want, colors = wants_marks(ask)
+    marks = _marks(ws, colors) if want else _marks_summary(ws)
     focused = context_scope == "selection" and (anchor or refs)
     whole = "本轮参考引用段落及相邻内容。其余正文未附入。只依据已提供或已核对的材料回答。" if focused else _paper_context(ws)  # i18n-ok
     return ("你在陪读者读一篇学术论文，回答他边读边冒出来的问题。\n" + style  # i18n-ok
@@ -270,7 +273,7 @@ def image_paths(ws: Workspace, messages: list[dict]) -> list[Path]:
     return paths[-4:]
 
 
-def stream(ecfg: dict, text: str, cwd: Path, cancel: threading.Event, on_model=None, meter=None, images: list[Path] | None = None) -> Iterator[str]:
+def stream(ecfg: dict, text: str, cwd: Path, cancel: threading.Event, on_model=None, meter=None, images: list[Path] | None = None, *, library_scope=False) -> Iterator[str]:
     """on_model(实际模型名)：Claude Code 开头会报它实际用的模型。meter：传了就记下这次回答的 token 用量。"""
     e = ecfg.get("engine")
     bad = netcheck.problem(ecfg)
@@ -284,6 +287,10 @@ def stream(ecfg: dict, text: str, cwd: Path, cancel: threading.Event, on_model=N
     if images and engines.image_mode(ecfg) == "claude":
         text += "\n\n读者附上的图片，请用读图工具查看这些本地文件：\n" + "\n".join(str(path) for path in images)  # i18n-ok
     try:
+        if library_scope and e != "openai":
+            ecfg[e]["lean"] = True
+            yield engines.run(ecfg, text, cwd, images, cancel, meter)
+            return
         if e in engines.CLI_ENGINES:
             text += chat_tools.RESEARCH_PROMPT
         if e == "claude":

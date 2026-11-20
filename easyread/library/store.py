@@ -273,7 +273,9 @@ class Workspace:
             return result
 
     def patch_item(self, fields: dict) -> dict:
-        allowed = {"tags", "status", "starred", "rating", "last_opened", "meta_override", "archived"}
+        allowed = {"tags", "status", "starred", "rating", "last_opened", "meta_override", "archived", "ai_indexed"}
+        if "ai_indexed" in fields and type(fields["ai_indexed"]) is not bool:
+            raise ValueError("ai_indexed must be boolean")
 
         def apply(item):
             for k, v in fields.items():

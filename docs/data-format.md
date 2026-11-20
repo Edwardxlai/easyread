@@ -103,6 +103,8 @@ JSON 里 TeX 的反斜杠要写两个（`\\frac`）。`\f` `\b` `\t` `\n` `\r` �
 
 ## item.json（只读）
 
+`ai_indexed` 默认 true，控制该篇是否参与文献库自动检索。`category_review` 保存建议的请求标识、处理状态及待确认的分类名称与理由。确认后选定的分类追加到原有 `tags`，跳过只结束该建议。
+
 ```json
 { "added": "…", "tags": ["统计"], "status": "unread | reading | done", "starred": false,
   "last_opened": "…", "meta_override": { "title_zh": "…" } }
@@ -158,3 +160,5 @@ JSON 里 TeX 的反斜杠要写两个（`\\frac`）。`\f` `\b` `\t` `\n` `\r` �
 ## 为什么用 JSON 文件而不是数据库
 
 EasyRead 是个人工具：一个人、一台电脑、几十到几百篇论文。每篇一个文件夹、几个 JSON，好处是能直接看、能直接备份和同步（网盘、git 都行），agent 在对话里也能直接读写；按“谁写哪个文件”分开之后，也不需要数据库的并发控制。文献库列表每次扫描各文件夹生成，几百篇以内是毫秒级。浏览器 localStorage 只用来暂存还没写进文件的修改和缓存偏好，不是数据的正本。
+
+跨论文提问时，`chat.json` 的用户消息记录 `library_scope`。对应回答保存当时使用的 `sources`（论文、段落、标题和节选）和所选论文中没有提供正文的 `missing`。旧对话可继续使用。

@@ -177,6 +177,7 @@
     PR.$("#viewTitle").textContent = L.tag ? PR.catTree.label(L.tag) : L.view === "all" ? PR.t("全部论文") : view[1];
     PR.$("#count").textContent = PR.t("{n} 篇", { n: list.length });
     PR.renderBatch && PR.renderBatch(list);
+    L.renderAiActions?.();
     PR.renderStopAll && PR.renderStopAll();
     const status = L.loadStatus !== "ready" && L.items.length ? '<div class="up-status" role="status">' + loadHtml() + "</div>" : "";
     PR.$("#list").innerHTML = status + (list.length ? list.map(rowHtml).join("") : emptyHtml());
@@ -278,7 +279,7 @@
       if (e.key === "Escape") e.target.blur();
       return;
     }
-    if (PR.$(".dialog-backdrop.open, #libraryAsk[open]")) return;
+    if (PR.$(".dialog-backdrop.open, dialog[open]")) return;
     const rows = PR.$$(".row");
     const idx = rows.findIndex((r) => r.dataset.id === L.selected);
     if (e.key === "/" || (e.key === "k" && (e.ctrlKey || e.metaKey))) { e.preventDefault(); PR.$("#q").focus(); }

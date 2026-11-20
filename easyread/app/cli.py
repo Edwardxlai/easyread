@@ -121,7 +121,10 @@ def cmd_translate(a):
     tl = paper.get("translation", {})
     done = set(tl.get("done_pages", [])) - set(tl.get("en_pages", []))
     pages = pages or [p["n"] for p in paper["meta"]["pages"] if p["n"] not in done]
-    failed = translate_pages(ws, cfg, pages, threading.Event(), lambda d, t, m: out(f"[{d}/{t}] {m}"))
+    cancel = threading.Event()
+    failed = translate_pages(ws, cfg, pages, cancel, lambda d, t, m: out(f"[{d}/{t}] {m}"))
+    from ..chat.category_suggestions import after_translation
+    after_translation(lib(), ws, cfg, cancel, pages, failed)
     if failed:
         out(f"没译成功的页：{sorted(failed)}，原因见 {ws.root / 'job.log'}")
 

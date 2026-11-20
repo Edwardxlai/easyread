@@ -11,6 +11,15 @@
   const esc = PR.esc;
   const zotero = () => s.source === "zotero";
   const close = () => { dlg.classList.remove("open"); clearTimeout(pollT); };
+  function dismiss() {
+    if (!zotero() && s.step === "scan") {
+      if (s.busy) return;
+      close();
+      PR.$("#importBtn")?.focus?.();
+      return;
+    }
+    close();
+  }
   const list = (rows) => '<ul class="zt-list">' + rows.map((r) => "<li><b>" + esc(r.title) + "</b>" + (r.why ? "<small>" + esc(r.why) + "</small>" : "") + "</li>").join("") + "</ul>";
   const more = (label, rows) => (rows && rows.length ? '<details class="zt-more"><summary>' + label + "</summary>" + list(rows) + "</details>" : "");
   const stat = (n, label) => '<div class="zt-stat"><b>' + n + "</b><span>" + label + "</span></div>";
@@ -23,26 +32,40 @@
       '<button class="linkish" data-z="other">' + PR.t("选别的文件夹…") + "</button>" +
       '<div class="actions"><button class="btn" data-z="close">' + PR.t("取消") + '</button><button class="btn accent" data-z="scan"' + (s.path && !s.busy ? "" : " disabled") + ">" + (s.busy ? '<span class="spin"></span> ' + PR.t("正在读取") : PR.t("下一步")) + "</button></div>";
   }
+  function folderConfirm(c) {
+    const locked = s.busy ? " disabled" : "";
+    const checked = value => value ? " checked" : "";
+    const action = c.watch ? (s.watch ? PR.t("保存") : PR.t("停止自动导入"))
+      : !c.with_pdf && s.watch ? PR.t("启用自动导入") : PR.t("导入");
+    const canSubmit = c.with_pdf || s.watch || c.watch;
+    const name = c.path.split(/[\\/]/).pop() || c.path;
+    return '<div class="folder-confirm"><p class="folder-source" dir="auto" title="' + esc(c.path) + '">' + esc(name) + '</p><p class="folder-count">' +
+      PR.t("{pdf} 个 PDF · {cats} 个分类", { pdf: c.with_pdf, cats: c.collections }) + '</p>' +
+      '<label class="switch-row"><b>' + PR.t("自动导入新 PDF") + '</b><input class="switch" type="checkbox" data-zo="watch"' +
+      checked(s.watch) + locked + '></label>' +
+      '<details class="folder-options"' + (s.optionsOpen ? " open" : "") + '><summary>' + PR.t("更多选项") + '</summary><p class="zt-src">' + esc(c.path) + '</p>' +
+      '<label class="zt-opt"><input type="checkbox" data-zo="link"' + checked(s.link) + locked + '>' + PR.t("链接本地 PDF，不复制原文件") + '</label>' +
+      (c.watch ? '<label class="zt-opt"><input type="checkbox" data-zo="keepFilename"' + checked(s.keepFilename) + locked + '>' +
+        PR.t("用原文件名作为文献库标题") + '</label>' : '') + '</details>' +
+      '<div class="actions"><button class="btn" data-z="close"' + locked + '>' + PR.t("取消") +
+      '</button><button class="btn accent" data-z="start"' + (locked || (!canSubmit ? " disabled" : "")) + '>' + action + '</button></div></div>';
+  }
+
   function scanHtml() {
     const c = s.scan;
+    if (!zotero()) return folderConfirm(c);
     let h = '<p class="zt-src">' + esc(c.path) + "</p>";
-    if (zotero()) {
-      h += (c.from_backup ? '<p class="zt-warn">' + PR.t("Zotero 正在用它的数据库，这次读的是 Zotero 的自动备份，最近几天的改动可能不在里面。想要最新的，先关掉 Zotero 再点“上一步”重新读。") + "</p>" : "") +
+    h += (c.from_backup ? '<p class="zt-warn">' + PR.t("Zotero 正在用它的数据库，这次读的是 Zotero 的自动备份，最近几天的改动可能不在里面。想要最新的，先关掉 Zotero 再点“上一步”重新读。") + "</p>" : "") +
         '<div class="zt-stats">' + stat(c.with_pdf, PR.t("篇有 PDF，会导入")) + stat(c.collections, PR.t("个分类")) + stat(c.tags, PR.t("个标签")) + "</div>" +
         (c.no_pdf ? '<p class="hint">' + PR.t("另有 {n} 条没有 PDF（只有题录，或者文件找不到），默认跳过。", { n: c.no_pdf }) + "</p>" + more(PR.t("看看是哪些"), c.missing) : "") +
         '<label class="zt-opt"><input type="checkbox" data-zo="tags"' + (s.tags ? " checked" : "") + ">" + PR.t("Zotero 的标签也建成分类（放在“Zotero 标签”下面）") + "</label>" +
         (c.fetchable ? '<label class="zt-opt"><input type="checkbox" data-zo="fetch"' + (s.fetch ? " checked" : "") + (s.link ? " disabled" : "") + ">" + PR.t("没有 PDF 的 {n} 条有 DOI 或 arXiv 编号，联网下载 PDF（慢一些，有的下不到）", { n: c.fetchable }) + "</label>" : "") +
         '<p class="hint">' + PR.t("导入后不会自动翻译，只准备原页；想读哪篇再翻译哪篇。迁移可以重复做，已经导入的只补分类，不会重复。") + "</p>";
-    } else {
-      h += '<div class="zt-stats">' + stat(c.with_pdf, PR.t("个 PDF，会导入")) + stat(c.collections, PR.t("个文件夹，变成分类")) + "</div>" +
-        '<label class="zt-opt"><input type="checkbox" data-zo="keepFilename"' + (s.keepFilename ? " checked" : "") + ">" + PR.t("用原文件名作为文献库标题") + "</label>" +
-        '<p class="hint">' + PR.t("文件夹的层级就是分类的层级：选的文件夹是最外层，里面的子文件夹是它的子分类。同一个 PDF 放在几个文件夹里，只导入一篇，几个分类都会有它。") + "</p>" +
-        '<p class="hint">' + PR.t("导入后不会自动翻译，只准备原页；想读哪篇再翻译哪篇。可以重复导入同一个文件夹，已经导入的只补分类，不会重复。") + "</p>";
-    }
     h += '<label class="zt-opt"><input type="checkbox" data-zo="link"' + (s.link ? " checked" : "") + ">" + PR.t("链接本地 PDF，不复制原文件") + "</label>" +
       '<p class="hint">' + PR.t("链接仅在能访问原路径的电脑上使用。请保留原 PDF；已有论文保留原来的存储方式、笔记和进度。") + "</p>";
     const can = c.with_pdf || (!s.link && s.fetch && c.fetchable);
-    return h + '<div class="actions"><button class="btn" data-z="back">' + (zotero() ? PR.t("上一步") : PR.t("换个文件夹")) + '</button><button class="btn accent" data-z="start"' + (s.busy || !can ? " disabled" : "") + ">" + (zotero() ? PR.t("开始迁移") : PR.t("开始导入")) + "</button></div>";
+    return h + '<div class="actions"><button class="btn" data-z="back">' + PR.t("上一步") + '</button><button class="btn accent" data-z="start"' +
+      (s.busy || !can ? " disabled" : "") + ">" + PR.t("开始迁移") + "</button></div>";
   }
   function runHtml() {
     const st = s.status || {};
@@ -84,18 +107,18 @@
 
   PR.openZotero = async function () {
     if (await resume()) return;
-    Object.assign(s, { source: "zotero", step: "pick", scan: null, busy: false, path: "" });
+    Object.assign(s, { source: "zotero", step: "pick", scan: null, busy: false, path: "", link: false });
     dlg.classList.add("open");
     render();
     try { s.candidates = (await PR.api("/api/zotero/detect")).candidates || []; } catch (e) { s.candidates = []; }
     if (s.candidates.length) s.path = s.candidates[0].path;
     render();
   };
-  PR.openFolderImport = async function (keepFilename = s.keepFilename) {
+  PR.openFolderImport = async function (keepFilename = false) {
     if (await resume()) return;
     const p = await PR.pickFolder({ title: PR.t("选择要导入的文件夹") });
     if (!p) return;
-    Object.assign(s, { source: "folder", path: p, scan: null, busy: false, fetch: false, keepFilename });
+    Object.assign(s, { source: "folder", step: "pick", path: p, scan: null, watch: false, optionsOpen: false, busy: false, fetch: false, link: false, keepFilename });
     scan();
   };
 
@@ -103,13 +126,27 @@
     s.busy = true; render();
     try {
       s.scan = await PR.api("/api/migrate/scan", { method: "POST", body: { source: s.source, path: s.path } });
+      if (!zotero()) {
+        s.watch = !!s.scan.watch;
+        if (s.watch) { s.link = s.scan.watch.link; s.keepFilename = s.scan.watch.keep_filename; }
+      }
       s.step = "scan"; dlg.classList.add("open");
     } catch (e) { PR.toast(PR.t("读不了：{msg}", { msg: esc(e.message) }), null, 8000); }
     s.busy = false; render();
+    if (!zotero() && s.step === "scan") box.querySelector?.('[data-z="close"]')?.focus();
   }
   async function start() {
     s.busy = true; render();
     try {
+      if (!zotero() && (s.watch || s.scan.watch)) {
+        await PR.api("/api/migrate/watch", { method: "POST", body: {
+          path: s.scan.path, enabled: s.watch, link: s.link, keep_filename: !!s.keepFilename,
+        } });
+        close(); s.busy = false; s.step = "pick";
+        PR.toast(s.watch ? PR.t("EasyRead 运行时会自动导入这个文件夹里的 PDF") : PR.t("已停止自动导入"));
+        L.load();
+        return;
+      }
       s.status = await PR.api("/api/migrate/start", { method: "POST", body: { source: s.source, path: s.path, tags: s.tags, fetch: s.fetch, link: s.link, keep_filename: !zotero() && s.keepFilename } });
       s.step = "run"; poll();
     } catch (e) { PR.toast(PR.t("没能开始：{msg}", { msg: esc(e.message) }), null, 8000); }
@@ -117,13 +154,13 @@
   }
 
   dlg.addEventListener("click", async (e) => {
-    if (e.target === dlg) return close();
+    if (e.target === dlg) return dismiss();
     const b = e.target.closest("[data-z]");
     if (!b || b.disabled) return;
     const act = b.dataset.z;
-    if (act === "close") close();
+    if (act === "close") dismiss();
     if (act === "finish") { close(); s.step = "pick"; }
-    if (act === "back") { if (zotero()) { s.step = "pick"; render(); } else { close(); PR.openFolderImport(); } }
+    if (act === "back") { s.step = "pick"; render(); }
     if (act === "scan") scan();
     if (act === "start") start();
     if (act === "stop") { await PR.api("/api/migrate/stop", { method: "POST", body: {} }).catch(() => {}); poll(); }
@@ -134,7 +171,19 @@
   });
   dlg.addEventListener("change", (e) => {
     if (e.target.name === "ztPath") { s.path = e.target.value; render(); }
-    if (e.target.dataset.zo) { s[e.target.dataset.zo] = e.target.checked; if (s.link) s.fetch = false; render(); }
+    const option = e.target.dataset.zo;
+    if (option) {
+      s[option] = e.target.checked;
+      if (s.link) s.fetch = false;
+      if (!zotero()) s.optionsOpen = !!box.querySelector?.(".folder-options")?.open;
+      render();
+      if (!zotero()) box.querySelector?.('[data-zo="' + option + '"]')?.focus();
+    }
   });
-  dlg.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
+  (dlg.ownerDocument || dlg).addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || !dlg.classList.contains("open") || dlg.ownerDocument?.querySelector("dialog:modal")) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    dismiss();
+  }, true);
 })(window.PR);

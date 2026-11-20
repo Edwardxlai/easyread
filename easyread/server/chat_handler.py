@@ -1,7 +1,10 @@
 """HTTP streaming for the reader chat, including attachment lifecycle."""
 import json
 import threading
-from ..chat import answer_styles, chat, chat_models, chat_store, documents
+from contextlib import nullcontext
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from ..chat import answer_styles, chat, chat_models, chat_store, documents, library_search
 from ..app import config
 from ..app.i18n import tr
 from ..app.log import log
@@ -29,9 +32,9 @@ def handle(self, ws, body: dict):
     user["documents"] = documents.extract(body.get("documents"))
     past = (thread or {}).get("messages", [])
     convo = [{"role": x["role"], "content": x["content"]} for x in past] + [{"role": "user", "content": text}]
-    prompt_text = chat.prompt(ws, convo, user["anchor"], user["quote"], ecfg["engine"], refs,
-                              answer_style=style, context_scope=body.get("context_scope", "paper"))
-    prompt_text += documents.context((past + [user])[-chat.HISTORY:])
+    scope = body.get("library_scope")
+    if scope is not None:
+        user["library_scope"] = scope
     images = chat.receive_images(ws, body.get("images"), ecfg)
     user["images"] = images
     self.send_response(200)
@@ -41,6 +44,8 @@ def handle(self, ws, body: dict):
     self.end_headers()
     self.close_connection = True
     cancel = threading.Event()
+    sources = None
+    missing = []
     pieces: list[str] = []
     meter = usage.Meter(ecfg["engine"])
 
@@ -60,15 +65,35 @@ def handle(self, ws, body: dict):
             send({"model": model})
         attachments = chat.image_paths(ws, past + [user])
         image_options = {"images": attachments} if attachments else {}
-        for piece in chat.stream(ecfg, prompt_text, ws.root, cancel, seen, meter, **image_options):
-            pieces.append(piece)
-            send({"t": piece})
-        msg = chat_store.append(ws, tid, user, "".join(pieces), m["id"], model, meter.snapshot())
+        with (TemporaryDirectory(prefix="easyread-chat-") if scope is not None else nullcontext(ws.root)) as directory:
+            cwd = Path(directory)
+            evidence = None
+            if scope is not None:
+                ecfg[ecfg["engine"]]["lean"] = True
+                query = "\n".join([text] + [r["quote"] for r in refs if r["quote"]])
+                found = library_search.retrieve(self.app.lib, self.app.lib.passage_index, scope, query, ecfg, cwd, meter, cancel)
+                sources = found["sources"]
+                missing = found["missing"]
+                send({"sources": sources, "missing": missing})
+                evidence = library_search.evidence_prompt(found)
+            prompt_text = chat.prompt(ws, convo, user["anchor"], user["quote"], ecfg["engine"], refs,
+                                      answer_style=style, context_scope=body.get("context_scope", "paper"), evidence=evidence)
+            prompt_text += documents.context((past + [user])[-chat.HISTORY:])
+            if scope is not None and not sources and not (refs or attachments or user["documents"]):
+                pieces.append(tr("没有找到相关段落"))
+                send({"t": pieces[-1]})
+            else:
+                if scope is not None:
+                    image_options["library_scope"] = True
+                for piece in chat.stream(ecfg, prompt_text, cwd, cancel, seen, meter, **image_options):
+                    pieces.append(piece)
+                    send({"t": piece})
+        msg = chat_store.append(ws, tid, user, "".join(pieces), m["id"], model, meter.snapshot(), sources=sources, missing=missing)
         send({"done": True, "id": msg["id"], "usage": msg.get("usage")})
     except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
         cancel.set()  # 读者点了停止或关了页面
         if pieces:
-            chat_store.append(ws, tid, {**user, "note": None}, "".join(pieces) + "\n\n" + tr("（已停止）"), m["id"], model, meter.snapshot())
+            chat_store.append(ws, tid, {**user, "note": None}, "".join(pieces) + "\n\n" + tr("（已停止）"), m["id"], model, meter.snapshot(), sources=sources, missing=missing)
     except engines.Cancelled:
         pass
     except Exception as e:  # noqa: BLE001

@@ -72,6 +72,7 @@ class Library:
             "pages": meta.get("page_count", 0), "done_pages": len(tr.get("done_pages", [])), "en_pages": len(tr.get("en_pages", [])),
             "todo": _todo(meta.get("page_count", 0), tr),
             "abstract": abstract,
+            "ai_indexed": item.get("ai_indexed", True), "category_review": item.get("category_review") or {},
             "meta_override": item.get("meta_override") or {},
             "tags": item.get("tags", []), "status": item.get("status", "unread"), "starred": bool(item.get("starred")),
             "added": item.get("added", ""), "last_opened": item.get("last_opened", ""),
@@ -156,30 +157,34 @@ class Library:
                     linked: Path | None = None, keep_filename: bool = False) -> tuple[Workspace, bool]:
         pid = digest[:12]
         ws = Workspace(self.root / pid)
-        if (ws.root / "paper.json").exists():
+        if ws.paper_path.exists():
             return ws, False
-        ws.root.mkdir(parents=True, exist_ok=True)
-        if linked is None:
-            (ws.root / "source.pdf").write_bytes(data)
-        base_meta = {"title_zh": "", "title_en": "", "authors": "", "source": filename, "source_sha256": digest, "pdf": "source.pdf"}
-        base_meta.update(meta or {})
-        base_meta.update(source_sha256=digest, pdf="source.pdf")
-        base_meta.pop("source_pdf_path", None)
-        if linked is not None:
-            base_meta["source_pdf_path"] = str(linked)
-        if not base_meta.get("title_en"):
-            base_meta["title_en"] = _pdf_title(linked or ws.root / "source.pdf") or Path(filename).stem
-        write_json_atomic(ws.paper_path, {
-            "schema": SCHEMA, "meta": base_meta,
-            "translation": {"scope": "未开始", "done_pages": [], "note": ""},  # i18n-ok 存进 paper.json
-            "glossary": [], "references": [], "blocks": [],
-        })
-        write_json_atomic(ws.discussion_path, empty_discussion())
-        write_json_atomic(ws.reader_path, empty_reader())
-        item = {"added": now_iso(), "tags": [], "status": "unread", "starred": False}
-        if keep_filename:
-            item["meta_override"] = {"display_title": Path(filename).name}
-        write_json_atomic(ws.item_path, item)
+        with dir_lock(self.root, name=f".import-{pid}.lock"):
+            if ws.paper_path.exists():
+                return ws, False
+            ws.root.mkdir(parents=True, exist_ok=True)
+            if linked is None:
+                (ws.root / "source.pdf").write_bytes(data)
+            base_meta = {"title_zh": "", "title_en": "", "authors": "", "source": filename, "source_sha256": digest, "pdf": "source.pdf"}
+            base_meta.update(meta or {})
+            base_meta.update(source_sha256=digest, pdf="source.pdf")
+            base_meta.pop("source_pdf_path", None)
+            if linked is not None:
+                base_meta["source_pdf_path"] = str(linked)
+            if not base_meta.get("title_en"):
+                base_meta["title_en"] = _pdf_title(linked or ws.root / "source.pdf") or Path(filename).stem
+            write_json_atomic(ws.discussion_path, empty_discussion())
+            write_json_atomic(ws.reader_path, empty_reader())
+            item = {"added": now_iso(), "tags": [], "status": "unread", "starred": False}
+            if keep_filename:
+                item["meta_override"] = {"display_title": Path(filename).name}
+            write_json_atomic(ws.item_path, item)
+            # The workspace becomes visible only after its original and user data exist.
+            write_json_atomic(ws.paper_path, {
+                "schema": SCHEMA, "meta": base_meta,
+                "translation": {"scope": "未开始", "done_pages": [], "note": ""},  # i18n-ok 存进 paper.json
+                "glossary": [], "references": [], "blocks": [],
+            })
         return ws, True
 
     def import_reference(self, ref: str, kind: str = "auto") -> tuple[Workspace, bool]:

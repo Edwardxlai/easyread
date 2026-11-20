@@ -57,10 +57,15 @@ class PassageIndex:
         self._papers = {}
         self._lock = threading.Lock()
 
-    def snapshot(self, library):
+    def snapshot(self, library, allowed=None):
         with self._lock:
+            workspaces = library.all()
+            ids = {ws.id for ws in workspaces}
+            self._papers = {key: value for key, value in self._papers.items() if key in ids}
             live = {}
-            for ws in library.all():
+            for ws in workspaces:
+                if allowed is not None and ws.id not in allowed:
+                    continue
                 version = (file_version(ws.paper_path), file_version(ws.reader_path))
                 old = self._papers.get(ws.id)
                 if old and old[0] == version:
@@ -70,7 +75,7 @@ class PassageIndex:
                     live[ws.id] = (version, list(passages(ws)))
                 except (DataReadError, FileNotFoundError):
                     continue
-            self._papers = live
+            self._papers.update(live)
             return ([row for _, rows in live.values() for row in rows],
                     sum(not rows for _, rows in live.values()))
 

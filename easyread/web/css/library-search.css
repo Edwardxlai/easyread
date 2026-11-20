@@ -1,14 +1,23 @@
-#libraryAsk { width: min(640px, calc(100% - 32px)); max-height: 80vh; box-sizing: border-box;
-  padding: 22px; border: 1px solid var(--rule); border-radius: 12px;
-  color: var(--ink); background: var(--surface); box-shadow: var(--shadow); }
-#libraryAsk::backdrop { background: rgba(25, 24, 22, .35); }
-#libraryAsk form { display: grid; gap: 10px; }
-#libraryAsk .ask-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-#libraryAsk h2 { margin: 0; font-size: 20px; }
-#libraryAsk textarea { resize: vertical; width: 100%; }
-.ask-status:not(:empty), .ask-answer:not(:empty) { margin-top: 16px; }
-.ask-answer { white-space: pre-wrap; line-height: 1.65; }
-.ask-sources { margin: 14px 0 0; padding-left: 24px; }
-.ask-sources:empty { display: none; }
-.ask-sources li + li { margin-top: 10px; }
-.ask-sources small { display: block; color: var(--ink-2); line-height: 1.5; }
+.lib-ai-dialog {
+  box-sizing: border-box; width: min(620px, calc(100% - 24px)); max-height: 85dvh; overflow: auto;
+  padding: 22px; border: 1px solid var(--rule); border-radius: 12px; background: var(--surface); color: var(--ink);
+}
+.lib-ai-dialog::backdrop { background: rgba(25, 24, 22, .35); }
+.lib-ai-dialog header, .lib-ai-dialog footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.lib-ai-dialog h2 { font-size: 20px; margin: 0; }
+.lib-ai-dialog h3 { font-size: 16px; margin: 12px 0; }
+.lib-ai-dialog input[type=checkbox] { accent-color: var(--accent); }
+.lib-ai-dialog [type=search] { box-sizing: border-box; width: 100%; }
+.directory-all, .directory-pref { display: flex; align-items: center; gap: 8px; margin: 12px 0 4px; }
+.directory-list { max-height: 35vh; overflow: auto; border-block: 1px solid var(--rule); }
+.directory-list label { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; cursor: pointer; }
+.directory-list label + label, .review-list section + section { border-top: 1px solid var(--rule); }
+.directory-list small { display: block; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.directory-list label span { min-width: 0; }
+.review-list section { padding: 8px 0; }
+.category-choice { display: flex; align-items: center; gap: 8px; }
+.category-choice .input { flex: 1; min-width: 0; }
+.review-list p { color: var(--ink-2); margin: 6px 0 14px 25px; }
+.review-list footer { justify-content: flex-end; }
+#categoryQueueBtn[hidden] { display: none; }
+@media (max-width:760px) { .topbar { flex-wrap: wrap; height: auto; } .topbar .search { min-width: 90px; } }

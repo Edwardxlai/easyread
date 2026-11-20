@@ -12,6 +12,11 @@ from ..app.i18n import tr
 def post(app, ws, parts: list[str], body: dict):
     """返回要回给页面的 JSON；不认识的 action 返回 None。"""
     action = parts[4]
+    if action in ("suggest-categories", "review-categories"):
+        from ..chat import category_suggestions
+        if action == "suggest-categories":
+            return category_suggestions.suggest(app.lib, ws)
+        return category_suggestions.resolve(ws, body)
     if action == "translate-selection":
         from ..translate.selection import translate
         return translate(ws, body)

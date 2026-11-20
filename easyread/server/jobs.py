@@ -279,6 +279,9 @@ class Jobs:
         started = time.time()
         try:
             failed = translate.translate_pages(ws, cfg, pages, cancel, report, meter, read)
+            if not read:
+                from ..chat.category_suggestions import after_translation
+                after_translation(self.lib, ws, cfg, cancel, pages, failed, meter)
         finally:  # 取消、出错也把已经花掉的记上
             run = meter.snapshot()
             self._write(ws, timing=timeline.snapshot())
