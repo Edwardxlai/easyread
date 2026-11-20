@@ -103,7 +103,13 @@ body.pv-open .blk.pv-pair::before { background: rgba(214, 160, 40, .8); opacity:
 .np-ai-body table.tbl, .np-preview table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; line-height: 1.55; }
 .np-ai-body table.tbl th, .np-ai-body table.tbl td, .np-preview table.tbl th, .np-preview table.tbl td { padding: 5px 8px; white-space: normal; word-break: break-word; }
 .np-ai-body blockquote, .np-preview blockquote { margin: .5em 0; padding: .4em .8em; border-left: 3px solid var(--accent); background: var(--accent-soft); color: var(--ink-2); border-radius: 0 4px 4px 0; }
-.np-ai-body blockquote p, .np-preview blockquote p { margin: 0; }
+.np-ai-body blockquote p, .np-preview blockquote p { margin: 0 0 .4em; }
+.np-ai-body blockquote p:last-child, .np-preview blockquote p:last-child { margin-bottom: 0; }
+.np-ai-body hr, .np-preview hr { border: 0; border-top: 1px solid var(--rule); margin: .9em 0; }
+.np-ai-body pre, .np-preview pre { max-width: 100%; overflow-x: auto; padding: .65em .85em; margin: .5em 0; background: var(--surface-2); border-radius: 6px; text-align: left; }
+.np-ai-body pre code, .np-preview pre code { display: block; padding: 0; background: none; white-space: pre; font-size: .88em; line-height: 1.6; }
+.np-ai-body .md-h, .np-preview .md-h { font-weight: 600; font-family: var(--ui); margin: .7em 0 .25em; }
+.np-ai-body ul, .np-ai-body ol, .np-preview ul, .np-preview ol { margin: .3em 0 .6em; padding-left: 1.4em; }
 .np-ai-acts { display: flex; gap: 8px; justify-content: flex-end; padding: 8px 10px; border-top: 1px solid var(--rule); }
 .np-tools .nh-btns { display: inline-flex; gap: 6px; }
 .np-preview { flex: 1; overflow-y: auto; font: 15px/1.9 var(--serif-zh); color: var(--ink); padding: 4px 4px 30px; }

@@ -1,8 +1,8 @@
-/* 行内标记：$TeX$ / \(TeX\)、**粗体**、*斜体*、`代码`、[n] 引用、[Jimenez et al., 2024](#cite:Jimenez-2024) 作者-年份引用，
-   以及 [表 3](#tab:3) 这样指向论文里图表、公式、章节的链接。译文、讨论、笔记都用同一套，用户编辑时看到的就是这套原始标记。 */
+/* 行内与块级标记：$TeX$ / \(TeX\)、**粗体**、*斜体*、`代码`、[n] 引用、[Jimenez et al., 2024](#cite:Jimenez-2024) 作者-年份引用，
+   以及 [表 3](#tab:3) 这样指向论文里图表、公式、章节的链接。块级 Markdown 由 markdown-it 解析，保留前置公式/代码/引用保护。 */
 (function (PR) {
   "use strict";
-  // 先识别代码和完整公式，避免分段、Markdown 和表格的 | 拆坏 TeX。
+  // 先识别代码、完整公式和链接，避免分段、Markdown 和表格的 | 拆坏 TeX。
   // For numeric openers, a dollar introducing another price or following prose is not a close.
   const TOKENS = new RegExp([
     /(?<!\\)(`+)([\s\S]*?)\1/.source,  // i18n-ok: code span pattern
@@ -14,27 +14,48 @@
   ].join("|"), "g");
   const mathCache = new Map();
 
+  function dedentFence(body, text, offset) {
+    const lineStart = text.lastIndexOf("\n", offset - 1) + 1;
+    const prefix = text.slice(lineStart, offset);
+    if (!prefix || !/^(?:[ \t]|>[ \t]*)+$/.test(prefix)) return body;
+    const qDepth = (prefix.match(/>/g) || []).length;
+    const indentRe = new RegExp("^[ \\t]{1," + prefix.replace(/>/g, " ").length + "}");
+    const lines = body.split("\n");
+    return lines.map((line, i) => {
+      if (i === lines.length - 1 && /^(?:[ \t]|>[ \t]*)*$/.test(line)) return "";
+      if (line.startsWith(prefix)) return line.slice(prefix.length);
+      if (qDepth) {
+        let s = line;
+        for (let q = 0; q < qDepth; q++) s = s.replace(/^[ \t]*>[ \t]?/, "");
+        return s;
+      }
+      return line.replace(indentRe, "");
+    }).join("\n");
+  }
+
   function tokens(text, blocks) {
     let prefix = "\uE000";
     while (text.includes(prefix)) prefix += "\uE000";
     const values = [];
-    const masked = text.replace(TOKENS, (raw, ticks, code, dollarBlock, dollarInline, bracketBlock, parenInline, linkLabel, linkUrl) => {
+    const masked = text.replace(TOKENS, (raw, ticks, code, dollarBlock, dollarInline, bracketBlock, parenInline, linkLabel, linkUrl, offset, whole) => {
       if (linkLabel != null) {
         values.push({ raw, text: linkLabel.replace(/\\([\[\]\\])/g, "$1"), link: linkUrl });
         return prefix + (values.length - 1) + "I\uE001";
       }
       const display = ticks ? ticks.length >= 3 && code.includes("\n") : dollarBlock != null || bracketBlock != null;
-      const body = ticks ? (display ? code.replace(/^[\w+-]*\r?\n/, "") : code) : dollarBlock ?? dollarInline ?? bracketBlock ?? parenInline;
+      let body = ticks ? (display ? code.replace(/^[\w+-]*\r?\n/, "") : code) : dollarBlock ?? dollarInline ?? bracketBlock ?? parenInline;
+      if (ticks && display) body = dedentFence(body, whole, offset);
       values.push({ raw, text: body, code: !!ticks, display });
       return prefix + (values.length - 1) + (blocks && display ? "B" : "I") + "\uE001";
     });
-    return { text: masked, values, inline: new RegExp(prefix + "(\\d+)I\uE001", "g"), blocks: new RegExp(prefix + "(\\d+)B\uE001", "g") };
+    return { prefix, text: masked, values, inline: new RegExp(prefix + "(\\d+)I\\uE001", "g"), blocks: new RegExp(prefix + "(\\d+)B\\uE001", "g") };
   }
 
   // 论文内部链接由模型按原文写出：[图 3](#fig:3)、第 [2.1](#sec:2.1) 节、[代码清单 3](#lst:3)、[Jimenez 等人（2024）](#cite:Jimenez-2024)。
   // 类型:编号 查 PR.xindex（render.js 按块的编号建），cite:键 查参考文献；查不到、或这里不该有链接（opts.xref/cite === false）就只留文字
   const INTERNAL = /^#(fig|tab|eq|sec|alg|lst):(.+)$/;
   function tokenHtml(t, block, opts) {
+    if (t.footnote != null) return footnoteAnchor(t.footnote, opts || {});
     if (t.link && /^#b-[\w-]+$/.test(t.link)) return '<a href="' + PR.esc(t.link) + '">' + PR.esc(t.text) + '</a>';
     if (t.link && t.link.startsWith("#")) {
       opts = opts || {};
@@ -59,7 +80,9 @@
   }
 
   function restore(s, saved, raw, opts) {
-    return s.replace(saved.inline, (m, i) => raw ? saved.values[i].raw : tokenHtml(saved.values[i], false, opts));
+    s = s.replace(saved.inline, (m, i) => raw ? saved.values[i].raw : tokenHtml(saved.values[i], false, opts));
+    if (!raw && saved.blocks) s = s.replace(saved.blocks, (m, i) => tokenHtml(saved.values[i], true, opts));
+    return s;
   }
 
   /* [表 3](#tab:3) -> 表 3：拿到阅读页以外（导出的 Markdown）时，指向论文里的链接没有去处，只留文字 */
@@ -223,33 +246,24 @@
     });
   }
 
-  /* 脚注标记 [^13]，符号脚注 [^*]、[^†]（∗ 当 * 算）。要在粗体斜体之前处理：[^*] 里的星号不能被当成斜体的一半 */
+  /* 脚注标记 [^13]，符号脚注 [^*]、[^†]（∗ 当 * 算）。要在粗体斜体之前保护：[^*] 里的星号不能被当成斜体的一半 */
   const FOOTNOTE = /(?<!\\)\[\^(\d{1,3}|[*∗†‡§¶]{1,3})\]/g;
   const footnoteNum = (n) => String(n).replace(/∗/g, "*");
-  function footnoteRefs(s, opts) {
-    return s.replace(FOOTNOTE, (raw, mark) => {
-      const n = footnoteNum(mark), ix = PR.footnoteIndex, key = opts.footnotePage + ":" + n;
-      const id = ix && (ix.pages.has(key) ? ix.pages.get(key) : ix.all.get(n));
-      const label = "<sup>" + n.replace(/\*/g, "&#42;") + "</sup>";
-      return id ? '<a class="footnote-ref" href="#b-' + PR.esc(id) + '" data-footnote="b-' + PR.esc(id) + '">' + label + "</a>" : label;
+  function footnoteAnchor(mark, opts) {
+    const n = footnoteNum(mark), ix = PR.footnoteIndex, key = opts.footnotePage + ":" + n;
+    const id = ix && (ix.pages.has(key) ? ix.pages.get(key) : ix.all.get(n));
+    const label = "<sup>" + n.replace(/\*/g, "&#42;") + "</sup>";
+    return id ? '<a class="footnote-ref" href="#b-' + PR.esc(id) + '" data-footnote="b-' + PR.esc(id) + '">' + label + "</a>" : label;
+  }
+
+  function maskFootnotes(saved) {
+    saved.text = saved.text.replace(FOOTNOTE, (raw, mark) => {
+      saved.values.push({ raw, footnote: mark });
+      return saved.prefix + (saved.values.length - 1) + "I\uE001";
     });
   }
 
-  function inline(text, opts) {
-    let s = blockLabel(PR.esc(text).replace(/\\\$/g, "$"));
-    if (opts.xref !== false) s = legacyXrefs(s);
-    s = footnoteRefs(s, opts);
-    s = s.replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
-    s = s.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, "$1<em>$2</em>");
-    if (opts.cite !== false) s = citeLinks(s);
-    return s.replace(/\n/g, "<br>");
-  }
-
-  /* 一行/一段文字 -> HTML */
-  PR.md = function (text, opts) {
-    opts = opts || {};
-    text = String(text == null ? "" : text);
-    const saved = tokens(text, false);
+  function applySuperscriptNotes(saved, opts) {
     // Some older translations have literal superscripts instead of [^n]. Only use a
     // same-page note after prose. Keep standalone powers, units, code and full TeX intact.
     const noteHere = n => PR.footnoteIndex?.pages.get(opts.footnotePage + ":" + n);
@@ -266,123 +280,166 @@
         return noteHere(num) && inProse(str, at) ? "[^" + num + "]" : raw;
       });
     }
-    return restore(inline(saved.text, opts), saved, false, opts);
-  };
+  }
 
-  /* 行间公式先拆出来，再按空行分段；已有回答的 \[...\] 也能显示，不需要改记录。 */
-  PR.mdBlocks = function (text, opts) {
-    const saved = tokens(String(text || "").trim(), true);
-    const html = saved.text.split(saved.blocks).map((part, i) => i % 2 ? tokenHtml(saved.values[part], true, opts) :
-      part.split(/\n\s*\n/).map((p) => para(p, opts)).join("")).join("");
+  function renderPlainSegment(chunk, opts) {
+    if (!chunk) return "";
+    let s = blockLabel(PR.esc(chunk));
+    if (opts.xref !== false) s = legacyXrefs(s);
+    if (opts.cite !== false) s = citeLinks(s);
+    return s;
+  }
+
+  function renderPlainText(text, env) {
+    const saved = env && env.saved, opts = (env && env.opts) || {};
+    if (!saved) return renderPlainSegment(text, opts);
+    return text.split(saved.inline).map((part, i) => (i % 2 ? saved.prefix + part + "I\uE001" : renderPlainSegment(part, opts))).join("");
+  }
+
+  function prepareBlockMarkdown(saved) {
+    let text = saved.text;
+    // 中文顿号编号或实心圆点列表（如 “1、 第一步”“• 要点”）转为标准列表语法
+    text = text.replace(/^([ \t]*(?:>[ \t]*)*)(\d+)、[ \t]+/gm, "$1$2. ").replace(/^([ \t]*(?:>[ \t]*)*)•[ \t]+/gm, "$1- ");
+    // 行间块标记（$$...$$、\[...\]、围栏代码块）占独立行，便于在列表/引用内正确成块
+    const blockRe = new RegExp("(" + saved.prefix + "\\d+B\\uE001)", "g");
+    return text.split("\n").map((line) => {
+      if (!blockRe.test(line)) return line;
+      blockRe.lastIndex = 0;
+      if (line.includes("|") && !/^\s*\uE000+\d+B\uE001\s*$/.test(line)) return line;
+      const listMatch = line.match(/^([ \t]*(?:>[ \t]*)*)((?:[-+*]|\d{1,9}[.)])[ \t]+)/);
+      const contPrefix = listMatch
+        ? listMatch[1] + " ".repeat(listMatch[2].length)
+        : (line.match(/^([ \t]*(?:>[ \t]*)+|[ \t]+)/) || ["", ""])[1];
+      const prefixOnlyRe = /^([ \t]*(?:>[ \t]*)*)$/;
+      return line.replace(blockRe, (tok, _g, off) => {
+        const before = line.slice(0, off);
+        const after = line.slice(off + tok.length);
+        const needBefore = before.trim() && !prefixOnlyRe.test(before);
+        const needAfter = after.trim();
+        return (needBefore ? "\n" + contPrefix : "") + tok + (needAfter ? "\n" + contPrefix : "");
+      });
+    }).join("\n");
+  }
+
+  let mdEngine = null;
+  function markdown() {
+    if (mdEngine) return mdEngine;
+    if (!PR.MarkdownIt) return null;
+    const md = new PR.MarkdownIt({ html: false, breaks: true, linkify: false });
+    md.validateLink = (url) => /^(https?:\/\/|mailto:|#)/i.test(String(url || "").trim());
+
+    const StateInline = md.inline.State;
+    if (!StateInline.prototype._erCjkPatched) {
+      const origScan = StateInline.prototype.scanDelims;
+      const isCjkOrFull = (c) => (c >= 0x2E80 && c <= 0x9FFF) || (c >= 0xAC00 && c <= 0xD7AF) || (c >= 0xF900 && c <= 0xFAFF) || (c >= 0xFF00 && c <= 0xFFEF) || (c >= 0x20000 && c <= 0x2FA1F);
+      const isCjkPunct = (c) => (c >= 0x2010 && c <= 0x2027) || (c >= 0x3000 && c <= 0x303F) || (c >= 0xFF01 && c <= 0xFF0F) || (c >= 0xFF1A && c <= 0xFF20) || (c >= 0xFF3B && c <= 0xFF40) || (c >= 0xFF5B && c <= 0xFF65);
+      const isSpace = (c) => c === 0x20 || c === 0x09 || c === 0x0A || c === 0x0D || c === 0x3000;
+      const codePointBefore = (src, index) => {
+        if (index <= 0) return 0x20;
+        const c = src.charCodeAt(index - 1);
+        if (c >= 0xDC00 && c <= 0xDFFF && index >= 2) {
+          const h = src.charCodeAt(index - 2);
+          if (h >= 0xD800 && h <= 0xDBFF) return 0x10000 + ((h - 0xD800) << 10) + (c - 0xDC00);
+        }
+        return c;
+      };
+      StateInline.prototype.scanDelims = function (start, canSplitWord) {
+        const res = origScan.call(this, start, canSplitWord);
+        const marker = this.src.charCodeAt(start);
+        if (marker !== 0x2A && marker !== 0x5F) return res;
+        let pos = start;
+        while (pos < this.posMax && this.src.charCodeAt(pos) === marker) pos++;
+        const prev = codePointBefore(this.src, start);
+        const next = pos < this.posMax ? this.src.codePointAt(pos) : 0x20;
+        const prevCjkP = isCjkPunct(prev), nextCjkP = isCjkPunct(next);
+        const prevCjk = isCjkOrFull(prev) && !prevCjkP;
+        const nextCjk = isCjkOrFull(next) && !nextCjkP;
+        if (prevCjk && !isSpace(next) && nextCjkP) res.can_open = true;
+        if (nextCjk && !isSpace(prev) && prevCjkP) res.can_close = true;
+        if (nextCjkP && !isSpace(prev)) res.can_open = true;
+        if (prevCjkP && !isSpace(next)) res.can_close = true;
+        if (marker === 0x2A && prevCjk && nextCjk) { res.can_open = true; res.can_close = true; }
+        return res;
+      };
+      StateInline.prototype._erCjkPatched = true;
+    }
+
+    md.block.ruler.before("code", "er_block", function (state, startLine, _endLine, silent) {
+      const pos = state.bMarks[startLine] + state.tShift[startLine];
+      const max = state.eMarks[startLine];
+      const line = state.src.slice(pos, max).trim();
+      if (!/^\uE000+\d+B\uE001$/.test(line)) return false;
+      if (silent) return true;
+      const token = state.push("er_block", "", 0);
+      token.content = line;
+      token.map = [startLine, startLine + 1];
+      state.line = startLine + 1;
+      return true;
+    }, { alt: ["paragraph", "reference", "blockquote", "list"] });
+
+    md.renderer.rules.er_block = (toks, idx) => toks[idx].content + "\n";
+    md.renderer.rules.heading_open = (toks, idx, options, _env, self) => {
+      toks[idx].attrJoin("class", "md-h");
+      return self.renderToken(toks, idx, options);
+    };
+    md.renderer.rules.table_open = () => '<div class="tbl-wrap"><table class="tbl">\n';
+    md.renderer.rules.table_close = () => "</table></div>\n";
+    md.renderer.rules.text = (toks, idx, _options, env) => renderPlainText(toks[idx].content, env);
+
+    md.core.ruler.after("inline", "er_task_list", (state) => {
+      const toks = state.tokens;
+      for (let i = 2; i < toks.length; i++) {
+        if (toks[i].type !== "inline" || toks[i - 1].type !== "paragraph_open" || toks[i - 2].type !== "list_item_open") continue;
+        const m = toks[i].content.match(/^\[([ xX])\]\s+/);
+        if (!m || !toks[i].children || !toks[i].children.length || toks[i].children[0].type !== "text") continue;
+        const first = toks[i].children[0];
+        if (!/^\[([ xX])\]\s+/.test(first.content)) continue;
+        first.content = first.content.replace(/^\[([ xX])\]\s+/, "");
+        toks[i - 2].attrJoin("class", "task-list-item");
+        const cb = new state.Token("html_inline", "", 0);
+        cb.content = '<input type="checkbox" disabled' + (m[1].toLowerCase() === "x" ? " checked" : "") + "> ";
+        toks[i].children.unshift(cb);
+      }
+    });
+
+    mdEngine = md;
+    return mdEngine;
+  }
+
+  /* 最小兜底：极简测试环境未加载 markdown-it.js 时保持基础渲染 */
+  function fallbackInline(text, opts) {
+    let s = renderPlainSegment(text.replace(/\\\$/g, "$"), opts);
+    s = s.replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
+    s = s.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, "$1<em>$2</em>");
+    return s.replace(/\n/g, "<br>");
+  }
+
+  /* 一行/一段文字 -> HTML */
+  PR.md = function (text, opts) {
+    opts = opts || {};
+    text = String(text == null ? "" : text);
+    const saved = tokens(text, false);
+    applySuperscriptNotes(saved, opts);
+    maskFootnotes(saved);
+    const md = markdown();
+    const html = md ? md.renderInline(saved.text, { saved, opts }) : fallbackInline(saved.text, opts);
     return restore(html, saved, false, opts);
   };
 
-  function isTableDelimiter(line) {
-    const trimmed = (line || "").trim();
-    if (!trimmed.includes("-") || !trimmed.includes("|")) return false;
-    let parts = trimmed.split("|");
-    if (trimmed.startsWith("|")) parts.shift();
-    if (trimmed.endsWith("|")) parts.pop();
-    if (parts.length === 0) return false;
-    return parts.every((p) => /^\s*:?-+:?\s*$/.test(p));
-  }
-
-  function splitTableRow(line) {
-    let s = (line || "").trim();
-    const saved = tokens(s, false);
-    s = saved.text;
-    s = s.replace(/\\\|/g, "\uE002");
-    if (s.startsWith("|")) s = s.slice(1);
-    if (s.endsWith("|")) s = s.slice(0, -1);
-    return s.split("|").map((cell) => {
-      let c = cell.trim();
-      c = c.replace(/\uE002/g, "|");
-      return restore(c, saved, true);
-    });
-  }
-
-  function parseAlign(delimLine) {
-    return splitTableRow(delimLine).map((col) => {
-      const c = col.trim();
-      const left = c.startsWith(":");
-      const right = c.endsWith(":");
-      if (left && right) return "center";
-      if (right) return "right";
-      if (left) return "left";
-      return "";
-    });
-  }
-
-  function tableHtml(headerLine, delimLine, dataLines, opts) {
-    const align = parseAlign(delimLine);
-    const getStyle = (i) => (align[i] ? ' style="text-align:' + align[i] + '"' : "");
-    const headCells = splitTableRow(headerLine);
-    const head = "<tr>" + headCells.map((c, i) => "<th" + getStyle(i) + ">" + PR.md(c, opts) + "</th>").join("") + "</tr>";
-    const colCount = headCells.length;
-    const rows = dataLines.map((rowLine) => {
-      const cells = splitTableRow(rowLine);
-      while (cells.length < colCount) cells.push("");
-      return "<tr>" + cells.slice(0, colCount).map((c, i) => "<td" + getStyle(i) + ">" + PR.md(c, opts) + "</td>").join("") + "</tr>";
-    }).join("");
-    return '<div class="tbl-wrap"><table class="tbl"><thead>' + head + "</thead><tbody>" + rows + "</tbody></table></div>";
-  }
-
-  function para(p, opts) {
-    p = p.trim();
-    if (!p) return "";
-
-    // 1. 表格（Markdown GFM 表格：表头 + 分隔行 + 数据行）
-    const lines = p.split("\n");
-    const dIdx = lines.findIndex((l, idx) => idx >= 1 && isTableDelimiter(l) && lines[idx - 1].includes("|"));
-    if (dIdx >= 1) {
-      const before = lines.slice(0, dIdx - 1);
-      const headerLine = lines[dIdx - 1];
-      const delimLine = lines[dIdx];
-      let endIdx = dIdx + 1;
-      while (endIdx < lines.length && lines[endIdx].includes("|") && lines[endIdx].trim()) {
-        endIdx++;
-      }
-      const dataLines = lines.slice(dIdx + 1, endIdx);
-      const after = lines.slice(endIdx);
-      return (before.length ? para(before.join("\n"), opts) : "") +
-        tableHtml(headerLine, delimLine, dataLines, opts) +
-        (after.length ? para(after.join("\n"), opts) : "");
-    }
-
-    // 2. 引用块（> 开头）
-    const qIdx = lines.findIndex((l) => /^\s*>/.test(l));
-    if (qIdx >= 0) {
-      let qEnd = qIdx;
-      while (qEnd < lines.length && /^\s*>/.test(lines[qEnd])) qEnd++;
-      const before = lines.slice(0, qIdx);
-      const qText = lines.slice(qIdx, qEnd).map((l) => l.replace(/^\s*>\s?/, "")).join("\n");
-      const after = lines.slice(qEnd);
-      return (before.length ? para(before.join("\n"), opts) : "") +
-        "<blockquote>" + para(qText, opts) + "</blockquote>" +
-        (after.length ? para(after.join("\n"), opts) : "");
-    }
-
-    // 3. 标题
-    const hIdx = lines.findIndex((l) => /^#{1,6}\s+.+$/.test(l));
-    if (hIdx >= 0) {
-      const h = lines[hIdx].replace(/^#{1,6}\s+/, "");
-      return (hIdx ? para(lines.slice(0, hIdx).join("\n"), opts) : "") +
-        '<p class="md-h">' + PR.md(h, opts) + "</p>" +
-        (hIdx + 1 < lines.length ? para(lines.slice(hIdx + 1).join("\n"), opts) : "");
-    }
-
-    // 4. 列表：从某行起每行都以 “- ”“* ”或“1. ”开头（AI 的回答常用“引子：\n- …\n- …”）
-    const isItem = (l) => /^\s*([-*•]|\d+[.、)])\s+/.test(l);
-    const k = lines.findIndex(isItem);
-    if (k >= 0 && lines.slice(k).every(isItem)) {
-      const ordered = /^\s*\d/.test(lines[k]);
-      const start = ordered ? lines[k].match(/^\s*(\d+)/)[1] : "";
-      return (k ? "<p>" + PR.md(lines.slice(0, k).join("\n"), opts) + "</p>" : "") + (ordered ? '<ol' + (start === "1" ? "" : ' start="' + start + '"') + '>' : "<ul>") +
-        lines.slice(k).map((l) => "<li>" + PR.md(l.replace(/^\s*([-*•]|\d+[.、)])\s+/, ""), opts) + "</li>").join("") + (ordered ? "</ol>" : "</ul>");
-    }
-
-    return "<p>" + PR.md(p, opts) + "</p>";
-  }
+  /* 块级 Markdown（AI 对话、页边讨论、笔记预览） */
+  PR.mdBlocks = function (text, opts) {
+    opts = opts || {};
+    const src = String(text || "").trim();
+    if (!src) return "";
+    const saved = tokens(src, true);
+    maskFootnotes(saved);
+    const md = markdown();
+    const html = md
+      ? md.render(prepareBlockMarkdown(saved), { saved, opts })
+      : saved.text.split(saved.blocks).map((part, i) => (i % 2 ? tokenHtml(saved.values[part], true, opts) :
+          part.split(/\n\s*\n/).map((p) => (p.trim() ? "<p>" + fallbackInline(p.trim(), opts) + "</p>" : "")).join(""))).join("");
+    return restore(html, saved, false, opts);
+  };
 
   /* 去掉标记的纯文字，给目录、列表摘要用 */
   PR.plain = (text) => {

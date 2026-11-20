@@ -7,9 +7,11 @@ const { test } = require("node:test");
 function markup(realKatex = false) {
   const PR = {
     t: (s, v) => v ? s.replace(/\{(\w+)\}/g, (m, k) => v[k]) : s, esc: text => String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;") };
-  vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../../easyread/web/js/common/markup.js"), "utf8"), {
+  const ctx = {
     window: { PR }, URL, katex: realKatex ? require("../../easyread/web/vendor/katex/katex.min.js") : { renderToString: tex => '<math>' + PR.esc(tex) + '</math>' },
-  });
+  };
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../../easyread/web/vendor/markdown-it.js"), "utf8"), ctx);
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../../easyread/web/js/common/markup.js"), "utf8"), ctx);
   return PR;
 }
 
@@ -225,9 +227,10 @@ test("headings can precede tables and lists; their text still escapes HTML", () 
 
 test("blank lines between numbered steps do not reset each displayed number to one", () => {
   const html = markup().mdBlocks("1. 准备器件。\n\n2. 输入 $x$。\n\n3. 读取结果。");
-  assert.ok(html.includes('<ol><li>准备器件。</li></ol>'));
-  assert.ok(html.includes('<ol start="2"><li>输入 <math>x</math>。</li></ol>'));
-  assert.ok(html.includes('<ol start="3"><li>读取结果。</li></ol>'));
+  assert.equal((html.match(/<ol>/g) || []).length, 1);
+  assert.equal((html.match(/<li>/g) || []).length, 3);
+  assert.ok(html.includes("输入 <math>x</math>。"));
+  assert.ok(html.includes("读取结果。"));
 });
 
 test("links into the paper go where their type and number say, never by guessing from the wording", () => {
@@ -304,4 +307,52 @@ test("links exact alphanumeric labels and unique author-year citations, leaving 
   assert.ok(!PR.md('Jones, 2021').includes('class="cite"'));
   assert.ok(!PR.md('`Vaswani et al., 2017`').includes('class="cite"'));
   assert.ok(!PR.md('[feature-2]').includes('class="cite"'));
+});
+
+test("AI chat renders nested lists, horizontal rules, task lists, strikethrough and CJK bold cleanly", () => {
+  const PR = markup();
+  PR.xindex = { sec: { "1": "s1" }, fig: { "1": "fig1" }, tab: { "1": "tab1" }, eq: {}, alg: {}, lst: {} };
+  const sample = String.raw`2. **源任务刷高分不代表真正学会推理（第 [1](#sec:1) 节、[图 1](#fig:1)）**
+   论文用 Qwen3-8B 在 MuSiQue 上训练的对比把这个问题具体化了：
+   - **仅答案监督**：从 $34.2\%$ 升到 **56.2%**，但这是**“重要”**的对比。
+   - **原始学生轨迹监督**：见**（第 1 节）**，~~旧假设~~不再成立。
+   - **公式推导**：$$a = b$$ 收尾。
+
+---
+
+- [x] 已验证项
+- [ ] 待补充项
+
+> 多段引用第一段
+>
+> - 引用中的列表项
+>
+> ` + "```python\n> y = 2\n> ```";
+  const html = PR.mdBlocks(sample);
+  assert.ok(html.includes('<ol start="2">'));
+  assert.ok(html.includes("<ul>"));
+  assert.ok(html.includes("<strong>“重要”</strong>"));
+  assert.ok(html.includes('<strong>（<a class="xref" data-kind="sec" data-key="1">第 1 节</a>）</strong>'));
+  assert.ok(html.includes("<s>旧假设</s>"));
+  assert.ok(html.includes("<hr>"));
+  assert.ok(html.includes('<div class="eq"><math>a = b</math></div>'));
+  assert.ok(html.includes("<pre><code>y = 2\n</code></pre>"));
+  assert.ok(html.includes('class="task-list-item"'));
+  assert.ok(html.includes('disabled checked'));
+  assert.ok(html.includes('data-kind="sec" data-key="1"'));
+  assert.ok(html.includes('data-kind="fig" data-key="1"'));
+  assert.ok(html.includes("<blockquote>"));
+});
+
+test("markdown-it integration preserves HTML/URL XSS protection and fenced code inside lists", () => {
+  const PR = markup();
+  const unsafe = "Text <script>alert(1)</script> and <img src=x onerror=alert(1)> and [bad](<javascript:alert(1)>) and [bad2](javascript:alert(1)).\n\n1. 示例：\n   ```python\n   x = 1\n   ```";
+  const html = PR.mdBlocks(unsafe);
+  assert.ok(!html.includes("<script>"));
+  assert.ok(!html.includes("<img"));
+  assert.ok(!html.includes('href="javascript:'));
+  assert.ok(!html.includes("<a "));
+  assert.ok(html.includes("&lt;script&gt;alert(1)&lt;/script&gt;"));
+  assert.ok(html.includes("<ol>"));
+  assert.ok(html.includes("<pre><code>x = 1\n</code></pre>"));
 });
