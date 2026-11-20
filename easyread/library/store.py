@@ -4,7 +4,7 @@
   paper.json       翻译方（对话里的 agent 或后台翻译任务）写：原文、译文、术语、参考文献
   discussion.json  翻译方写：解释、问答、回复、原文核对提示
   reader.json      只由页面经 /api/.../ops 写：用户改的译文、笔记、划线、论文笔记、进度
-  item.json        只由页面经 /api/items 写：标签、阅读状态、星标、打开时间
+  item.json        文献库管理的分类、论文标签、阅读状态、星标和打开时间
 """
 from __future__ import annotations
 

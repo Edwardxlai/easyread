@@ -3,14 +3,14 @@ import re
 from ..app.i18n import tr
 from ..library.store import Workspace
 
-_REF_LINE = re.compile(r"^\s*(\d+\.?\s*)?(references|bibliography|参考文献)\s*$", re.I | re.M)  # i18n-ok
+REFERENCE_HEADING = re.compile(r"^\s*(\d+\.?\s*)?(references|bibliography|参考文献)\s*$", re.I | re.M)  # i18n-ok
 
 def references_page(ws: Workspace) -> int | None:
     """参考文献从哪一页开始（找单独成行的 References 标题）。找不到返回 None。"""
     n = ws.load("paper").get("meta", {}).get("page_count") or 0
     for p in range(2, n + 1):
         f = ws.root / "extract" / f"page-{p:03d}.txt"
-        if f.exists() and _REF_LINE.search(f.read_text(encoding="utf-8", errors="replace")):
+        if f.exists() and REFERENCE_HEADING.search(f.read_text(encoding="utf-8", errors="replace")):
             return p
     return None
 

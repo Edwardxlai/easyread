@@ -3,9 +3,9 @@ from __future__ import annotations
 
 import threading
 from contextlib import contextmanager
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
-from ..library import cloudlib
+from ..library import cloudlib, paper_labels
 from ..app import config
 from ..library.cloudlib_lock import LibraryMarker
 from ..app.i18n import tr
@@ -134,13 +134,20 @@ def inspect(body: dict) -> dict:
         return incomplete(e)
 
 
-def get(app, path: str):
+def get(app, path: str, query: str = ""):
     if path == "/api/library/location":
         return app.location.location()
+    if path == "/api/library/labels":
+        name = parse_qs(query, keep_blank_values=True).get("name", [None])[0]
+        return paper_labels.definitions(app.lib, name)
     return None
 
 
 def post(app, path: str, body: dict):
+    if path == "/api/library/labels":
+        return paper_labels.create(app.lib.root, body.get("name"))
+    if path == "/api/library/labels/rule":
+        return paper_labels.set_rule(app.lib, body)
     if path == "/api/library/ask":
         from ..chat.library_search import answer
         return answer(app.lib, app.lib.passage_index, body)
@@ -163,4 +170,4 @@ def post(app, path: str, body: dict):
     return None
 
 
-POST = {"/api/library/ask", "/api/library/inspect", "/api/library/pick-folder", "/api/library/cleanup", "/api/library/move", "/api/library/reveal", "/api/shutdown"}
+POST = {"/api/library/labels", "/api/library/labels/rule", "/api/library/ask", "/api/library/inspect", "/api/library/pick-folder", "/api/library/cleanup", "/api/library/move", "/api/library/reveal", "/api/shutdown"}

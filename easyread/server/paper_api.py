@@ -43,6 +43,15 @@ def post(app, ws, parts: list[str], body: dict):
         return res
     if action == "item":
         return ws.patch_item(body)
+    if action == "labels" and len(parts) == 5:
+        from ..library import paper_labels
+        return paper_labels.edit(app.lib.root, ws, body)
+    if action == "labels" and parts[5:] == ["auto"]:
+        from ..chat import paper_labeling
+        return paper_labeling.apply_existing(app.lib, ws)
+    if action == "labels" and parts[5:] in (["suggest"], ["generate"]):
+        from ..chat import paper_labeling
+        return paper_labeling.generate(app.lib, ws, preview=parts[5] == "suggest")
     if action == "translate":
         return translate_api.enqueue(app.jobs, ws, body)
     if action == "figure-images":

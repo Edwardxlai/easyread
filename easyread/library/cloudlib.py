@@ -14,6 +14,7 @@ from ..app import config
 from .cloudlib_detect import detect, target_path  # noqa: F401
 from ..app.i18n import tr
 from ..app.log import log
+from .paper_labels import CATALOG
 from .store import read_json, write_json_atomic
 
 MIGRATION_MARKER = ".easyread-migration.json"
@@ -222,6 +223,9 @@ def move(src: str | Path, dst: str | Path, mode: str) -> dict:
                 result["skipped"].append({"id": str(target), "reason": tr("目标已有同名文件夹，已保留目标内容")})
             else:
                 entries.append((p, target))
+    labels = src / CATALOG
+    if mode == "copy" and (labels.exists() or labels.is_symlink()):
+        entries.append((labels, Path(CATALOG)))
     dst.mkdir(parents=True, exist_ok=True)
     staging = dst / f"{STAGING_PREFIX}{uuid.uuid4().hex}"
     staging.mkdir()  # 不用 mkdtemp：同样会在没权限时无限重试
@@ -270,7 +274,7 @@ def move(src: str | Path, dst: str | Path, mode: str) -> dict:
                     shutil.copyfileobj(source, output)
                 if target.stat().st_size != staged.stat().st_size:
                     raise ValueError(tr("复制核对失败，文献库位置没有更改"))
-            if relative.parts[0] != ".trash":
+            if relative.parts[0] not in (".trash", CATALOG):
                 result["copied"] += 1
         transaction["state"] = "ready"
         write_json_atomic(marker, transaction)

@@ -5,6 +5,37 @@ const { createInterface } = require('node:readline');
 const assert = require('node:assert/strict');
 const { chromium } = require(process.env.PLAYWRIGHT || 'playwright');
 
+async function checkTagSettings(page) {
+  const row = page.locator('.row[data-id="sample-paper"]');
+  const detail = page.locator('#detail');
+  await row.click();
+  assert.equal(await detail.locator('[data-label-auto], [data-label-generate]').count(), 0);
+  for (const [match, create] of [[true, false], [true, true], [false, true], [false, false]]) {
+    await page.locator('#settingsBtn').click();
+    await page.locator('[data-set-tab="library"]').click();
+    for (const [id, checked] of [['ai_label_match', match], ['ai_label_create', create]]) {
+      const input = page.locator('[data-label-feature="' + id + '"]');
+      if (await input.isChecked() === checked) continue;
+      await Promise.all([
+        page.waitForResponse(r => r.url().endsWith('/api/prefs') && r.request().method() === 'POST' && r.ok()),
+        input.setChecked(checked),
+      ]);
+    }
+    await page.locator('#setCancel').click();  // Sidebar switches are saved immediately.
+    await page.reload();
+    await row.click();
+    await detail.locator('[data-label-edit]:enabled').waitFor();
+    assert.equal(await detail.locator('[data-label-auto]').count(), Number(match));
+    assert.equal(await detail.locator('[data-label-generate]').count(), Number(create));
+    await row.click({ button: 'right' });
+    const menu = page.locator('#ctxmenu.open');
+    assert.equal(await menu.getByRole('button', { name: 'AI 打标签', exact: true }).count(), Number(match));
+    assert.equal(await menu.getByRole('button', { name: 'AI 新建标签', exact: true }).count(), Number(create));
+    await page.keyboard.press('Escape');
+  }
+  await row.click();
+}
+
 async function main() {
   const root = path.resolve(__dirname, '../..');
   const python = process.env.PYTHON || (process.platform === 'win32'
@@ -32,7 +63,20 @@ async function main() {
     page = await browser.newPage({ locale: 'zh-CN', viewport: { width: 1440, height: 1000 } });
     page.setDefaultTimeout(8000);
     await page.goto(url);
+    await page.locator('#recentPaperList .empty').waitFor();
+    assert.equal(await page.locator('#recentPaperList [data-paper]').count(), 0);
+    const toggle = page.getByRole('button', { name: '标签', exact: true });
+    assert.equal(await toggle.getAttribute('aria-expanded'), 'true');
+    await toggle.press('Space');
+    await page.reload();
+    await page.locator('#recentPaperList .empty').waitFor();
+    assert.equal(await toggle.getAttribute('aria-expanded'), 'false');
+    assert.ok(await page.locator('#paperLabelList').evaluate(list => list.hidden));
     await page.locator('.row[data-id="sample-paper"]').click();
+    await toggle.press('Enter');
+    assert.equal(await toggle.getAttribute('aria-expanded'), 'true');
+    assert.ok(await page.locator('#paperLabelList').evaluate(list => !list.hidden));
+    await checkTagSettings(page);
     const reader = page.locator('#detail a[href^="/read/sample-paper"]');
     await Promise.all([page.waitForURL('**/read/sample-paper*'), reader.click()]);
     await page.waitForLoadState('load');
@@ -63,6 +107,29 @@ async function main() {
     await source.waitFor();
     await source.evaluate(link => link.click());
     assert.equal(new URL(page.url()).hash, '#b-p1-1');
+    await page.goto(url);
+    await page.locator('#recentPaperList [data-paper="sample-paper"]').waitFor();
+    assert.equal(await page.locator('#recentPaperList .empty').count(), 0);
+    await page.setViewportSize({ width: 390, height: 844 });
+    const nav = page.locator('#libraryNavBtn');
+    await nav.click();
+    assert.equal(await nav.getAttribute('aria-expanded'), 'true');
+    await toggle.press('Space');
+    assert.equal(await toggle.getAttribute('aria-expanded'), 'false');
+    await nav.click();
+    assert.equal(await nav.getAttribute('aria-expanded'), 'false');
+    assert.equal(await page.locator('#side').isHidden(), true);
+    for (const width of [320, 768, 1147]) {
+      await page.setViewportSize({ width, height: 844 });
+      const fits = await page.locator('.topbar').evaluate(bar => {
+        const bounds = bar.getBoundingClientRect();
+        return document.documentElement.scrollWidth <= innerWidth && [...bar.children].every(element => {
+          const rect = element.getBoundingClientRect();
+          return !rect.width || (rect.left >= 0 && rect.right <= innerWidth && rect.top >= 0 && rect.bottom <= bounds.bottom);
+        });
+      });
+      assert.ok(fits, 'Library toolbar must fit at ' + width + 'px');
+    }
     console.log('PASS: library, excerpt, server save, reload and return to source');
   } catch (error) {
     if (page) console.error(await page.locator('#notespanel').evaluateAll(nodes => nodes.map(node => ({

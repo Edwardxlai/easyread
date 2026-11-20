@@ -6,6 +6,34 @@
   const L = PR.lib;
   const BUILTIN = [["reading", PR.t("在读")], ["unread", PR.t("未读")], ["done", PR.t("已读")], ["starred", PR.t("星标")],
     ["questions", PR.t("有待回答的问题"), PR.t("有问题没回答时才出现")], ["translating", PR.t("翻译中"), PR.t("有论文在翻译时才出现")]];
+  const savingLabels = new Map();
+  const labelChecked = (id) => savingLabels.get(id) ?? (L.labelFeatures[id] === true);
+  const labelDisabled = (id) => savingLabels.has(id) || L.loadStatus !== "ready";
+
+  L.syncLabelSwitches = function () {
+    for (const input of PR.$$("#settingsDlg [data-label-feature]")) {
+      const id = input.dataset.labelFeature;
+      input.checked = labelChecked(id);
+      input.disabled = labelDisabled(id);
+    }
+  };
+
+  async function saveLabelFeature(input) {
+    const id = input.dataset.labelFeature, enabled = input.checked;
+    savingLabels.set(id, enabled);
+    input.disabled = true;
+    try {
+      const saved = await PR.api("/api/prefs", { method: "POST", body: { library: { [id]: enabled } } });
+      L.labelFeatures[id] = saved.library[id] === true;
+      PR.renderDetail();
+      await L.load();
+    } catch (error) {
+      PR.toast(PR.t("保存失败：{msg}", { msg: PR.esc(error.message) }));
+    } finally {
+      savingLabels.delete(id);
+      L.syncLabelSwitches();
+    }
+  }
 
   function row(o) {  // o: {name, label, depth, sub, pinKey, hideKey, custom, fixed}；自建分类的 name 是完整路径，改名时可以改成别的路径来移动
     const pinned = o.pinKey && L.side.pinned.includes(o.pinKey);
@@ -20,7 +48,11 @@
     render(s) {
       const count = (fn) => L.items.filter(fn).length;
       const cats = L.cats();
-      return '<p class="set-lead">' + PR.t("文献库左侧栏里显示哪些分类。开关控制显示或隐藏，图钉是置顶。一篇论文可以放进好几个分类：在论文上右键，或者把它拖到侧栏的分类上。改动立刻生效。") + "</p>" +
+      return '<p class="set-lead">' + PR.t("选择 AI 标签工具和侧栏中显示的分类，改动会立即保存。把论文拖进自建分类即可归档，同一篇论文可以放进多个分类。") + "</p>" +
+        '<h4 class="set-h">' + PR.t("论文标签") + '</h4><div class="switch-list">' +
+        PR.PAPER_LABEL_TOOLS.map(({ id, name, description }) => '<label class="switch-row"><span><b>' + name + '</b><small>' + description +
+          '</small></span><input type="checkbox" class="switch" data-label-feature="' + id + '"' + (labelChecked(id) ? ' checked' : '') +
+          (labelDisabled(id) ? ' disabled' : '') + '></label>').join("") + '</div>' +
         '<h4 class="set-h">' + PR.t("内置分类") + '</h4><div class="sb-list">' +
         row({ name: PR.t("全部"), sub: PR.t("始终显示"), fixed: true }) +
         BUILTIN.map(([k, name, note]) => row({ name, sub: note || PR.t("{n} 篇", { n: count((L.VIEWS.find((v) => v[0] === k) || [])[3] || (() => false)) }), pinKey: "v:" + k, hideKey: k })).join("") + "</div>" +
@@ -41,6 +73,7 @@
       return true;
     },
     change(e) {
+      if (e.target.dataset.labelFeature) saveLabelFeature(e.target);
       if (e.target.dataset.libshow) L.setHidden(e.target.dataset.libshow, !e.target.checked);
       return false;
     },

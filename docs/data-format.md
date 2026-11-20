@@ -104,9 +104,12 @@ JSON 里 TeX 的反斜杠要写两个（`\\frac`）。`\f` `\b` `\t` `\n` `\r` �
 ## item.json（只读）
 
 ```json
-{ "added": "…", "tags": ["统计"], "status": "unread | reading | done", "starred": false,
+{ "added": "…", "tags": ["统计"], "labels": ["队列研究", "预注册"], "status": "unread | reading | done", "starred": false,
   "last_opened": "…", "meta_override": { "title_zh": "…" } }
 ```
+
+`tags` 保存原有分类路径。`labels` 保存论文的多个标签名，旧条目缺少该字段时视为未设置标签。
+`translation_labels_done: true` 表示该论文已完成随翻译运行的标签判断。后续的选页、重译和续跑会读取该标记。两个 AI 标签开关都关闭时会跳过判断，不写标记。开关保存在界面偏好的 `library.ai_label_match` 和 `library.ai_label_create`，缺省均为 `false`。
 
 ## job.json（后台任务状态）
 
@@ -146,6 +149,7 @@ JSON 里 TeX 的反斜杠要写两个（`\\frac`）。`\f` `\b` `\t` `\n` `\r` �
 | `config.json` | 设置：翻译引擎、各家 API Key（`openai.keys`，按服务商分开存）、问 AI 的模型名单和默认模型（`chat.models`、`chat.default`） |
 | `prefs.json` | 界面偏好：阅读页字号、版心、主题、划线笔（`reader`），功能开关和快捷键总开关（`ui`），改过的键位（`keys`） |
 | `easyread.log` | 服务日志，设置底部“查看运行日志”能看到 |
+| `library/.paper-labels.json` | 全库共享的标签定义。以标签名为键，值为匹配规则文本，空字符串表示按名称匹配。旧版的名称数组可直接读取。复制文献库时复制定义，合并库时已应用的标签名随论文复制。 |
 
 ## 图：裁图和图内文字
 

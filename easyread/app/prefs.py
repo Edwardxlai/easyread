@@ -5,9 +5,11 @@
 from __future__ import annotations
 
 from . import config
-from ..library.store import read_json, write_json_atomic
+from ..library.store import dir_lock, read_json, write_json_atomic
 
 ALLOWED = {"reader", "keys", "ui", "library", "import"}  # ui：功能开关 features、快捷键总开关 keys_on
+AI_LABEL_MATCH = "ai_label_match"
+AI_LABEL_CREATE = "ai_label_create"
 
 
 def path():
@@ -19,10 +21,22 @@ def load() -> dict:
     return read_json(path(), {}) or {}
 
 
+def paper_label_features() -> dict[str, bool]:
+    try:
+        data = load()
+        library = data.get("library") if isinstance(data, dict) else None
+    except (OSError, ValueError):
+        library = None
+    return {key: isinstance(library, dict) and library.get(key) is True
+            for key in (AI_LABEL_MATCH, AI_LABEL_CREATE)}
+
+
 def save(patch: dict) -> dict:
-    data = load()
-    for k, v in (patch or {}).items():
-        if k in ALLOWED and isinstance(v, dict):
-            data[k] = {**(data.get(k) or {}), **v}
-    write_json_atomic(path(), data)
-    return data
+    target = path()
+    with dir_lock(target.parent, name=".prefs.lock"):
+        data = read_json(target, {}) or {}
+        for k, v in (patch or {}).items():
+            if k in ALLOWED and isinstance(v, dict):
+                data[k] = {**(data.get(k) or {}), **v}
+        write_json_atomic(target, data)
+        return data

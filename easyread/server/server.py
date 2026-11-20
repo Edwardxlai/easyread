@@ -18,7 +18,7 @@ from ..pdf import figures, pdfwork
 from ..app import cli_models, config, i18n, open_link, prefs, updates
 from ..engines import detect, engines, usage
 from ..translate import langs
-from ..library import citations, trash
+from ..library import citations, paper_labels, trash
 from . import settings_api, library_api, jobs_api, paper_api, wsock
 from .babeldoc_api import BabelDocJobs
 from ..app.log import log, tail
@@ -167,14 +167,17 @@ class Handler(BaseHTTPRequestHandler):
             return self._file(_safe(WEB, path[5:]), cache=path.startswith("/web/vendor/"))
         if path == "/api/presence" and wsock.is_upgrade(self.headers):
             return self._presence()
-        location = library_api.get(app, path)
+        location = library_api.get(app, path, url.query)
         if location is not None:
             return self._json(200, location)
         if path in bulk_api.GET:
             return self._json(200, bulk_api.get(app, path))
         if path == "/api/library":
             cfg = config.load()
-            return self._json(200, {"items": lib.list(), "token": app.token, "jobs": app.jobs.small_status(),
+            items = lib.list()
+            return self._json(200, {"items": items, "labels": paper_labels.summarize(lib.root, items),
+                                    "label_features": prefs.paper_label_features(),
+                                    "token": app.token, "jobs": app.jobs.small_status(),
                                     "library_status": app.location.status, "other_device": app.location.marker.other_device(),
                                     "engine": cfg.get("engine"), "engine_label": cli_models.engine_label(cfg),
                                     "first_run": config.is_first_run(), "version": __version__, "trash": len(trash.items(lib.root))})

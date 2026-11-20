@@ -39,6 +39,30 @@ test("opening from details or the sidebar preserves normal links and records the
   }
 });
 
+test("return restores the exact paper tag even when a category shares its name", async () => {
+  const items = papers();
+  const name = "分类/标签";
+  items[4].labels = [name, "社交 VR"];
+  items[5].tags = [name];
+  const load = p => {
+    p.library(items, [name]);
+    p.setLibraryRead(() => ({ items, labels: [name, "社交 VR"], engine: "none" }));
+    return p;
+  };
+  const p = load(page()); await p.boot();
+  Object.assign(p.PR.lib, { view: "label", tag: name }); p.PR.lib.render();
+  assert.deepEqual(p.rows.map(row => row.dataset.id), ["p4"]);
+  p.PR.lib.openReader("p4");
+  const reader = page(p.location.href, p.storage);
+  reader.PR.libraryNav.readerBack("p4");
+  const returned = load(page("http://127.0.0.1:8765" + reader.node("#backBtn").href, p.storage));
+  await returned.boot();
+  assert.equal(returned.PR.lib.view, "label");
+  assert.equal(returned.node("#viewTitle").textContent, name);
+  assert.equal(returned.PR.lib.selected, "p4");
+  assert.deepEqual(returned.rows.map(row => row.dataset.id), ["p4"]);
+});
+
 test("browser back, including a cached library, locates the paper after recent-open sorting changes", async () => {
   const p = page().library(papers()); await p.boot(); p.PR.lib.tag = "分类"; p.PR.lib.render();
   p.node(".main").scrollTop = 900; p.PR.lib.openReader("p6");

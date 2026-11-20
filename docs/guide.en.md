@@ -107,6 +107,17 @@ Your browser opens `http://127.0.0.1:8765`. The server only listens on localhost
 3. Translation runs in the background page by page. Translated parts are readable immediately; untranslated pages show the original. Importing more than 5 PDFs at once asks before translating them all (the default is "Import only"); "Stop translation" at the top of the list stops every running job and keeps what is already translated.
 4. Click a paragraph for its action bar; select text to highlight, note or ask. Shortcuts are listed and editable under Settings → Shortcuts; the question mark at top right has help and updates.
 
+### Tag papers
+
+- **Recent** appears below the categories in the library sidebar. Open a paper in the reader to add it to your reading history. Pinned papers appear at the top of the sidebar.
+- Select the **Tags** heading below **Recent** to expand or collapse the list. The browser remembers your choice after a refresh. Use **+** beside the heading to create a tag. Select a tag to filter papers. The number beside each tag shows how many papers carry it.
+- Open a paper's details and select **Edit tags…**. Check any existing tags you want to apply, or type a name and select **Create and add**. Uncheck a tag to remove it from the paper, then select **Save tags**.
+- In **Edit tags…**, right-click a tag or choose **Rules** beside it to view and edit its library-wide criteria. A new tag and its rule are saved together. You can also right-click an existing tag in the sidebar to open its rule.
+- In the library, open **Settings → Sidebar → Paper tags**. **Tag with AI** and **Create tags with AI** are independent and off by default. Changes take effect immediately. You can always tag and filter papers manually.
+- Enable **Tag with AI** to use it in paper details. Your default Ask AI model checks existing rules against the title, abstract and available body text and applies all matches. For long papers it samples passages relevant to the rules. An empty rule uses the tag name.
+- Enable **Create tags with AI** to preview up to three suggestions in paper details. Select **Rules** to view or edit the criteria, check the tags you want to keep, then select **Save selected tags**.
+- Translation, including selected pages, uses the same switches. With both on, the translation model applies matching existing tags first and considers creating tags with rules only when none fit. With only creation on, it skips papers already covered by an existing rule. With both off, translation makes no tagging call. Once a paper has been checked, further translation preserves manual edits.
+
 ## Reading with an AI agent
 
 EasyRead ships with a CLI, so agents like Claude Code or Codex can read your notes and questions in a conversation, write answers next to the right paragraphs, or translate / re-translate pages themselves. The skill is in [`skill/paper-reading/SKILL.md`](../skill/paper-reading/SKILL.md); put that folder in `~/.claude/skills/` or `~/.codex/skills/`.
