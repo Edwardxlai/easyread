@@ -8,8 +8,7 @@ from . import config
 from ..library.store import dir_lock, read_json, write_json_atomic
 
 ALLOWED = {"reader", "keys", "ui", "library", "import"}  # ui：功能开关 features、快捷键总开关 keys_on
-AI_LABEL_MATCH = "ai_label_match"
-AI_LABEL_CREATE = "ai_label_create"
+AI_LABELS = "ai_labels"
 
 
 def path():
@@ -27,8 +26,9 @@ def paper_label_features() -> dict[str, bool]:
         library = data.get("library") if isinstance(data, dict) else None
     except (OSError, ValueError):
         library = None
-    return {key: isinstance(library, dict) and library.get(key) is True
-            for key in (AI_LABEL_MATCH, AI_LABEL_CREATE)}
+    library = library if isinstance(library, dict) else {}
+    legacy = any(library.get(key) is True for key in ("ai_label_match", "ai_label_create"))
+    return {AI_LABELS: library.get(AI_LABELS, legacy) is True}
 
 
 def save(patch: dict) -> dict:

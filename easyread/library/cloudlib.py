@@ -223,9 +223,12 @@ def move(src: str | Path, dst: str | Path, mode: str) -> dict:
                 result["skipped"].append({"id": str(target), "reason": tr("目标已有同名文件夹，已保留目标内容")})
             else:
                 entries.append((p, target))
-    labels = src / CATALOG
-    if mode == "copy" and (labels.exists() or labels.is_symlink()):
-        entries.append((labels, Path(CATALOG)))
+    label_files = (CATALOG, ".label-organizer.json")
+    if mode == "copy":
+        for name in label_files:
+            source = src / name
+            if source.exists() or source.is_symlink():
+                entries.append((source, Path(name)))
     dst.mkdir(parents=True, exist_ok=True)
     staging = dst / f"{STAGING_PREFIX}{uuid.uuid4().hex}"
     staging.mkdir()  # 不用 mkdtemp：同样会在没权限时无限重试
@@ -274,7 +277,7 @@ def move(src: str | Path, dst: str | Path, mode: str) -> dict:
                     shutil.copyfileobj(source, output)
                 if target.stat().st_size != staged.stat().st_size:
                     raise ValueError(tr("复制核对失败，文献库位置没有更改"))
-            if relative.parts[0] not in (".trash", CATALOG):
+            if relative.parts[0] not in (".trash", *label_files):
                 result["copied"] += 1
         transaction["state"] = "ready"
         write_json_atomic(marker, transaction)

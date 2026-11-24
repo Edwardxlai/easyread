@@ -210,6 +210,9 @@ class Handler(BaseHTTPRequestHandler):
                     return self._json(200, app.babeldoc.status(ws))
                 if len(parts) == 7:
                     return self._file(app.babeldoc.file(ws, parts[5], parts[6]), ctype="application/pdf")
+            if action == "labels" and parts[5:] == ["evidence"]:
+                name = parse_qs(url.query).get("name", [""])[0]
+                return self._json(200, paper_labels.saved_evidence(lib, ws, name))
             if action == "citations":
                 return self._json(200, citations.graph_for(lib, ws.id))
             if action == "state":

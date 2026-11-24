@@ -12,9 +12,19 @@
   const pathFor = (id) => "/api/p/" + encodeURIComponent(id) + "/labels";
   const enabledTools = () => PR.PAPER_LABEL_TOOLS.filter((tool) => L.labelFeatures[tool.id] === true);
 
-  L.labelChips = (item) => assigned(item).map((label) =>
-    '<span class="chip paper-label" title="' + PR.esc(label) + '">' + PR.icon("tag", "sm") +
-    '<span>' + PR.esc(label) + '</span></span>').join("");
+  const sourceHref = (item, source) => source.anchor ?
+    "/read/" + encodeURIComponent(item.id) + "#b-" + encodeURIComponent(source.anchor) :
+    "/p/" + encodeURIComponent(item.id) + (item.source_type === "web" ? "/source.html" : "/source.pdf#page=" + (source.page || 1));
+
+  L.labelChips = (item, withEvidence = false) => assigned(item).map((label) => {
+    const body = PR.icon("tag", "sm") + '<span>' + PR.esc(label) + '</span>';
+    if (withEvidence && item.evidence_labels?.includes(label)) {
+      const title = PR.esc(PR.t("查看「{name}」的原文依据", { name: label }));
+      return '<button type="button" class="chip paper-label" data-label-proof="' + PR.esc(label) +
+        '" title="' + title + '" aria-label="' + title + '">' + body + '</button>';
+    }
+    return '<span class="chip paper-label" title="' + PR.esc(label) + '">' + body + '</span>';
+  }).join("");
 
   L.labelSidebar = function () {
     const counts = new Map();
@@ -24,7 +34,7 @@
     const heading = PR.t("新建标签");
     const rows = L.labels.map((label) => {
       const active = L.view === "label" && L.tag === label;
-      return '<button type="button" class="srow' + (active ? ' on' : '') + '" data-paper-label="' + PR.esc(label) +
+      return '<button type="button" draggable="true" class="srow' + (active ? ' on' : '') + '" data-paper-label="' + PR.esc(label) +
         '" title="' + PR.esc(label) + '" aria-pressed="' + active + '">' + PR.icon("tag", "sm") +
         '<span class="t">' + PR.esc(label) + '</span><span class="n">' + (counts.get(label) || 0) + '</span></button>';
     });
@@ -37,7 +47,7 @@
   L.labelDetail = function (item) {
     const busy = pending.get(item.id);
     const disabled = L.loadStatus === "ready" ? "" : " disabled";
-    const chips = L.labelChips(item);
+    const chips = L.labelChips(item, true);
     const aiButton = ({ action, name, progress, description }) => '<button type="button" class="btn sm line" data-label-' + action +
       ' title="' + PR.esc(description) + '"' + (busy ? ' disabled' : disabled) + '>' +
       (busy === action ? '<span class="spin" aria-hidden="true"></span>' + progress : PR.icon("sparkle", "sm") + name) + '</button>';
@@ -60,7 +70,7 @@
     }
   }
 
-  async function openRuleEditor(name, drafts, onSuggestionEdit) {
+  async function openRuleEditor(name, drafts, onSuggestionEdit, evidenceItem) {
     const isDraft = !!drafts?.has(name);
     const title = PR.t("「{name}」的规则", { name });
     const dialog = PR.el("dialog", { class: "confirm label-rule-editor", "aria-labelledby": "labelRuleTitle" },
@@ -117,10 +127,20 @@
     } else {
       field.placeholder = PR.t("加载中…");
       try {
-        const { labels } = await PR.api("/api/library/labels?name=" + encodeURIComponent(name));
+        let entry;
+        if (evidenceItem) {
+          entry = await PR.api(pathFor(evidenceItem.id) + "/evidence?name=" + encodeURIComponent(name));
+        } else {
+          const { labels } = await PR.api("/api/library/labels?name=" + encodeURIComponent(name));
+          entry = labels.find((label) => key(label.name) === key(name));
+        }
         if (!dialog.open) return;
-        const entry = labels.find((label) => key(label.name) === key(name));
         if (!entry) throw new Error(PR.t("找不到这个论文标签"));
+        if (evidenceItem) {
+          const citation = PR.el("blockquote", { class: "label-proof" }, PR.esc(entry.quote) +
+            ' <a target="_blank" rel="noopener" href="' + PR.esc(sourceHref(evidenceItem, entry)) + '">' + PR.t("查看原文") + '</a>');
+          form.before(citation);
+        }
         previousRule = field.value = entry.rule;
         field.disabled = save.disabled = false;
       } catch (failure) {
@@ -132,14 +152,15 @@
     if (dialog.open && !field.disabled) field.focus();
   }
 
-  function openPicker(item, suggestions) {
-    const preview = Array.isArray(suggestions);
+  function openPicker(item, preview) {
+    const matches = preview?.matches || [], suggestions = preview?.suggestions || [];
+    const candidates = new Map([...matches, ...suggestions].map((row) => [row.name, row]));
     const initial = new Set(preview ? [] : assigned(item));
-    const selected = new Set(initial);
-    const draftRules = new Map((suggestions || []).map(({ name, rule }) => [name, rule]));
-    const available = new Set(preview ? draftRules.keys() : [...L.labels, ...initial]);
+    const selected = new Set(preview ? matches.map((row) => row.name) : initial);
+    const draftRules = new Map(suggestions.map(({ name, rule }) => [name, rule]));
+    const available = new Set(preview ? candidates.keys() : [...L.labels, ...initial]);
     const dialog = PR.el("dialog", { class: "confirm label-picker", "aria-labelledby": "labelPickerTitle" },
-      '<div id="labelPickerTitle" class="cf-title">' + (preview ? PR.t("选择要新建的标签") : PR.t("编辑标签…")) + '</div>' +
+      '<div id="labelPickerTitle" class="cf-title">' + (preview ? (matches.length ? PR.t("匹配的已有标签") : PR.t("选择要新建的标签")) : PR.t("编辑标签…")) + '</div>' +
       '<div class="cf-body label-paper-title">' + PR.esc(PR.titles(item).main) + '</div>' +
       '<form><fieldset>' + (preview ? '' : '<div class="label-input-row"><input class="input" maxlength="60" autocomplete="off" placeholder="' +
       PR.esc(PR.t("搜索或输入标签名")) + '" aria-label="' + PR.esc(PR.t("搜索或输入标签名")) + '">' +
@@ -164,9 +185,12 @@
       options.innerHTML = shown.map((label) => {
         const name = PR.esc(label);
         const ruleTitle = PR.esc(PR.t("编辑「{name}」的规则", { name: label }));
+        const candidate = candidates.get(label);
+        const proof = candidate ? '<small class="label-proof">“' + PR.esc(candidate.quote) + '”</small>' : "";
         return '<div class="label-choice" data-label-choice="' + name + '"><label><input type="checkbox" value="' + name + '"' +
           (selected.has(label) ? ' checked' : '') + '><span>' + name + (preview ?
-            '<small class="label-rule-summary">' + PR.esc(draftRules.get(label)) + '</small>' : '') + '</span></label>' +
+            '<small class="label-rule-summary">' + PR.esc(draftRules.get(label) ?? candidate.rule) + '</small>' + proof : '') + '</span></label>' +
+          (candidate ? '<a class="btn sm" target="_blank" rel="noopener" href="' + PR.esc(sourceHref(item, candidate)) + '">' + PR.t("查看原文") + '</a>' : "") +
           '<button type="button" class="btn sm" data-edit-rule title="' + ruleTitle + '" aria-label="' + ruleTitle + '">' +
           PR.t("规则") + '</button></div>';
       }).join("") ||
@@ -201,7 +225,7 @@
     });
     function editChoice(row) {
       const summary = PR.$(".label-rule-summary", row);
-      openRuleEditor(row.dataset.labelChoice, draftRules, summary ? (rule) => { summary.textContent = rule; } : null);
+      openRuleEditor(row.dataset.labelChoice, draftRules, summary && draftRules.has(row.dataset.labelChoice) ? (rule) => { summary.textContent = rule; } : null);
     }
     options.addEventListener("click", (event) => {
       const button = event.target.closest("[data-edit-rule]");
@@ -226,7 +250,8 @@
       fields.disabled = true;
       error.hidden = true;
       try {
-        const result = await write(pathFor(item.id), { add, remove, new_rules: newRules });
+        const result = preview ? await write(pathFor(item.id) + "/confirm", { preview: preview.preview, selected: add, rules: newRules }) :
+          await write(pathFor(item.id), { add, remove, new_rules: newRules });
         dialog.close();
         await L.load();
         if (preview && result.added.length) PR.toast(PR.t("已添加 {n} 个标签", { n: result.added.length }));
@@ -246,24 +271,16 @@
 
   async function runAI(item, mode) {
     if (pending.has(item.id) || !enabledTools().some((tool) => tool.action === mode)) return;
-    const generating = mode === "generate";
-    if (!generating && !L.labels.length) return PR.toast(PR.t("请先创建至少一个论文标签"));
     pending.set(item.id, mode);
     PR.renderDetail();
     try {
-      const result = await write(pathFor(item.id) + (generating ? "/suggest" : "/auto"), {});
-      if (generating) {
-        if (result.suggestions.length) openPicker(L.byId(item.id) || item, result.suggestions);
-        else PR.toast(PR.t("AI 没有生成新标签"));
-        return;
-      }
-      if (result.added.length) {
-        await L.load();
-        PR.toast(PR.t("AI 已添加 {n} 个标签", { n: result.added.length }));
-      } else PR.toast(PR.t("AI 没有找到可新增的标签"));
+      const result = await write(pathFor(item.id) + "/preview", {});
+      if (L.selected !== item.id) return;
+      if (result.matches.length || result.suggestions.length) openPicker(L.byId(item.id) || item, result);
+      else PR.toast(PR.t("AI 没有找到可新增的标签"));
     } catch (error) {
       const detail = { msg: PR.esc(error.message) };
-      PR.toast(generating ? PR.t("AI 新建标签失败：{msg}", detail) : PR.t("AI 打标签失败：{msg}", detail));
+      PR.toast(PR.t("AI 打标签失败：{msg}", detail));
     } finally {
       pending.delete(item.id);
       if (L.selected === item.id) PR.renderDetail();
@@ -314,8 +331,9 @@
   PR.$("#detail").addEventListener("click", (event) => {
     const item = L.byId(L.selected);
     if (!item) return;
-    if (event.target.closest("[data-label-edit]")) openPicker(item);
+    const proof = event.target.closest("[data-label-proof]");
+    if (proof) openRuleEditor(proof.dataset.labelProof, null, null, item);
+    else if (event.target.closest("[data-label-edit]")) openPicker(item);
     else if (event.target.closest("[data-label-auto]")) runAI(item, "auto");
-    else if (event.target.closest("[data-label-generate]")) runAI(item, "generate");
   });
 })(window.PR);

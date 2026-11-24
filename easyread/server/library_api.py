@@ -9,6 +9,7 @@ from ..library import cloudlib, paper_labels
 from ..app import config
 from ..library.cloudlib_lock import LibraryMarker
 from ..app.i18n import tr
+from . import label_organizer
 
 
 class LibraryLocation:
@@ -135,6 +136,8 @@ def inspect(body: dict) -> dict:
 
 
 def get(app, path: str, query: str = ""):
+    if path == "/api/library/labels/organize":
+        return label_organizer.request(app, "status")
     if path == "/api/library/location":
         return app.location.location()
     if path == "/api/library/labels":
@@ -144,6 +147,8 @@ def get(app, path: str, query: str = ""):
 
 
 def post(app, path: str, body: dict):
+    if path in ORGANIZER_ROUTES:
+        return label_organizer.request(app, path.rsplit("/", 1)[-1], body)
     if path == "/api/library/labels":
         return paper_labels.create(app.lib.root, body.get("name"))
     if path == "/api/library/labels/rule":
@@ -170,4 +175,6 @@ def post(app, path: str, body: dict):
     return None
 
 
-POST = {"/api/library/labels", "/api/library/labels/rule", "/api/library/ask", "/api/library/inspect", "/api/library/pick-folder", "/api/library/cleanup", "/api/library/move", "/api/library/reveal", "/api/shutdown"}
+ORGANIZER_ROUTES = {"/api/library/labels/organize/" + action
+                    for action in ("start", "pause", "resume", "feedback", "confirm")}
+POST = ORGANIZER_ROUTES | {"/api/library/labels", "/api/library/labels/rule", "/api/library/ask", "/api/library/inspect", "/api/library/pick-folder", "/api/library/cleanup", "/api/library/move", "/api/library/reveal", "/api/shutdown"}

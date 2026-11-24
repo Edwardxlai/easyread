@@ -73,7 +73,7 @@ class Library:
             "todo": _todo(meta.get("page_count", 0), tr),
             "abstract": abstract,
             "meta_override": item.get("meta_override") or {},
-            "labels": item.get("labels", []),
+            "labels": item.get("labels", []), "evidence_labels": list(item.get("label_evidence") or {}),
             "tags": item.get("tags", []), "status": item.get("status", "unread"), "starred": bool(item.get("starred")),
             "added": item.get("added", ""), "last_opened": item.get("last_opened", ""),
             "progress": (reader.get("progress") or {}).get("ratio", 0),

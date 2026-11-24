@@ -14,10 +14,8 @@
   ];
   /* 文献库里的 AI 操作，同时控制翻译任务。开关由服务端读取 prefs.json 的 library 段。 */
   PR.PAPER_LABEL_TOOLS = [
-    { id: "ai_label_match", action: "auto", name: PR.t("AI 打标签"), progress: PR.t("正在识别标签…"),
-      description: PR.t("在论文详情或翻译时，按规则添加所有匹配的已有标签。") },
-    { id: "ai_label_create", action: "generate", name: PR.t("AI 新建标签"), progress: PR.t("正在生成标签…"),
-      description: PR.t("在论文详情预览标签建议。翻译时，已有标签都不适用才会创建带规则的新标签。") },
+    { id: "ai_labels", action: "auto", name: PR.t("AI 打标签"), progress: PR.t("正在识别标签…"),
+      description: PR.t("在论文详情预览标签和原文依据。翻译时按已有规则匹配，正文译完且没有匹配时才考虑新建。") },
   ];
   /* [id, 名字, 默认键, 分组, 依赖的功能] */
   PR.KEY_ACTIONS = [

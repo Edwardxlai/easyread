@@ -295,6 +295,26 @@
 .paper-label { max-width: 100%; color: var(--accent); background: var(--accent-soft); }
 .paper-label svg { flex: none; width: 11px; height: 11px; }
 .paper-label span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.side [data-paper-label][draggable="true"] { cursor: grab; }
+.row[data-label-drop], .detail-inner[data-label-drop] {
+  position: relative; outline: 2px solid var(--accent); outline-offset: -2px; background: var(--accent-soft);
+}
+[data-label-drop="existing"]:is(.row, .detail-inner) { outline: 1px dashed var(--ink-3); background: var(--surface-2); }
+[data-label-drop]::after {
+  content: attr(data-label-drop-hint); position: absolute; top: 4px; right: 5px; padding: 3px 8px;
+  border-radius: 6px; font-size: 12px; background: var(--surface); color: var(--ink); pointer-events: none;
+}
+.paper-label-float {
+  position: fixed; z-index: 90; pointer-events: none; display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 9px; max-width: min(20em, 85vw); border-radius: 999px; border: 1px solid var(--rule);
+  background: var(--surface); color: var(--accent); box-shadow: var(--shadow); font-size: 13px; line-height: 1.4;
+}
+.paper-label-float[hidden] { display: none; }
+.paper-label-float svg { flex: none; }
+.paper-label-float span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 1100px) {
+  .lib.dragging-paper-label.library-nav-open .side { pointer-events: none; opacity: .06; }
+}
 .detail .paper-labels { margin: 12px 0 16px; }
 .detail .paper-labels h4 { margin: 0 0 8px; }
 .detail .paper-labels .tags { margin: 0 0 8px; }
@@ -310,6 +330,11 @@
 .label-choice label { display: flex; flex: 1; min-width: 0; align-items: center; gap: 9px; padding: 6px 8px; cursor: pointer; }
 .label-choice label span { min-width: 0; overflow-wrap: anywhere; }
 .label-rule-summary { display: block; margin-top: 3px; color: var(--ink-2); line-height: 1.45; white-space: pre-line; }
+.label-choice .label-proof, .label-rule-editor .label-proof {
+  display: block; margin: 6px 0; padding-left: 9px; border-left: 2px solid var(--rule);
+  color: var(--ink-2); line-height: 1.5; overflow-wrap: anywhere;
+}
+.paper-label[data-label-proof]:hover { text-decoration: underline; }
 .label-choice:hover, .label-choice:focus-within { background: var(--accent-soft); }
 .label-choice button { flex: none; color: var(--ink-2); }
 .label-picker .label-options input { flex: none; accent-color: var(--accent); }

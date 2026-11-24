@@ -109,7 +109,9 @@ JSON 里 TeX 的反斜杠要写两个（`\\frac`）。`\f` `\b` `\t` `\n` `\r` �
 ```
 
 `tags` 保存原有分类路径。`labels` 保存论文的多个标签名，旧条目缺少该字段时视为未设置标签。
-`translation_labels_done: true` 表示该论文已完成随翻译运行的标签判断。后续的选页、重译和续跑会读取该标记。两个 AI 标签开关都关闭时会跳过判断，不写标记。开关保存在界面偏好的 `library.ai_label_match` 和 `library.ai_label_create`，缺省均为 `false`。
+`label_evidence` 按标签名保存支持分配的原句 `quote`、页码 `page` 与可用的段落 ID `anchor`。`label_exclusions` 记录用户从本篇移除的标签，自动整理会尊重这一选择。`label_checked_pages` 记录已随翻译核对的页码；正文译完时写入 `translation_labels_done`。旧库可以根据已译页面补做增量判断。界面偏好的 `library.ai_labels` 控制单篇与翻译标签，默认关闭。缺少新键时沿用两个旧开关中任意一个已开启的选择。
+
+每篇 `item.json` 中的 `label_organizer_receipt` 保存最近一次全库整理的任务 `job` 和新增分配数 `added`。整理任务先保存本篇通过验证的候选，再写入标签与回执。即使在两次写入之间退出，继续时也可以准确恢复进度和分配数量。
 
 ## job.json（后台任务状态）
 
@@ -149,7 +151,8 @@ JSON 里 TeX 的反斜杠要写两个（`\\frac`）。`\f` `\b` `\t` `\n` `\r` �
 | `config.json` | 设置：翻译引擎、各家 API Key（`openai.keys`，按服务商分开存）、问 AI 的模型名单和默认模型（`chat.models`、`chat.default`） |
 | `prefs.json` | 界面偏好：阅读页字号、版心、主题、划线笔（`reader`），功能开关和快捷键总开关（`ui`），改过的键位（`keys`） |
 | `easyread.log` | 服务日志，设置底部“查看运行日志”能看到 |
-| `library/.paper-labels.json` | 全库共享的标签定义。以标签名为键，值为匹配规则文本，空字符串表示按名称匹配。旧版的名称数组可直接读取。复制文献库时复制定义，合并库时已应用的标签名随论文复制。 |
+| `library/.paper-labels.json` | 以标签名为键，值可为规则字符串，也可为含 `rule`、`origin`（`user` 或 `ai`）和 `aliases`（并入的曾用名）的对象。兼容旧名称数组。来源未知和用户编辑过规则的标签都受保护。复制文献库时复制定义，合并库时已应用的标签名随论文复制。 |
+| `library/.label-organizer.json` | 保存本库最近一轮整理的文献清单、扫描进度、原文证据、待审建议、对话、版本与确认记录。复制整个库时随库复制。中断后可从设置页继续。 |
 
 ## 图：裁图和图内文字
 

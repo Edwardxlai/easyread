@@ -10,27 +10,26 @@ async function checkTagSettings(page) {
   const detail = page.locator('#detail');
   await row.click();
   assert.equal(await detail.locator('[data-label-auto], [data-label-generate]').count(), 0);
-  for (const [match, create] of [[true, false], [true, true], [false, true], [false, false]]) {
+  for (const enabled of [true, false]) {
     await page.locator('#settingsBtn').click();
     await page.locator('[data-set-tab="library"]').click();
-    for (const [id, checked] of [['ai_label_match', match], ['ai_label_create', create]]) {
-      const input = page.locator('[data-label-feature="' + id + '"]');
-      if (await input.isChecked() === checked) continue;
-      await Promise.all([
-        page.waitForResponse(r => r.url().endsWith('/api/prefs') && r.request().method() === 'POST' && r.ok()),
-        input.setChecked(checked),
-      ]);
-    }
+    assert.equal(await page.locator('[data-label-feature]').count(), 1);
+    assert.equal(await page.locator('[data-organize-labels]').count(), 1);
+    const input = page.locator('[data-label-feature="ai_labels"]');
+    await Promise.all([
+      page.waitForResponse(r => r.url().endsWith('/api/prefs') && r.request().method() === 'POST' && r.ok()),
+      input.setChecked(enabled),
+    ]);
     await page.locator('#setCancel').click();  // Sidebar switches are saved immediately.
     await page.reload();
     await row.click();
     await detail.locator('[data-label-edit]:enabled').waitFor();
-    assert.equal(await detail.locator('[data-label-auto]').count(), Number(match));
-    assert.equal(await detail.locator('[data-label-generate]').count(), Number(create));
+    assert.equal(await detail.locator('[data-label-auto]').count(), Number(enabled));
+    assert.equal(await detail.locator('[data-label-generate]').count(), 0);
     await row.click({ button: 'right' });
     const menu = page.locator('#ctxmenu.open');
-    assert.equal(await menu.getByRole('button', { name: 'AI 打标签', exact: true }).count(), Number(match));
-    assert.equal(await menu.getByRole('button', { name: 'AI 新建标签', exact: true }).count(), Number(create));
+    assert.equal(await menu.getByRole('button', { name: 'AI 打标签', exact: true }).count(), Number(enabled));
+    assert.equal(await menu.getByRole('button', { name: 'AI 新建标签', exact: true }).count(), 0);
     await page.keyboard.press('Escape');
   }
   await row.click();
@@ -77,6 +76,8 @@ async function main() {
     assert.equal(await toggle.getAttribute('aria-expanded'), 'true');
     assert.ok(await page.locator('#paperLabelList').evaluate(list => !list.hidden));
     await checkTagSettings(page);
+    await require('./label-organizer.cjs')(page);
+    await require('./label-drag.cjs')(page);
     const reader = page.locator('#detail a[href^="/read/sample-paper"]');
     await Promise.all([page.waitForURL('**/read/sample-paper*'), reader.click()]);
     await page.waitForLoadState('load');

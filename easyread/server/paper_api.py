@@ -46,6 +46,12 @@ def post(app, ws, parts: list[str], body: dict):
     if action == "labels" and len(parts) == 5:
         from ..library import paper_labels
         return paper_labels.edit(app.lib.root, ws, body)
+    if action == "labels" and parts[5:] == ["preview"]:
+        from ..chat import paper_labeling
+        return paper_labeling.preview(app.lib, ws)
+    if action == "labels" and parts[5:] == ["confirm"]:
+        from ..chat import paper_labeling
+        return paper_labeling.confirm(app.lib, ws, body)
     if action == "labels" and parts[5:] == ["auto"]:
         from ..chat import paper_labeling
         return paper_labeling.apply_existing(app.lib, ws)

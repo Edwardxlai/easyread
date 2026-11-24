@@ -1,0 +1,29 @@
+.organize-entry { display: flex; gap: 12px; align-items: center; margin: 12px 0 20px; }
+.organize-entry button { flex: none; }
+.organize-entry small { color: var(--ink-2); line-height: 1.55; }
+.label-organizer { width: min(680px, 94vw); max-height: 88vh; box-sizing: border-box; color: var(--ink); background: var(--panel, var(--bg)); border: 1px solid var(--rule); border-radius: 12px; padding: 0; box-shadow: 0 15px 50px #0003; }
+.label-organizer[open] { display: flex; flex-direction: column; }
+.label-organizer::backdrop { background: #0005; }
+.label-organizer header, .label-organizer footer { display: flex; align-items: center; gap: 12px; padding: 14px 20px; }
+.label-organizer header { justify-content: space-between; border-bottom: 1px solid var(--rule); }
+.label-organizer footer { justify-content: flex-end; border-top: 1px solid var(--rule); }
+.label-organizer footer:empty { display: none; }
+.label-organizer h2 { margin: 0; font-size: 19px; }
+.label-organizer h3 { margin: 18px 0 8px; font-size: 15px; }
+.organize-body { padding: 10px 20px 16px; overflow-y: auto; overflow-wrap: anywhere; }
+.organize-body > [role=status] { color: var(--ink-2); font-size: 13px; }
+.organize-body progress { width: 100%; height: 7px; accent-color: var(--accent); }
+.organize-proposal { border-top: 1px solid var(--rule); padding: 10px 0; }
+.organize-proposal label { display: flex; align-items: baseline; gap: 8px; cursor: pointer; }
+.organize-proposal input { accent-color: var(--accent); }
+.organize-proposal p, .organize-proposal details { margin: 5px 0 0 26px; }
+.organize-proposal summary { color: var(--accent); cursor: pointer; font-size: 13px; }
+.organize-proposal ul { padding-inline-start: 20px; }
+.organize-proposal blockquote { margin: 5px 0; border-left: 2px solid var(--rule); padding-left: 10px; color: var(--ink-2); }
+.organize-feedback p { white-space: pre-wrap; }
+.organize-feedback label { display: block; margin: 8px 0 4px; }
+.organize-feedback textarea { display: block; width: 100%; box-sizing: border-box; margin-bottom: 8px; resize: vertical; }
+@media (max-width: 520px) {
+  .organize-entry { align-items: flex-start; flex-direction: column; gap: 6px; }
+  .label-organizer header, .label-organizer footer, .organize-body { padding-inline: 14px; }
+}

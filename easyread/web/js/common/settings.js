@@ -156,7 +156,7 @@
     if (t && t.change && t.change(e, st, dlg())) render();
   });
   document.addEventListener("keydown", (e) => {
-    if (document.querySelector('.translation-dialog, dialog.confirm[open]')) return;
+    if (document.querySelector('.translation-dialog, dialog[open]')) return;
     if (!dlg().classList.contains("open")) return;
     const t = PR.settingsTabs[st.tab];
     if (st.recording && t && t.key) { e.preventDefault(); e.stopImmediatePropagation(); if (t.key(e, st)) render(); return; }

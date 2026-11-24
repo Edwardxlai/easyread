@@ -53,6 +53,8 @@
         PR.PAPER_LABEL_TOOLS.map(({ id, name, description }) => '<label class="switch-row"><span><b>' + name + '</b><small>' + description +
           '</small></span><input type="checkbox" class="switch" data-label-feature="' + id + '"' + (labelChecked(id) ? ' checked' : '') +
           (labelDisabled(id) ? ' disabled' : '') + '></label>').join("") + '</div>' +
+        '<div class="organize-entry"><button type="button" class="btn line" data-organize-labels>' + PR.icon("tag", "sm") +
+          PR.t("一键整理文献标签") + '</button><small>' + PR.t("使用默认问答模型扫描全库。明确匹配的标签直接分配，新建和并入的建议由你统一确认。") + '</small></div>' +
         '<h4 class="set-h">' + PR.t("内置分类") + '</h4><div class="sb-list">' +
         row({ name: PR.t("全部"), sub: PR.t("始终显示"), fixed: true }) +
         BUILTIN.map(([k, name, note]) => row({ name, sub: note || PR.t("{n} 篇", { n: count((L.VIEWS.find((v) => v[0] === k) || [])[3] || (() => false)) }), pinKey: "v:" + k, hideKey: k })).join("") + "</div>" +
@@ -61,6 +63,7 @@
         '</div><div class="cm-form-acts" style="margin-top:10px"><input class="input" id="libNewInput" placeholder="' + PR.t("新分类的名字，“父/子”建子分类") + '" maxlength="' + PR.catTree.MAX_PATH + '" style="max-width:280px"><button class="btn sm line" data-lib="add">' + PR.icon("plus", "sm") + PR.t("新建分类") + "</button></div>";
     },
     async click(e, s) {
+      if (e.target.closest("[data-organize-labels]")) { PR.openLabelOrganizer(); return false; }
       const b = e.target.closest("[data-lib]");
       if (!b) return false;
       const c = b.dataset.c, act = b.dataset.lib;

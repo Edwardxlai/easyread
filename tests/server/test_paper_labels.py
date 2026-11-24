@@ -17,6 +17,14 @@ from easyread.server.library_api import LibraryLocation
 from easyread.server.server import Handler
 
 
+QUOTE = "We survey small groups using virtual reality."
+
+
+def analysis(matches=(), suggestions=()):
+    return json.dumps({"matches": [{"id": i, "source": 1, "quote": QUOTE} for i in matches],
+                       "suggestions": [dict(row, source=1, quote=QUOTE) for row in suggestions]})
+
+
 class PaperLabelsTest(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
@@ -77,29 +85,29 @@ class PaperLabelsTest(unittest.TestCase):
         self.assertEqual(refreshed["items"][0]["tags"], ["Methods/Survey"])
         self.assertEqual(refreshed["items"][0]["status"], "reading")
 
-    def test_independent_opt_ins_control_ai_routes_and_preserve_manual_tags(self):
+    def test_unified_setting_migrates_previous_opt_ins_and_controls_all_routes(self):
         self.request(self.paper_path, {"add": ["Manual"]})
-        self.request("/api/library/labels", {"name": "Surveys"})
-        self.assertEqual(self.request("/api/library")[1]["label_features"], {"ai_label_match": False, "ai_label_create": False})
-        for match, create in ((True, False), (True, True), (False, True), (False, False)):
-            flags = {"ai_label_match": match, "ai_label_create": create}
-            with self.subTest(flags=flags), patch(self.model_call, return_value='{"selected":[],"labels":[]}') as model:
+        self.assertEqual(self.request("/api/library")[1]["label_features"], {"ai_labels": False})
+        for flags, enabled in (({"ai_label_match": True}, True), ({"ai_label_create": True}, True),
+                               ({"ai_label_match": True, "ai_labels": False}, False), ({"ai_labels": True}, True)):
+            with self.subTest(flags=flags), patch(self.model_call, return_value=analysis()) as model:
+                prefs.path().unlink(missing_ok=True)
                 self.assertEqual(self.request("/api/prefs", {"library": flags})[0], 200)
-                self.assertEqual(self.request("/api/library")[1]["label_features"], flags)
-                for action, enabled in (("auto", match), ("suggest", create), ("generate", create)):
+                self.assertEqual(self.request("/api/library")[1]["label_features"], {"ai_labels": enabled})
+                for action in ("auto", "suggest", "generate", "preview"):
                     status, result = self.request(self.paper_path + "/" + action, {})
                     self.assertEqual(status, 200 if enabled else 400, result)
-                self.assertEqual(model.call_count, int(match) + 2 * int(create))
+                self.assertEqual(model.call_count, 4 * int(enabled))
                 self.assertEqual(self.request("/api/library")[1]["items"][0]["labels"], ["Manual"])
 
     def test_disabling_during_manual_ai_calls_discards_results(self):
         self.request("/api/library/labels", {"name": "Existing"})
-        for action, feature in (("auto", prefs.AI_LABEL_MATCH), ("generate", prefs.AI_LABEL_CREATE)):
+        for action, feature in (("auto", prefs.AI_LABELS), ("preview", prefs.AI_LABELS)):
             prefs.save({"library": {feature: True}})
 
             def disable(*args, **kwargs):
                 self.assertEqual(self.request("/api/prefs", {"library": {feature: False}})[0], 200)
-                return '{"selected":[1],"labels":[{"name":"Late","rule":"A new rule"}]}'
+                return analysis([1])
 
             with self.subTest(action=action), patch(self.model_call, side_effect=disable):
                 self.assertEqual(self.request(self.paper_path + "/" + action, {})[0], 400)
@@ -131,11 +139,24 @@ class PaperLabelsTest(unittest.TestCase):
         (extracts / "page-002.txt").write_text("Our study used surveys. [1] Cited trial.", encoding="utf-8")
         (extracts / "page-003.txt").write_text("Another cited trial.", encoding="utf-8")
         self.request("/api/library/labels", {"name": "Trials"})
-        with patch(self.model_call, return_value='{"selected":[]}') as model:
+        with patch(self.model_call, return_value=analysis()) as model:
             self.assertEqual(self.request(self.paper_path + "/auto", {}), (200, {"added": []}))
-        excerpt = json.loads(model.call_args.args[1].splitlines()[-1])["paper"]["excerpt"]
+        excerpt = " ".join(json.loads(model.call_args.args[1].splitlines()[-1])["sources"].values())
         self.assertIn("Our study used surveys", excerpt)
         self.assertNotIn("cited trial", excerpt.lower())
+
+    def test_translated_only_blocks_do_not_count_as_verbatim_originals(self):
+        prefs.save({"library": {"ai_labels": True}})
+        library = Library(self.paper.parent)
+        ws = library.ws(self.paper.name)
+        ws.update("paper", lambda paper: paper.update(meta={}, blocks=[
+            {"type": "para", "page": 1, "zh": "Translated text which is not the source."},
+            {"type": "list", "page": 1, "items": [{"zh": "Translated list item."}]},
+        ]))
+        with patch(self.model_call) as model:
+            status, preview = self.request(self.paper_path + "/preview", {})
+            self.assertEqual((status, preview["matches"], preview["suggestions"]), (200, [], []))
+            model.assert_not_called()
 
     def test_ai_appends_valid_matches_and_merges_a_concurrent_manual_edit(self):
         prefs.save({"library": {"ai_label_match": True}})
@@ -149,17 +170,16 @@ class PaperLabelsTest(unittest.TestCase):
             self.assertEqual(cfg["codex"]["model"], "fixture-model")
             self.assertTrue(cfg["codex"]["lean"])
             data = json.loads(prompt.splitlines()[-1])
-            self.assertEqual(data["paper"], {
-                "title": "Dialogue in social VR", "abstract": "We survey small groups using virtual reality."
-            })
+            self.assertEqual(data["title"], "Dialogue in social VR")
+            self.assertIn(QUOTE, data["sources"].values())
             rules = {entry["name"]: entry["rule"] for entry in data["labels"].values()}
-            self.assertNotIn("Manual", rules)
+            self.assertIn("Manual", rules)
             self.assertEqual(rules["Survey"], rule)
             self.assertEqual(rules["VR"], "")
             self.assertIn("only when the paper meets the rule", prompt)
             self.assertEqual(self.request(self.paper_path, {"add": ["Concurrent"], "remove": ["Manual"]})[0], 200)
             selected = [int(i) for i, entry in data["labels"].items() if entry["name"] in ("VR", "Survey")]
-            return "```json\n" + json.dumps({"selected": selected + [selected[0], 999, True, "Invented"]}) + "\n```"
+            return "```json\n" + analysis(selected + [selected[0], 999, True, "Invented"]) + "\n```"
 
         with patch(self.model_call, side_effect=complete) as model:
             status, result = self.request(self.paper_path + "/auto", {})
@@ -186,6 +206,38 @@ class PaperLabelsTest(unittest.TestCase):
         self.assertEqual(self.request("/api/library/labels/rule", {"name": "VR", "rule": ""})[1]["rule"], "")
         self.assertEqual(self.request("/api/library")[1]["items"][0]["labels"], list(draft))
 
+    def test_saved_evidence_can_be_read_from_details_with_tagging_switched_off(self):
+        prefs.save({"library": {"ai_labels": True}})
+        self.request("/api/library/labels", {"name": "Survey"})
+        self.request(self.paper_path, {"add": ["Manual"]})
+        with patch(self.model_call, return_value=analysis([2])) as model:
+            status, preview = self.request(self.paper_path + "/preview", {})
+            self.assertEqual(status, 200)
+            self.request(self.paper_path + "/confirm", {"preview": preview["preview"], "selected": ["Survey"]})
+            prefs.save({"library": {"ai_labels": False}})
+            listing = self.request("/api/library")[1]["items"][0]
+            self.assertEqual(listing["evidence_labels"], ["Survey"])
+            self.assertEqual(self.request(self.paper_path + "/evidence?name=Survey"),
+                             (200, {"name": "Survey", "rule": "", "quote": QUOTE, "anchor": "", "page": 1}))
+            self.assertEqual(self.request(self.paper_path + "/evidence?name=Manual")[0], 409)
+            self.request(self.paper_path, {"remove": ["Survey"]})
+            self.assertEqual(self.request(self.paper_path + "/evidence?name=Survey")[0], 409)
+            model.assert_called_once()
+
+    def test_manual_removal_during_merge_resolves_prior_spelling_and_clears_evidence(self):
+        write_json_atomic(self.catalog_path, {"Canonical": {"rule": "", "origin": "user", "aliases": ["Former"]}})
+        write_json_atomic(self.paper / "item.json", {"labels": ["Former"], "label_evidence": {
+            "Former": {"quote": QUOTE, "page": 1, "anchor": ""}}})
+        item = self.request("/api/library")[1]["items"][0]
+        self.assertEqual((item["labels"], item["evidence_labels"]), (["Canonical"], ["Canonical"]))
+        self.assertEqual(self.request(self.paper_path + "/evidence?name=Canonical")[1]["quote"], QUOTE)
+        self.assertEqual(self.request(self.paper_path, {"remove": ["Canonical"]})[1]["labels"], [])
+        saved = json.loads((self.paper / "item.json").read_text(encoding="utf8"))
+        self.assertEqual(saved["label_exclusions"], ["Canonical"])
+        self.assertEqual(saved["label_evidence"], {})
+        self.assertEqual(self.request(self.paper_path, {"add": ["Former"]})[1]["labels"], ["Canonical"])
+        self.assertEqual(self.request("/api/library")[1]["labels"], ["Canonical"])
+
     def test_model_match_is_discarded_if_rule_changed_during_call(self):
         prefs.save({"library": {"ai_label_match": True}})
         self.assertEqual(self.request("/api/library/labels", {"name": "VR"})[0], 200)
@@ -193,7 +245,7 @@ class PaperLabelsTest(unittest.TestCase):
 
         def complete(cfg, prompt, cwd, **options):
             self.assertEqual(self.request("/api/library/labels/rule", {"name": "VR", "rule": "Exclude surveys"})[0], 200)
-            return '{"selected":[1]}'
+            return analysis([1])
 
         with patch(self.model_call, side_effect=complete):
             self.assertEqual(self.request(self.paper_path + "/auto", {}), (200, {"added": []}))
@@ -219,6 +271,57 @@ class PaperLabelsTest(unittest.TestCase):
         self.assertEqual(self.request(path + "imported")[1]["labels"], [{"name": "Imported", "rule": ""}])
         self.assertEqual(self.request(path + "absent")[1]["labels"], [])
 
+    def test_library_scan_covers_late_pages_with_cross_language_rules(self):
+        from easyread.chat.paper_labeling import _sample
+        from easyread.library.store import Workspace
+        extracts = self.paper / "extract"
+        extracts.mkdir()
+        for page in range(1, 19):
+            body = f"General observations on page {page}. " * 17
+            if page in (4, 15):
+                body += " Participants showed increased pupillary dilation."
+            (extracts / f"page-{page:03}.txt").write_text(body, encoding="utf-8")
+        samples = _sample(Workspace(self.paper), [], [paper_labels.Label("瞳孔测量")], bulk=True)
+        self.assertEqual({s["page"] for s in samples if "pupillary dilation" in s["text"]}, {4, 15})
+
+    def test_bulk_cross_language_terms_retrieve_only_actual_source_text(self):
+        from easyread.chat.paper_labeling import _sample
+        from easyread.library.store import Workspace
+        extracts = self.paper / "extract"
+        extracts.mkdir()
+        for page in range(1, 81):
+            text = f"General observations for day {page}. " * 18
+            if page == 2:
+                text += " Our assistants distributed questionnaires to visitors."
+            (extracts / f"page-{page:03}.txt").write_text(text, encoding="utf-8")
+        ws = Workspace(self.paper)
+        with patch("easyread.chat.paper_labeling._ask", return_value={
+                "retrieval_terms": "assistants distributed questionnaires inventedword"}) as translate:
+            sources = _sample(ws, [], [paper_labels.Label("问卷", "团队现场发放问卷")], bulk=True)
+        translate.assert_called_once()
+        self.assertTrue(any(p["page"] == 2 and "distributed questionnaires" in p["text"] for p in sources))
+        self.assertFalse(any("inventedword" in p["text"] for p in sources))
+
+    def test_long_scan_audit_can_only_keep_evidenced_matches(self):
+        from easyread.chat.paper_labeling import analyze
+        from easyread.library.store import Workspace
+        passage = "The website made the questionnaire available to park visitors."
+        extracts = self.paper / "extract"
+        extracts.mkdir()
+        for page in range(1, 17):
+            (extracts / f"page-{page:03}.txt").write_text((passage + " ") * 10, encoding="utf-8")
+        labels = {n: paper_labels.Label(n, "questionnaire") for n in ("a", "b", "c", "d")}
+        def model(instructions, data, **opts):
+            row = {"source": 1, "quote": passage}
+            if "approved" in instructions:
+                self.assertEqual(set(data["labels"]), {1, 2, 3})
+                return {"approved": [dict(row, id="1", source="1"), dict(row, id=2, quote="unsubstantiated"),
+                                     dict(row, id="3", source=True), dict(row, id=4)]}
+            return {"matches": [dict(row, id=i) for i in (1, 2, 3)], "suggestions": []}
+        with patch("easyread.chat.paper_labeling._ask", side_effect=model):
+            result = analyze(None, Workspace(self.paper), known=labels, bulk=True)
+        self.assertEqual([row["name"] for row in result["matches"]], ["a"])
+
     def test_match_reads_later_evidence_and_omits_reference_list_within_budget(self):
         from easyread.chat.paper_labeling import EXCERPT_LIMIT
         prefs.save({"library": {"ai_label_match": True}})
@@ -233,12 +336,13 @@ class PaperLabelsTest(unittest.TestCase):
         self.request("/api/library/labels/rule", {"name": "Eyes", "rule": "Reports pupillometry with 64 subjects"})
 
         def classify(cfg, prompt, cwd, **options):
-            paper = json.loads(prompt.splitlines()[-1])["paper"]
-            self.assertIn("abstract", paper)
-            self.assertIn("pupillometry with 64 subjects", paper["excerpt"])
-            self.assertNotIn("cited experiment", paper["excerpt"])
-            self.assertLessEqual(len(paper["excerpt"]), EXCERPT_LIMIT)
-            return '{"selected":[1]}'
+            sources = json.loads(prompt.splitlines()[-1])["sources"]
+            self.assertIn(QUOTE, sources.values())
+            self.assertFalse(any("cited experiment" in text for text in sources.values()))
+            self.assertLessEqual(sum(map(len, sources.values())), EXCERPT_LIMIT + len(QUOTE))
+            quote = "pupillometry with 64 subjects"
+            source = next(i for i, text in sources.items() if quote in text)
+            return json.dumps({"matches": [{"id": 1, "source": int(source), "quote": quote}], "suggestions": []})
 
         with patch(self.model_call, side_effect=classify):
             self.assertEqual(self.request(self.paper_path + "/auto", {}), (200, {"added": ["Eyes"]}))
@@ -246,19 +350,24 @@ class PaperLabelsTest(unittest.TestCase):
     def test_suggestions_are_read_only_and_selected_rules_can_be_edited_before_saving(self):
         prefs.save({"library": {"ai_label_create": True}})
         self.request(self.paper_path, {"add": ["Manual"]})
-        result = json.dumps({"labels": [
+        result = analysis(suggestions=[
             {"name": "manual", "rule": "Existing"}, {"name": "No rule", "rule": " "},
             *({"name": name, "rule": "Rule for " + name} for name in ("First", "FIRST", "Second", "Third", "Fourth")),
-        ]})
+        ])
         before = self.catalog_path.read_bytes(), (self.paper / "item.json").read_bytes()
         with patch(self.model_call, return_value=result) as model:
             for _ in range(2):
-                status, preview = self.request(self.paper_path + "/suggest", {})
+                status, preview = self.request(self.paper_path + "/preview", {})
                 self.assertEqual(status, 200)
                 self.assertEqual([entry["name"] for entry in preview["suggestions"]], ["First", "Second", "Third"])
                 self.assertEqual((self.catalog_path.read_bytes(), (self.paper / "item.json").read_bytes()), before)
             self.assertEqual(model.call_count, 2)
-        self.request(self.paper_path, {"add": ["Second"], "new_rules": {"Second": "Edited condition"}})
+        self.assertEqual(preview["matches"], [])
+        self.assertEqual(preview["suggestions"][1]["quote"], QUOTE)
+        self.assertEqual(self.request(self.paper_path + "/confirm", {"preview": preview["preview"], "selected": ["Invented"]})[0], 400)
+        self.assertEqual(self.request(self.paper_path + "/confirm", {"preview": preview["preview"], "selected": ["Second"],
+                                                                    "rules": {"Second": "Edited condition"}})[0], 200)
+        self.assertEqual(paper_labels.available(Library(self.paper.parent))["second"].origin, "user")
         self.assertEqual(self.request("/api/library/labels")[1]["labels"], [
             {"name": "Manual", "rule": ""}, {"name": "Second", "rule": "Edited condition"}])
         self.assertEqual(self.request("/api/library")[1]["items"][0]["labels"], ["Manual", "Second"])
@@ -270,15 +379,16 @@ class PaperLabelsTest(unittest.TestCase):
 
         def complete(cfg, prompt, cwd, **options):
             data = json.loads(prompt.splitlines()[-1])
-            self.assertEqual(data["existing_labels"], [{"name": "VR", "rule": "Studies in VR"}])
+            self.assertEqual(list(data["labels"].values()),
+                             [{"name": "VR", "rule": "Studies in VR", "origin": "user", "aliases": []}])
             self.assertEqual(self.request("/api/library/labels", {"name": "Late tag"})[0], 200)
-            return json.dumps({"labels": [
+            return analysis(suggestions=[
                 {"name": "vr", "rule": "An unrelated rule"},
                 {"name": "Late tag", "rule": "Overwrite a concurrent creation"},
                 {"name": "No rule", "rule": "  "},
                 {"name": "Virtual group interaction", "rule": rule},
                 {"name": "Social surveys", "rule": "Include survey research on social interaction."},
-            ]})
+            ])
 
         with patch(self.model_call, side_effect=complete) as model:
             status, result = self.request(self.paper_path + "/generate", {})
@@ -301,7 +411,9 @@ class PaperLabelsTest(unittest.TestCase):
             model.assert_not_called()
         self.assertEqual(self.request(self.paper_path, {"add": ["Would be new"], "remove": "not an array"})[0], 400)
         self.assertEqual(self.request("/api/library/labels", {"name": "VR"})[0], 200)
-        for response, expected_status in (("{}", 400), ('{"selected":[true,999,"VR"]}', 400), ('{"selected":[]}', 200)):
+        for response, expected_status in (("{}", 400), (analysis([True, 999, "VR"]), 200),
+                                          ('{"matches":[{"id":1,"source":1,"quote":"unsupported quote"}],"suggestions":[]}', 200),
+                                          (analysis(), 200)):
             with self.subTest(response=response), patch(self.model_call, return_value=response):
                 self.assertEqual(self.request(self.paper_path + "/auto", {})[0], expected_status)
         _, refreshed = self.request("/api/library")
