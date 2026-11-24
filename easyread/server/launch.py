@@ -42,6 +42,7 @@ def serve(port: int | None = None, open_browser: bool = False, path: str = "/", 
     log.info("startup http-bound +%.0fms", (time.monotonic() - started) * 1000)
     app.shutdown = httpd.shutdown
     app.location.marker.start()
+    app.folder_watch.start()
     app.presence = Presence(lambda: app.jobs.busy() or bool(app.babeldoc.running) or reader_files.busy() or label_organizer.busy(app),
                             httpd.shutdown, exit_on_close)
     if not config.temp_library():
@@ -55,6 +56,7 @@ def serve(port: int | None = None, open_browser: bool = False, path: str = "/", 
     except KeyboardInterrupt:
         pass
     finally:
+        app.folder_watch.close()
         app.location.marker.close()
         httpd.server_close()
         if not config.temp_library() and (read_json(config.SERVER_INFO, {}) or {}).get("pid") == os.getpid():

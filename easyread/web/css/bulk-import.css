@@ -4,6 +4,14 @@
 .zt-path { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border: 1px solid var(--rule); border-radius: 8px; font-size: 13px; cursor: pointer; word-break: break-all; }
 .zt-path:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
 .zt-src { font-size: 12px; color: var(--ink-3); word-break: break-all; margin: 0 0 12px; }
+#bulkDlg .dialog:has(.folder-confirm) { width: min(420px, calc(100vw - 32px)); }
+.folder-confirm .folder-source { overflow-wrap: anywhere; font-size: 14px; margin: 0 0 3px; }
+.folder-confirm .folder-count { color: var(--ink-3); font-size: 12.5px; margin: 0 0 13px; }
+.folder-confirm .switch-row { justify-content: space-between; border-top: 1px solid var(--rule); border-bottom: 0; }
+.folder-options { font-size: 12.5px; margin: 3px 0 0; }
+.folder-options summary { color: var(--ink-3); cursor: pointer; width: fit-content; }
+.folder-options summary:hover { color: var(--ink); }
+.folder-options .zt-src { margin: 8px 0; }
 .zt-warn { font-size: 12.5px; line-height: 1.6; color: var(--ink); background: color-mix(in srgb, var(--danger) 10%, transparent); border-radius: 8px; padding: 8px 12px; margin: 0 0 12px; }
 .zt-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin: 4px 0 12px; }
 .zt-stat { background: var(--accent-soft); border-radius: 10px; padding: 10px 12px; }

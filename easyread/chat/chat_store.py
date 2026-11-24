@@ -48,12 +48,15 @@ def new_id() -> str:
     return "t" + uuid4().hex
 
 
-def append(ws: Workspace, tid: str, user: dict, answer: str, model_id: str, model_name: str, used: dict | None = None) -> dict:
+def append(ws: Workspace, tid: str, user: dict, answer: str, model_id: str, model_name: str, used: dict | None = None,
+           *, sources=None, missing=None) -> dict:
     """存一问一答；对话不存在就新建（标题取第一个问题）。回答页边笔记里的问题时，同时写成那条笔记的回复。"""
     stamp = now_iso()
     style = answer_styles.parse(user.get("answer_style"))
     msg = {"id": "m" + uuid4().hex, "role": "assistant", "content": answer, "at": stamp,
            "model": model_name, "anchor": user.get("anchor"), "note": user.get("note"), "answer_style": style}
+    if sources is not None:
+        msg.update(sources=sources, missing=missing or [])
     if used and used.get("calls"):
         msg["usage"] = used  # 这条回答的 token 用量（usage.Meter 的快照）
 

@@ -25,14 +25,15 @@
     const r = await PR.api("/api/engines").catch(() => null);
     if (r && (JSON.stringify([r.found, r.models]) !== JSON.stringify([st.found, st.models]))) {
       st.found = r.found; st.sources = r.sources; st.models = r.models;
-      if (dlg().classList.contains("open")) { sync(); render(); }
+      if (dlg().classList.contains("open") && st.tab !== "reading") { sync(); render(); }
     }
   };
   window.addEventListener("focus", async () => {
     if (!dlg().classList.contains("open")) return;
     const r = await PR.api("/api/engines").catch(() => null);
     if (r && JSON.stringify([r.models, r.found]) !== JSON.stringify([st.models, st.found])) {
-      sync(); st.models = r.models; st.found = r.found; st.sources = r.sources; render();
+      sync(); st.models = r.models; st.found = r.found; st.sources = r.sources;
+      if (st.tab !== "reading") render();
     }
   });
   const btn = PR.$("#settingsBtn");

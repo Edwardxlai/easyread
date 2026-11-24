@@ -276,6 +276,8 @@ class Jobs:
         try:
             failed = translate.translate_pages(ws, cfg, pages, cancel, report, meter, read) if pages else {}
             if not read:
+                from ..chat.category_suggestions import after_translation as suggest_categories
+                suggest_categories(self.lib, ws, cfg, cancel, pages, failed, meter)
                 # On resume the selected pages may already be saved, with tagging still pending.
                 completed = set(pages).difference(failed) if pages else wanted
                 paper_labeling.after_translation(self.lib, ws, cfg, cancel, completed, meter=meter,

@@ -189,6 +189,7 @@
     title.title = L.view === "label" ? L.tag : "";
     PR.$("#count").textContent = PR.t("{n} 篇", { n: list.length });
     PR.renderBatch && PR.renderBatch(list);
+    L.renderAiActions?.();
     PR.renderStopAll && PR.renderStopAll();
     const status = L.loadStatus !== "ready" && L.items.length ? '<div class="up-status" role="status">' + loadHtml() + "</div>" : "";
     PR.$("#list").innerHTML = status + (list.length ? list.map(rowHtml).join("") : emptyHtml());

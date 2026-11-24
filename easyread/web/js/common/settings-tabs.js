@@ -17,7 +17,7 @@
     const sel = (key, label, list) => '<label class="field"><span>' + label + '</span><select class="input" data-type="' + key + '">' + PR.opt(list, t[key]) + "</select></label>";
     return '<h4 class="set-h">' + PR.t("排版") + '</h4><div class="settings-sec grid3">' +
       sel("fs", PR.t("字号"), PR.typeValues("fs").map(v => [v, PR.t("{n} px", { n: v })])) + sel("measure", PR.t("版心（每行字数）"), PR.typeValues("measure").map(v => [v, PR.t("{n} 字", { n: v })])) +
-      sel("lh", PR.t("行距"), PR.typeValues("lh").map(v => [v, v])) + sel("font", PR.t("字体"), [["serif", PR.t("宋体")], ["sans", PR.t("黑体")]]) +
+      sel("lh", PR.t("行距"), PR.typeValues("lh").map(v => [v, v])) + '<label class="field"><span>' + PR.t("字体") + "</span>" + PR.readingFontField(t) + "</label>" +
       sel("view", PR.t("默认阅读模式"), [["translation", PR.t("译文")], ["original", PR.t("原文")], ["both", PR.t("双语")]]) + sel("margin", PR.t("边注"), [["true", PR.t("显示")], ["false", PR.t("收起")]]) +
       '</div><div class="keys-foot" style="margin-top:4px"><button class="btn sm" data-type-reset>' + PR.t("恢复默认排版") + "</button></div>";
   }
@@ -38,6 +38,7 @@
       return true;
     },
     change(e, s) {
+      if (e.detail && e.target.matches(".reading-font")) Object.assign(s.type, e.detail);
       const t = e.target.dataset.type;
       if (t === "view") { s.type.mode = e.target.value === "both" ? "bi" : "zh"; if (e.target.value !== "both") s.type.lead = e.target.value; }  // 和阅读页顶栏一样：mode + lead
       else if (t) s.type[t] = t === "margin" ? e.target.value === "true" : ["fs", "measure", "lh"].includes(t) ? +e.target.value : e.target.value;

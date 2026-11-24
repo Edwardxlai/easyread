@@ -26,7 +26,17 @@ async function build() {
   css = css.replace(/:root\{([^{}]*)\}/g, (_, body) => ':root{' + body.split(';').filter(value => value.trim().startsWith('--')).join(';') + '}')
     .replace(/\.dark\b/g, '[data-theme="dark"]').replace(/--white\b/g, '--tt-white').replace(/--black\b/g, '--tt-black');
   fs.writeFileSync(path.resolve(__dirname, '../easyread/web/vendor/note-libraries.css'), css);
-  const packages = new Set(Object.keys(result.metafile.inputs).map(file => file.match(/node_modules\/((?:@[^/]+\/)?[^/]+)\//)?.[1]).filter(Boolean));
+  const mdResult = await esbuild.build({
+    entryPoints: [path.resolve(__dirname, '../easyread/web/src/markdown-it.js')],
+    outfile: path.resolve(__dirname, '../easyread/web/vendor/markdown-it.js'),
+    bundle: true, minify: true, format: 'iife', target: 'es2022',
+    legalComments: 'linked', metafile: true,
+  });
+  const packages = new Set(
+    [...Object.keys(result.metafile.inputs), ...Object.keys(mdResult.metafile.inputs)]
+      .map(file => file.match(/node_modules\/((?:@[^/]+\/)?[^/]+)\//)?.[1])
+      .filter(Boolean)
+  );
   const licenses = [...packages].sort().map(name => {
     const dir = path.resolve(__dirname, '../node_modules', name);
     const info = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
@@ -35,6 +45,6 @@ async function build() {
     return name + ' ' + info.version + '\n\n' + notice;
   });
   licenses.push('Tiptap UI Components\nhttps://github.com/ueberdosis/tiptap-ui-components\n\n' + fs.readFileSync(path.join(ui, 'LICENSE'), 'utf8'));
-  fs.writeFileSync(path.resolve(__dirname, '../easyread/web/vendor/note-libraries.LICENSE.txt'), licenses.join('\n\n---\n\n'));
+  fs.writeFileSync(path.resolve(__dirname, '../easyread/web/vendor/note-libraries.LICENSE.txt'), licenses.join('\n\n---\n\n').replace(/\r\n/g, '\n'));
 }
 build().catch(error => { console.error(error); process.exitCode = 1; });

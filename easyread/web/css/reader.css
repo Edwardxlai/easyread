@@ -41,18 +41,18 @@ body { font-size: 15px; }
   font-size: var(--fs);
 
 }
-#paper { grid-column: 2; min-width: 0; font-family: var(--serif-zh); line-height: var(--lh); letter-spacing: .012em; font-variant-numeric: lining-nums; }
+#paper { grid-column: 2; min-width: 0; font-family: var(--reader-zh); line-height: var(--lh); letter-spacing: .012em; font-variant-numeric: lining-nums; }
 #paper.landing { visibility: hidden; }  /* 回到上次读到的地方期间先不显示正文 */
 #margin { grid-column: 4; position: relative; font-size: 15px; }
 :root[data-theme="dark"] #paper { font-weight: 330; }
 :root[data-theme="dark"] #paper :is(h1, h2, h3, strong, th, .label) { font-weight: 600; }
-body.font-sans #paper { font-family: var(--sans-zh); letter-spacing: .01em; }
+body.font-sans #paper { font-family: var(--reader-zh); letter-spacing: .01em; }
 
 /* 题头 */
 .paper-head { margin: 0 0 3.2em; }
 .paper-head .kicker { font: 12.5px/1.6 var(--ui); letter-spacing: .06em; color: var(--ink-3); margin-bottom: 1.4em; }
 .paper-head h1 { font-size: 1.72em; line-height: 1.42; font-weight: 600; margin: 0 0 .5em; letter-spacing: .02em; text-wrap: pretty; }
-.paper-head .title-en { font: italic .95em/1.5 var(--serif-en); color: var(--ink-2); margin: 0 0 1.1em; }
+.paper-head .title-en { font: italic .95em/1.5 var(--reader-en); color: var(--ink-2); margin: 0 0 1.1em; }
 .paper-head .byline { font: 14px/1.7 var(--ui); color: var(--ink-2); margin: 0; }
 .paper-head .scope { margin: 1.6em 0 0; padding-top: 1em; border-top: 1px solid var(--rule); font: 12.5px/1.8 var(--ui); color: var(--ink-3); }
 .paper-head .scope b { font-weight: 500; color: var(--ink-2); }
@@ -86,16 +86,16 @@ html:not(.stable-text-layout) #paper .blk { content-visibility: auto; contain-in
 /* 英文原文：对照模式或单段展开时出现 */
 .en {
   display: none; margin: .55em 0 .2em; padding: 0 0 0 .9em; border-left: 2px solid var(--rule);
-  font: .84em/1.66 var(--serif-en); color: var(--ink-2); letter-spacing: 0; text-align: left; hyphens: auto; font-variant-numeric: lining-nums;
+  font: .84em/1.66 var(--reader-en); color: var(--ink-2); letter-spacing: 0; text-align: left; hyphens: auto; font-variant-numeric: lining-nums;
 }
 body.mode-bi .en, .blk.show-en .en { display: block; }
 .en .katex { font-size: 1.04em; }
 
 /* 只读原文（不翻译）：没译的地方正文直接是英文，用英文衬线、左对齐、断词 */
-.zh.en-main { font-family: var(--serif-en); text-align: left; hyphens: auto; letter-spacing: 0; font-variant-numeric: lining-nums; }
+.zh.en-main { font-family: var(--reader-en); text-align: left; hyphens: auto; letter-spacing: 0; font-variant-numeric: lining-nums; }
 .zh.en-main .katex { font-size: 1.04em; }
 body.en-only #bar .mode-seg { display: none; }
-body.en-only #paper { font-family: var(--serif-en); }  /* 只读英文原文：用西文字体排 */
+body.en-only #paper { font-family: var(--reader-en); }  /* 只读英文原文：用西文字体排 */
 
 /* 标题 */
 .blk-heading { margin: 2.4em 0 1em; }
@@ -104,7 +104,7 @@ body.en-only #paper { font-family: var(--serif-en); }  /* 只读英文原文：�
 .blk-heading.h1 .zh { font-size: 1.28em; }
 .blk-heading.h2 .zh { font-size: 1.08em; }
 .blk-heading .num { color: var(--ink-3); font-weight: 500; margin-right: .7em; }
-.blk-heading .en-title { display: block; font: italic .74em/1.4 var(--serif-en); color: var(--ink-3); margin-top: .25em; letter-spacing: 0; font-weight: 400; }
+.blk-heading .en-title { display: block; font: italic .74em/1.4 var(--reader-en); color: var(--ink-3); margin-top: .25em; letter-spacing: 0; font-weight: 400; }
 .blk-heading.appendix-start { margin-top: 4.5em; padding-top: 2.2em; border-top: 1px solid var(--rule); }
 .blk-heading.appendix-start::after { content: "附录"; position: absolute; top: .6em; left: 0; font: 12px/1 var(--ui); letter-spacing: .3em; color: var(--ink-3); }
 
@@ -125,8 +125,8 @@ body.en-only #paper { font-family: var(--serif-en); }  /* 只读英文原文：�
 /* 表格：三线表 */
 .blk-table { margin: 1.8em 0 2em; }
 .tbl-wrap { overflow-x: auto; }
-table.tbl { margin: 0 auto; border-collapse: collapse; font-size: .86em; line-height: 1.5; font-variant-numeric: tabular-nums lining-nums; font-family: var(--serif-en), var(--serif-zh); border-top: 1.5px solid var(--ink); border-bottom: 1.5px solid var(--ink); }
-table.tbl th { font-family: var(--serif-zh); font-weight: 600; border-bottom: .75px solid var(--ink-2); }
+table.tbl { margin: 0 auto; border-collapse: collapse; font-size: .86em; line-height: 1.5; font-variant-numeric: tabular-nums lining-nums; font-family: var(--reader-table); border-top: 1.5px solid var(--ink); border-bottom: 1.5px solid var(--ink); }
+table.tbl th { font-family: var(--reader-zh); font-weight: 600; border-bottom: .75px solid var(--ink-2); }
 table.tbl th, table.tbl td { padding: .45em .95em; vertical-align: top; white-space: nowrap; }
 table.tbl td:first-child, table.tbl th:first-child { padding-left: .3em; }
 table.tbl td:last-child, table.tbl th:last-child { padding-right: .3em; }
@@ -149,7 +149,7 @@ table.tbl td .sub { color: var(--ink-3); }
 .inline-note .lbl { font-size: 11.5px; color: var(--accent); }
 
 /* 参考文献 */
-.refs { margin-top: .6em; font: .8em/1.62 var(--serif-en); color: var(--ink-2); letter-spacing: 0; }
+.refs { margin-top: .6em; font: .8em/1.62 var(--reader-en); color: var(--ink-2); letter-spacing: 0; }
 .refs .note { font: 12.5px/1.6 var(--ui); color: var(--ink-3); margin: -.2em 0 1.2em; }
 .refs ol { list-style: none; margin: 0; padding: 0; }
 .refs li { display: grid; grid-template-columns: 2.6em 1fr; margin: 0 0 .7em; border-radius: 3px; overflow-wrap: anywhere; }
@@ -189,7 +189,7 @@ mark.hl.agent.active { background: var(--hl-q); outline: 0; }
 .katex-html > .base { position: relative; isolation: isolate; }
 .katex mark.hl.math-fragment { background: transparent; box-shadow: none; outline: none; }
 .katex mark.hl.math-band { position: absolute; z-index: -1; padding: 0; pointer-events: none; }
-code { font: .86em var(--mono); background: var(--accent-soft); padding: .1em .3em; border-radius: 3px; }
+code { font: .86em var(--reader-code); background: var(--accent-soft); padding: .1em .3em; border-radius: 3px; }
 .blk pre { max-width: 100%; overflow-x: auto; padding: .8em 1em; background: var(--accent-soft); border-radius: 4px; text-align: left; }
 .blk pre code { display: block; padding: 0; background: none; white-space: pre; }
 
@@ -216,7 +216,8 @@ textarea.editor { display: block; width: 100%; resize: none; overflow: hidden; b
 .card .ttl { font-weight: 600; color: var(--ink); font-size: 13.5px; margin: 0 0 2px; }
 .card .q { color: var(--ink); margin: 0 0 4px; }
 .card .q::before { content: "问　"; color: var(--ink-3); }
-.card .quote { font: 12.5px/1.6 var(--serif-zh); color: var(--ink-3); margin: 0 0 3px; }
+.card .quote { font: 12.5px/1.6 var(--reader-zh); color: var(--ink-3); margin: 0 0 3px; }
+.card .quote[lang="en"] { font-family: var(--reader-en); }
 .card.mine.c-green .quote { box-shadow: inset 3px 0 0 var(--hl-green); padding-left: 6px; }
 .card.mine.c-blue .quote { box-shadow: inset 3px 0 0 var(--hl-blue); padding-left: 6px; }
 .card.mine.c-pink .quote { box-shadow: inset 3px 0 0 var(--hl-pink); padding-left: 6px; }
@@ -228,7 +229,13 @@ textarea.editor { display: block; width: 100%; resize: none; overflow: hidden; b
 .card .body table.tbl, .inline-note table.tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; line-height: 1.5; margin: 0; }
 .card .body table.tbl th, .card .body table.tbl td, .inline-note table.tbl th, .inline-note table.tbl td { padding: 4px 8px; white-space: normal; word-break: break-word; }
 .card .body blockquote, .inline-note blockquote { margin: .4em 0; padding: .3em .7em; border-left: 2px solid var(--accent); background: var(--accent-soft); color: var(--ink-2); border-radius: 0 4px 4px 0; font-size: 13px; }
-.card .body blockquote p, .inline-note blockquote p { margin: 0; }
+.card .body blockquote p, .inline-note blockquote p { margin: 0 0 .35em; }
+.card .body blockquote p:last-child, .inline-note blockquote p:last-child { margin-bottom: 0; }
+.card .body hr, .inline-note hr { border: 0; border-top: 1px solid var(--rule); margin: .7em 0; }
+.card .body pre, .inline-note pre { max-width: 100%; overflow-x: auto; padding: .6em .8em; margin: .45em 0; background: var(--accent-soft); border-radius: 6px; text-align: left; }
+.card .body pre code, .inline-note pre code { display: block; padding: 0; background: none; white-space: pre; font-size: .86em; line-height: 1.55; }
+.card .body .md-h, .inline-note .md-h { font-weight: 600; font-family: var(--ui); font-size: 1em; margin: .6em 0 .25em; }
+.card .body .md-h:first-child, .inline-note .md-h:first-child { margin-top: 0; }
 .card.clamp .body { max-height: 12em; overflow: hidden; -webkit-mask-image: linear-gradient(#000 70%, transparent); mask-image: linear-gradient(#000 70%, transparent); }
 .card .more { font-size: 12px; color: var(--accent); margin-top: 2px; }
 .card:hover, .card.linked { color: var(--ink); }

@@ -141,6 +141,28 @@ class JobsTest(unittest.TestCase):
         report(len(pages), len(pages), "Saved")
         return {}
 
+    def test_translation_can_assign_a_label_while_category_review_stays_pending(self):
+        prefs.save({"library": {"ai_labels": True}, "ui": {"features": {"category_suggestions": True}}})
+        paper_labels.create(self.lib.root, "Surveys")
+        paper_labels.set_rule(self.lib, {"name": "Surveys", "rule": "Reports a survey"})
+
+        def respond(cfg, prompt, *args, **kwargs):
+            payload = json.loads(prompt.splitlines()[-1])
+            if "categories" in payload:
+                return json.dumps({"suggestions": [{"name": "Group studies", "reason": "Studies small groups"}]})
+            return analysis([1])
+
+        with patch("easyread.server.jobs.config.load", return_value={"engine": "codex", "codex": {}}), \
+                patch("easyread.server.jobs.translate.translate_pages", side_effect=self._save_translated_page), \
+                patch("easyread.engines.engines.run", side_effect=respond):
+            self.jobs.enqueue(self.ws, pages=[1])
+            self.drain()
+        item = self.ws.load("item")
+        self.assertEqual(item["labels"], ["Surveys"])
+        self.assertEqual(item["category_review"]["state"], "pending")
+        self.assertEqual(item["category_review"]["options"][0]["name"], "Group studies")
+        self.assertNotIn("Group studies", item.get("tags", []))
+
     def test_translation_auto_labels_once_and_prefers_existing_rules(self):
         prefs.save({"library": {"ai_label_match": True, "ai_label_create": True}})
         for name, rule in (("VR", "Studies of virtual reality"), ("Surveys", "Studies that report a survey")):

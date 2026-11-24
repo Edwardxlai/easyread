@@ -115,7 +115,7 @@ def cmd_translate(a):
             return
         except OSError:  # 服务刚好在退出：就在这里译
             pass
-    from ..chat.paper_labeling import after_translation
+    from ..chat import category_suggestions, paper_labeling
     from ..translate.translate import translate_pages
     cfg = config.load()
     paper = ws.load("paper")
@@ -125,8 +125,10 @@ def cmd_translate(a):
     pages = pages or [n for n in wanted if n not in done]
     cancel = threading.Event()
     failed = translate_pages(ws, cfg, pages, cancel, lambda d, t, m: out(f"[{d}/{t}] {m}")) if pages else {}
+    library = Library(ws.root.parent)
+    category_suggestions.after_translation(library, ws, cfg, cancel, pages, failed)
     completed = set(pages).difference(failed) if pages else wanted
-    after_translation(Library(ws.root.parent), ws, cfg, cancel, completed, report=out)
+    paper_labeling.after_translation(library, ws, cfg, cancel, completed, report=out)
     if failed:
         out(f"没译成功的页：{sorted(failed)}，原因见 {ws.root / 'job.log'}")
 

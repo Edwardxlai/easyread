@@ -89,6 +89,7 @@
       titleFields(i) +
       '<div class="cats">' + cats + '<button class="catchip add" data-d="newcat">' + PR.icon("plus", "sm") + PR.t("新分类") + "</button>" +
       '<input id="catInput" class="catchip" placeholder="' + PR.t("分类名，回车确定") + '" maxlength="30" hidden></div>' +
+      '<button class="btn sm line" data-d="suggest-categories">' + PR.t("AI 建议分类") + '</button>' +
       (L.labelDetail ? L.labelDetail(i) : "") +
       '<div class="seg">' + status + "</div>" +
       '<div class="kv"><span>' + PR.t("作者") + '</span><span contenteditable="plaintext-only" data-meta="authors">' + PR.esc(i.authors) + "</span>" +
