@@ -276,11 +276,17 @@ class Workspace:
         allowed = {"tags", "status", "starred", "rating", "last_opened", "meta_override", "archived", "ai_indexed"}
         if "ai_indexed" in fields and type(fields["ai_indexed"]) is not bool:
             raise ValueError("ai_indexed must be boolean")
+        category = fields.get("add_category")
+        if "add_category" in fields and (not isinstance(category, str) or not category.strip()
+                                         or len(category) > 120 or "tags" in fields):
+            raise ValueError("Invalid category")
 
         def apply(item):
             for k, v in fields.items():
                 if k in allowed:
                     item[k] = v
+            if category and category not in item.get("tags", []):
+                item["tags"] = [*item.get("tags", []), category]
             item["updated"] = now_iso()
             return item
         return self.update("item", apply)

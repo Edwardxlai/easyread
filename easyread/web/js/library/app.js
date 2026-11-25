@@ -268,13 +268,21 @@
     const r = e.target.closest(".row");
     if (!r) return;
     e.preventDefault();
-    L.select(r.dataset.id);
     PR.rowMenu && PR.rowMenu(r.dataset.id, { x: e.clientX, y: e.clientY });
   });
   PR.$("#q").addEventListener("input", PR.debounce((e) => { L.q = e.target.value; L.render(); }, 120));
   PR.$("#sort").addEventListener("change", (e) => { L.sort = e.target.value; PR.ls.set("easyread-sort", L.sort); L.render(); });
 
   document.addEventListener("keydown", (e) => {
+    if (e.defaultPrevented) return;
+    const menu = PR.$("#ctxmenu.open");
+    if (menu) {
+      if (!e.target.closest("#ctxmenu, input, textarea, [contenteditable]") && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const shortcut = [...menu.querySelectorAll(".kbd")].find(k => k.textContent.toLowerCase() === e.key.toLowerCase());
+        if (shortcut) { e.preventDefault(); shortcut.closest("button").click(); }
+      }
+      return;
+    }
     if (e.target.closest("input, textarea, select, [contenteditable]")) {
       if (e.key === "Escape") e.target.blur();
       return;

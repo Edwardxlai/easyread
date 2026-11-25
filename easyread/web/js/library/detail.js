@@ -77,7 +77,11 @@
     const status = [["unread", PR.t("未读")], ["reading", PR.t("在读")], ["done", PR.t("已读")]].map(([k, l]) =>
       '<button data-status="' + k + '" class="' + ((i.status || "unread") === k ? "on" : "") + '">' + l + "</button>").join("");
     // 分类：全部分类都列出来，点一下放进 / 拿出
-    const cats = L.cats().map((c) => '<button class="catchip' + ((i.tags || []).includes(c) ? " on" : "") + '" data-cattoggle="' + PR.esc(c) + '">' + PR.icon((i.tags || []).includes(c) ? "check" : "folder", "sm") + PR.esc(PR.catTree.label(c)) + "</button>").join("");
+    const cats = L.cats().map(c => {
+      const checked = (i.tags || []).includes(c);
+      return '<button class="catchip' + (checked ? " on" : "") + '" aria-pressed="' + checked + '" data-cattoggle="' + PR.esc(c) + '">' +
+        (checked ? "" : PR.icon("folder", "sm")) + PR.esc(PR.catTree.label(c)) + (checked ? PR.icon("check", "sm") : "") + "</button>";
+    }).join("");
     box.innerHTML = '<div class="detail-head"><span>' + PR.t("论文详情") + '</span><button class="detail-close" data-d="close" title="' + PR.t("收起（Esc）") + '">' + PR.icon("x", "sm") + "</button></div>" +
       '<div class="detail-inner">' +
       '<div class="cover">' + thumb + '<div class="actions">' +
@@ -87,9 +91,9 @@
       '<button class="btn icon line" data-d="star" title="' + PR.t("星标（S）") + '" style="color:' + (i.starred ? "#c9a24a" : "") + '">' + PR.icon("star", "sm").replace('class="i sm"', 'class="i sm"' + (i.starred ? ' style="fill:currentColor"' : "")) + "</button>" +
       '<button class="btn icon line" data-d="more" title="' + PR.t("更多：导出、打开文件夹、回收站") + '">' + PR.icon("more", "sm") + "</button></div></div></div>" +
       titleFields(i) +
-      '<div class="cats">' + cats + '<button class="catchip add" data-d="newcat">' + PR.icon("plus", "sm") + PR.t("新分类") + "</button>" +
-      '<input id="catInput" class="catchip" placeholder="' + PR.t("分类名，回车确定") + '" maxlength="30" hidden></div>' +
-      '<button class="btn sm line" data-d="suggest-categories">' + PR.t("AI 建议分类") + '</button>' +
+      '<div class="cats">' + cats + '<span class="cat-actions"><button class="catchip add" data-d="newcat">' + PR.icon("plus", "sm") + PR.t("新分类") + "</button>" +
+      '<input id="catInput" class="catchip" placeholder="' + PR.t("分类名，回车确定") + '" maxlength="30" hidden>' +
+      '<button class="catchip" data-d="smart-category"' + (cats && L.loadStatus === "ready" ? "" : " disabled") + '>' + PR.icon("sparkle", "sm") + PR.t("智能分类") + '</button></span></div>' +
       '<div class="seg">' + status + "</div>" +
       '<div class="kv"><span>' + PR.t("作者") + '</span><span contenteditable="plaintext-only" data-meta="authors">' + PR.esc(i.authors) + "</span>" +
       '<span>' + PR.t("年份") + '</span><span contenteditable="plaintext-only" data-meta="year">' + PR.esc(i.year) + "</span>" +
@@ -148,6 +152,7 @@
     const act = d.dataset.d;
     if (act === "newcat") { d.hidden = true; const inp = PR.$("#catInput"); inp.hidden = false; inp.focus(); return; }
     if (act === "close") L.select(null);
+    else if (act === "smart-category") L.openCategoryMatch();
     else if (act === "star") L.patch(i.id, { starred: !i.starred });
     else if (act === "read") L.openReader(i.id);
     else if (act === "model-settings") PR.openSettings("chat");
@@ -190,6 +195,9 @@
       { label: L.side.pinned.includes("p:" + id) ? PR.t("取消置顶") : PR.t("置顶到侧栏"), icon: "pin", fn: () => L.togglePin("p:" + id) },
       "-",
       ...L.catMenuItems(id),
+      { label: PR.t("智能分类"), icon: "sparkle", disabled: L.loadStatus !== "ready" || !L.cats().length, fn: () => L.openCategoryMatch() },
+      ...(where?.closest?.("#detail") ? [{ label: PR.t("AI 建议分类"), icon: "folder", fn: () => L.suggestForPaper(id) }] : []),
+      "-",
       { label: PR.t("标为未读"), fn: setStatus("unread") }, { label: PR.t("标为在读"), fn: setStatus("reading") }, { label: PR.t("标为已读"), fn: setStatus("done") },
       "-",
       { label: PR.t("复制 BibTeX"), icon: "copy", fn: () => copy(PR.cite(i, "bibtex"), " BibTeX") },
@@ -202,7 +210,8 @@
         if (!(await PR.confirm({ title: PR.t("移到回收站？"), body: PR.t("《{title}》会放进回收站，随时可以在左侧“回收站”里恢复。", { title: i.title_zh || i.title_en }), ok: PR.t("移到回收站"), danger: true }))) return;
         const r = await PR.api("/api/p/" + id + "/delete", { method: "POST", body: {} }).catch((e) => { PR.toast(PR.t("没删成：") + PR.esc(e.message)); return null; });
         if (!r) return;
-        L.select(null); await L.load();
+        if (L.selected === id) L.select(null);
+        await L.load();
         const name = r && r.trash ? r.trash.split(/[\\/]/).pop() : "";
         PR.toast(PR.t("已移到回收站"), name ? { label: PR.t("撤销"), fn: () => PR.restoreTrash(name) } : null);
       } },

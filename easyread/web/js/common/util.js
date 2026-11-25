@@ -240,5 +240,7 @@ window.PR = window.PR || {};
   };
   PR.closeMenu = () => { const m = PR.$("#ctxmenu"); m && m.classList.remove("open"); };
   document.addEventListener("mousedown", (e) => { if (!e.target.closest("#ctxmenu")) PR.closeMenu(); });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") PR.closeMenu(); });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && PR.$("#ctxmenu.open")) { e.preventDefault(); PR.closeMenu(); }
+  });
 })(window.PR);

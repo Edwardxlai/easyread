@@ -63,20 +63,17 @@
   };
   document.addEventListener("visibilitychange", () => { if (!document.hidden) L.renderAiActions(); });
   const generating = new Set();
-  PR.$("#detail").addEventListener("click", async event => {
-    if (!event.target.closest('[data-d="suggest-categories"]')) return;
-    const id = L.selected;
+  L.suggestForPaper = async id => {
     if (generating.has(id)) return;
     if (L.byId(id)?.category_review?.state === "pending") return openQueue();
     generating.add(id);
-    const btn = event.target.closest("button"); btn.disabled = true;
-    btn.textContent = PR.t("正在生成分类建议…");
+    PR.toast(PR.t("正在生成分类建议…"));
     try {
       const res = await post(id, "suggest-categories", {});
       await L.load();
       if (res.state === "pending" && !queue.open) openQueue();
       if (res.state === "done") PR.toast(PR.t("没有新的分类建议"));
     } catch (e) { PR.toast(PR.esc(e.message)); }
-    finally { generating.delete(id); btn.disabled = false; btn.textContent = PR.t("AI 建议分类"); }
-  });
+    finally { generating.delete(id); }
+  };
 })(window.PR);

@@ -44,8 +44,9 @@
     const leaf = e.target.closest(".srow[data-leaf]");
     if (!leaf) return;
     const id = leaf.dataset.leaf;
-    L.select(id);
-    if (e.target.closest("[data-more]")) PR.rowMenu(id, e.target.closest("[data-more]"));
+    const more = e.target.closest("[data-more]");
+    if (more) PR.rowMenu(id, more);
+    else L.select(id);
   });
   side.addEventListener("dblclick", (e) => {
     const leaf = e.target.closest(".srow[data-leaf]");
@@ -55,7 +56,6 @@
     const leaf = e.target.closest(".srow[data-leaf]");
     if (!leaf) return;
     e.preventDefault();
-    L.select(leaf.dataset.leaf);
     PR.rowMenu(leaf.dataset.leaf, { x: e.clientX, y: e.clientY });
   });
 })(window.PR);

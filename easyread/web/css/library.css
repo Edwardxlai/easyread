@@ -258,6 +258,7 @@
 .row .chip.cat svg { width: 11px; height: 11px; color: var(--ink-3); }
 .row[draggable="true"] { -webkit-user-drag: element; }
 .detail .cats { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 2px 0 12px; }
+.detail .cat-actions { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .detail .catchip { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 9px; border-radius: 12px; font-size: 12.5px; color: var(--ink-3); box-shadow: inset 0 0 0 1px var(--rule-2); }
 .detail .catchip svg { width: 12px; height: 12px; }
 .detail .catchip:hover { color: var(--ink); }

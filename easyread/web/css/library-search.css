@@ -20,4 +20,13 @@
 .review-list p { color: var(--ink-2); margin: 6px 0 14px 25px; }
 .review-list footer { justify-content: flex-end; }
 #categoryQueueBtn[hidden] { display: none; }
+#categoryMatch [hidden] { display: none; }
+#categoryMatch fieldset { border: 0; padding: 0; margin: 16px 0; min-width: 0; }
+#categoryMatch select, #categoryMatch textarea { display: block; width: 100%; box-sizing: border-box; margin: 6px 0 12px; }
+#categoryMatch textarea { resize: vertical; }
+#categoryMatch summary { cursor: pointer; }
+#categoryMatch .directory-list, #categoryMatch .review-list { overflow-wrap: anywhere; }
+#categoryMatch .review-list label { display: flex; align-items: baseline; gap: 8px; }
+#categoryMatch .review-list blockquote { margin: 6px 0 6px 24px; color: var(--ink-2); }
+#categoryMatch footer { justify-content: flex-end; flex-wrap: wrap; }
 @media (max-width:760px) { .topbar { flex-wrap: wrap; height: auto; } .topbar .search { min-width: 90px; } }
