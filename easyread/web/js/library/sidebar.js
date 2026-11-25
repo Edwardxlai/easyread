@@ -75,7 +75,8 @@
       AUTO.filter(([k, , , fn]) => count(fn) && !L.side.hidden.includes(k)).map((v) => viewRow(v)).join("") +
       catTree(cats) +
       (ui.adding && !ui.addUnder ? addRow(0) : "") +
-      (!ui.adding ? '<button class="srow tree hint-row" data-add>' + PR.foldSlot(false) + PR.icon("plus", "sm") + '<span class="t">' + (cats.length ? PR.t("新建分类") : PR.t("新建分类，把论文拖进来")) + "</span></button>" : "") + "</div>";
+      (!ui.adding ? '<button class="srow tree hint-row" data-add>' + PR.foldSlot(false) + PR.icon("plus", "sm") + '<span class="t">' + (cats.length ? PR.t("新建分类") : PR.t("新建分类，把论文拖进来")) + "</span></button>" : "") +
+      (!ui.adding && cats.length ? '<button class="srow tree hint-row" data-category-match' + (L.loadStatus === "ready" ? "" : " disabled") + ">" + PR.foldSlot(false) + PR.icon("sparkle", "sm") + '<span class="t">' + PR.t("智能分类") + "</span></button>" : "") + "</div>";
     const recent = L.items.filter((i) => i.last_opened && !isPinned("p:" + i.id)).sort((a, b) => String(b.last_opened).localeCompare(String(a.last_opened)));
     if (recent.length) {
       const shown = recent.slice(0, ui.recentOpen ? RECENT_MAX : RECENT_SHORT);
@@ -132,7 +133,7 @@
   /* 论文行（列表里、详情里）用的“放进分类”菜单项：子分类缩进 */
   L.catMenuItems = function (id) {
     const it = L.byId(id);
-    return L.cats().map((c) => ({ label: ((it.tags || []).includes(c) ? "✓ " : "　 ") + "　".repeat(T.depth(c)) + T.leaf(c), icon: "folder", fn: () => L.toggleInCat(id, c) }))
+    return L.cats().map((c) => ({ label: "　".repeat(T.depth(c)) + T.leaf(c), icon: "folder", kbd: (it.tags || []).includes(c) ? "✓" : "", fn: () => L.toggleInCat(id, c) }))
       .concat({ label: PR.t("新建分类并放进去…"), icon: "plus", fn: () => startAdd("", id) });
   };
 
@@ -146,6 +147,7 @@
     if (m && row) { e.preventDefault(); e.stopPropagation(); return rowMenu(row, m); }
     if (e.target.closest("[data-fold]") && row) return L.toggleFold(row.dataset.cat);
     if (e.target.closest("[data-add]")) return startAdd("");
+    if (e.target.closest("[data-category-match]")) return L.openCategoryMatch();
     if (e.target.closest("[data-recent]")) { ui.recentOpen = !ui.recentOpen; return L.render(); }
     if (!row) return;
     if (row.dataset.view) { L.view = row.dataset.view; L.tag = null; L.render(); }

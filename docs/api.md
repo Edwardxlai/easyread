@@ -40,6 +40,8 @@ EasyRead 运行时把地址写在数据目录的 `.server.json`（默认 `~/Easy
 
 写操作（POST）都要带 `X-Token` 请求头，值从 `/api/library` 取；token 每次启动都会变。
 
+文献库界面内部使用 `POST /api/p/{id}/match-category`，传入 `rule` 后用默认问答模型核对原文。返回状态为 `match` 时附可核对的 `quote`、`page` 和可用的 `anchor`；其余状态为 `no_match`、`no_source` 或 `excluded`。分析不写入文献库。读者确认后，界面通过既有的 `item` 操作传 `add_category`，在锁内追加分类。这两个界面操作不属于外部兼容接口。
+
 ## 桌面版打开链接
 
 桌面版（1.3.1 起）注册了 `easyread://` 协议：

@@ -70,6 +70,24 @@
   <p class="hint">每篇单独确认。可以修改分类名称，或跳过这篇论文。</p>
   <div class="review-list"></div><p class="hint" role="status"></p>
 </dialog>
+<dialog class="lib-ai-dialog" id="categoryMatch" aria-labelledby="categoryMatchTitle">
+  <header><h2 id="categoryMatchTitle">智能分类</h2><button type="button" class="btn" data-close>关闭</button></header>
+  <fieldset data-setup>
+    <label for="categoryTarget">目标分类</label>
+    <select id="categoryTarget" class="input"></select>
+    <label for="categoryRule">归类标准</label>
+    <textarea id="categoryRule" class="input" rows="3" maxlength="2000" placeholder="例如：只收录本文实际报告了英德翻译实验结果的论文"></textarea>
+    <details><summary>选择待分析论文</summary>
+      <label class="directory-all"><input type="checkbox" data-all>全选</label>
+      <div class="directory-list" data-scope></div>
+    </details>
+    <p class="hint">使用你的默认问答模型逐篇分析。长文按原文节选判断。</p>
+  </fieldset>
+  <p role="status" class="hint"></p>
+  <div class="review-list" data-results></div>
+  <footer><button type="button" class="btn accent" data-run></button>
+    <button type="button" class="btn accent" data-apply hidden>加入当前分类</button></footer>
+</dialog>
 <div class="dialog-backdrop" id="importDlg"><div class="dialog" role="dialog" aria-label="导入论文"></div></div>
 <div class="dialog-backdrop" id="bulkDlg"><div class="dialog" role="dialog" aria-label="成批导入"></div></div>
 <div class="dialog-backdrop" id="settingsDlg"><div class="dialog wide" role="dialog" aria-label="设置"></div></div>
@@ -96,6 +114,7 @@
 <script src="/web/js/common/lang-toggle.js"></script>
 <script src="/web/js/library/app.js"></script>
 <script src="/web/js/library/category-review.js"></script>
+<script src="/web/js/library/category-match.js"></script>
 <script src="/web/js/common/cite.js"></script>
 <script src="/web/js/common/cite-zotero.js"></script>
 <script src="/web/js/common/page-cap.js"></script>
