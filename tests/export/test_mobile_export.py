@@ -38,6 +38,18 @@ class MobileExportTest(unittest.TestCase):
         self.assertIn("body.mobile-read", html)
         self.assertTrue(build(self.ws, mobile=True).name.endswith("手机版.html"))
 
+    def test_math_in_title_is_preserved_literally(self):
+        paper = self.ws.load("paper")
+        title = r"$\pi$ & $\frac{1}{2}$"
+        for mobile, field in ((False, "title_zh"), (True, "title_en")):
+            with self.subTest(mobile=mobile):
+                paper["meta"].pop("title_zh", None)
+                paper["meta"][field] = title
+                write_json_atomic(self.ws.paper_path, paper)
+                html, data = self.data(build(self.ws, mobile=mobile))
+                self.assertIn(r"<title>$\pi$ &amp; $\frac{1}{2}$</title>", html)
+                self.assertEqual(data["paper"]["meta"][field], title)
+
     def test_full_export_unchanged(self):
         html, d = self.data(build(self.ws))
         self.assertEqual(set(d["images"]), {"pages/p1.webp", "pages/p2.webp", "pages/fig.webp"})
