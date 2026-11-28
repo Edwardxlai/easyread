@@ -1,4 +1,4 @@
-const { app, BrowserWindow, crashReporter, dialog, Menu, shell, ipcMain } = require("electron");
+const { app, BrowserWindow, WebContentsView, crashReporter, dialog, Menu, shell, ipcMain, session } = require("electron");
 const { execFileSync, spawn } = require("child_process");
 const fs = require("fs");
 const os = require("os");
@@ -11,6 +11,7 @@ const { registerUpdates } = require("./desktop-updates.cjs");
 const { registerExports } = require("./desktop-exports.cjs");
 const deepLink = require("./deep-link.cjs");
 const desktopTabs = require("./desktop-tabs.cjs");
+const interactiveReader = require("./interactive-reader.cjs");
 const dataDir = require("./data-dir.cjs");
 
 // 窗口缓存等放 %APPDATA%\EasyRead（默认会用 package.json 的 name，叫 easyread-desktop）。
@@ -366,6 +367,7 @@ if (!app.requestSingleInstanceLock()) {
     openLink(deepLink.openPath(link));
   });
   app.whenReady().then(() => {
+    interactiveReader.register({ app, ipcMain, WebContentsView, session, trustedWindow, backendJson, getWindow: () => mainWindow });
     registerExports({ app, ipcMain, dialog, getWindow: () => mainWindow, trustedWindow });
     deepLink.register(app, process);
     registerUpdates({

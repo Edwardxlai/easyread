@@ -159,6 +159,12 @@
     PR.$(".bar-title").innerHTML = PR.titleHtml(m.short_zh || m.title_zh || m.title_en || "");
     PR.ls.get("pr-seen-" + PR.paperKey, (S.discussion.entries || []).map((e) => e.id)).forEach((id) => seen.add(id));
     PR.ls.set("pr-seen-" + PR.paperKey, Array.from(seen));
+    if (m.source_type === "web" && window.frameElement?.classList.contains("live-covered")) {
+      // Keep the local state and translation controls ready. Build the annotated
+      // reading view only when the tab actually needs to show it.
+      await new Promise(resolve => { PR.resumeDeferredReader = resolve; });
+      delete PR.resumeDeferredReader;
+    }
     PR.renderPaper(true);
     PR.citationNav.setup();
     PR.$('[data-act="dock"]').disabled = false;

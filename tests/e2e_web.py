@@ -189,7 +189,7 @@ def run():
                 assert page.locator('#webSnapshot').is_visible()
                 assert page.locator('#webSnapshot').bounding_box()['width'] < 1440
                 # Select native text -> shared AI chat. Only the transport is stubbed, never the action/ref pipeline.
-                page.locator('#notespanel [data-np-act="close"]').click()
+                page.locator('#readerDock .dock-tab-close[data-close="notes"]').click()
                 ai_quote = select(start='second', last=12)
                 page.wait_for_selector('#selbar.open'); page.locator('#selbar [data-s="chat"]').click()
                 page.wait_for_selector('#chatInput')
@@ -198,7 +198,7 @@ def run():
                 assert sent[-1]['refs'][0]['quote'] == ai_quote
                 assert sent[-1]['refs'][0]['anchor'] == question['anchor']
                 assert page.locator('#webSnapshot').is_visible()
-                page.locator('#chatpanel [data-c="close"]').click()
+                page.locator('#readerDock .dock-tab-close[data-close="chat"]').click()
                 # Code is also selectable without translating/reformatting its contents.
                 page.evaluate('''() => { const d=PR.webContentWindow().document,p=d.querySelector('pre'),t=p.querySelector('code').firstChild,r=d.createRange();p.scrollIntoView({block:'center'});
                   r.setStart(t,0);r.setEnd(t,5);d.getSelection().removeAllRanges();d.getSelection().addRange(r);p.dispatchEvent(new MouseEvent('mouseup',{bubbles:true})); }''')

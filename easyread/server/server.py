@@ -111,12 +111,14 @@ class Handler(BaseHTTPRequestHandler):
             raise ValueError(tr("文件太大"))
         return self.rfile.read(n) if n else b""
 
-    def _import_result(self, ws, fresh, translate_after, scope, read=False, model="", target="", translation_extra="", citation=None):
+    def _import_result(self, ws, fresh, translate_after, scope, read=False, model="", target="", translation_extra="", citation=None, interactive=False):
         # A failed first preparation still leaves a library entry. Re-importing
         # that PDF must retry preparation instead of silently skipping it.
         paper = ws.load("paper") or {}
         active = (ws.load("job") or {}).get("state") in ("queued", "running")
-        queued = fresh or (not paper.get("meta", {}).get("pages") and not active)
+        language = paper.get("translation") or {}
+        queued = (fresh or (not paper.get("meta", {}).get("pages") and not active) or
+                  (interactive and translate_after and not read and not active and bool(language.get("en_pages"))))
         if queued:
             if translate_after and not read:
                 langs.remember(ws, target)  # 导入框里选的译文语言
@@ -336,9 +338,10 @@ class Handler(BaseHTTPRequestHandler):
                                        read=q.get("read") == "1", model=q.get("model", ""), target=q.get("target", ""), translation_extra=q.get("translation_extra", ""))
         if path in ("/api/import-url", "/api/import-arxiv"):
             body = json.loads(self._body() or b"{}")
-            ws, fresh = lib.import_reference(body.get("ref", ""), body.get("kind", "auto"))
+            kind = body.get("kind", "auto")
+            ws, fresh = lib.import_reference(body.get("ref", ""), kind)
             return self._import_result(ws, fresh, bool(body.get("translate", True)), body.get("scope"),
-                                       read=bool(body.get("read")), model=str(body.get("model") or ""), target=str(body.get("target") or ""), translation_extra=body.get("translation_extra", ""))
+                                       read=bool(body.get("read")), model=str(body.get("model") or ""), target=str(body.get("target") or ""), translation_extra=body.get("translation_extra", ""), interactive=kind == "interactive")
         if path in settings_api.POST:  # 设置页：保存配置、模型名单、试一下、取模型列表
             return self._json(200, settings_api.POST[path](json.loads(self._body() or b"{}")))
         if path == "/api/prefs":

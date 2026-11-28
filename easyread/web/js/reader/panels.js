@@ -82,7 +82,7 @@
     if (os) { PR.$("#settings").classList.remove("open"); return PR.openSettings(os.dataset.openSettings); }
     if (e.target.closest("[data-reset-type]")) return PR.resetAllType();
     const view = e.target.closest("[data-view]");
-    if (view) return PR.setView(view.dataset.view);
+    if (view) return PR.setView(view.dataset.view, true);
     const order = e.target.closest("[data-order]");
     if (order) return PR.setBiOrder(order.dataset.order);
     const b = e.target.closest("[data-p]");
@@ -117,7 +117,7 @@
   PR.on("ui-changed", () => { PR.applyFeatures(); PR.hideBlockbar && PR.hideBlockbar(); PR.renderMargin && PR.renderMargin(); });
   PR.$("#bar").addEventListener("click", (e) => {
     const v = e.target.closest("[data-view]");
-    if (v) return PR.setView(v.dataset.view);
+    if (v) return PR.setView(v.dataset.view, true);
     if (e.target.closest("[data-order-menu]")) return PR.toggleOrderMenu();
     const a = e.target.closest("[data-act]");
     if (!a) return;

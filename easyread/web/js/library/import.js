@@ -24,6 +24,7 @@
     const p = pref();
     const off = L.engine === "none";
     const after = off ? "none" : p.after;
+    const interactive = window.easyreadDesktop && window.parent !== window && window.parent.easyreadLiveTabs && PR.feature("interactiveWeb");
     dlg.querySelector(".dialog").innerHTML =
       "<h2>" + PR.t("导入论文或博客") + "</h2>" +
       '<div class="dropzone" id="pick">' + PR.icon("upload") + '<div class="big">' + PR.t("选择 PDF，或拖到这里") + '</div><div class="hint">' + PR.t("可以一次选多个；同一个文件不会重复导入") + "</div></div>" +
@@ -31,7 +32,7 @@
       '<div class="or">' + PR.t("或者") + "</div>" +
       '<label class="field"><span>' + PR.t("博客链接、论文链接、arXiv 编号、DOI 或论文标题") + '</span><div class="inline"><input class="input" id="arxivRef" placeholder="' + PR.t("2411.00640 · 10.18653/v1/N19-1423 · 论文或博客网页链接 · 论文标题") + '">' +
       '<button class="btn accent" id="arxivGo">' + PR.t("导入") + "</button></div></label>" +
-      '<label class="field"><span>' + PR.t("链接类型") + '</span><select class="input" id="impKind"><option value="auto">' + PR.t("自动识别") + '</option><option value="web">' + PR.t("网页 / 博客（保留原排版）") + '</option><option value="pdf">' + PR.t("PDF 论文") + '</option></select><span class="hint">' + PR.t("博客保留网页排版、图片和链接；页码范围仅用于 PDF。读博客原文无需模型。") + '</span></label>' +
+      '<label class="field"><span>' + PR.t("链接类型") + '</span><select class="input" id="impKind"><option value="auto">' + PR.t("自动识别") + '</option><option value="web">' + PR.t("网页 / 博客（保留原排版）") + '</option>' + (interactive ? '<option value="interactive">' + PR.t("交互网页（在线阅读）") + '</option>' : '') + '<option value="pdf">' + PR.t("PDF 论文") + '</option></select><span class="hint">' + PR.t("博客保留网页排版、图片和链接；页码范围仅用于 PDF。读博客原文无需模型。") + '</span></label>' +
       '<div class="imp-bulk"><button class="linkish" id="folderGo">' + PR.icon("folder", "sm") + PR.t("导入整个文件夹") + "</button>" +
       '<button class="linkish" id="zoteroGo">' + PR.icon("upload", "sm") + PR.t("从 Zotero 迁移整个文献库") + "</button></div>" +
       '<div class="imp-opts"><span class="imp-lbl">' + PR.t("导入后") + '</span><div class="seg" id="afterSeg">' + AFTER.map(([k, l, tip]) => '<button data-after="' + k + '" title="' + PR.esc(tip) + '" class="' + (after === k ? "on" : "") + '"' + (off && k !== "none" ? " disabled" : "") + ">" + l + "</button>").join("") + "</div>" +
@@ -183,17 +184,23 @@
   async function importRef(ref, pdfOnly = false) {
     ref = (ref || "").trim();
     if (!ref) return;
-    if (!(await PR.pdfExport.prepare(pdfOnly))) return;
+    const kind = PR.$("#impKind")?.value || "auto";
+    const interactive = kind === "interactive" && !pdfOnly;
+    if (!interactive && !(await PR.pdfExport.prepare(pdfOnly))) return;
     const btn = PR.$("#arxivGo");
     if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin"></span> ' + PR.t("查找中"); }
     else PR.toast('<span class="spin"></span> ' + PR.t("正在查找并下载 {ref}", { ref: PR.esc(ref) }), null, 60000);
     const o = opts(pdfOnly);
     try {
-      const r = await PR.api("/api/import-url", { method: "POST", body: { ref, kind: PR.$("#impKind")?.value || "auto", ...o } });
-      if (o.pdf_export) await PR.pdfExport.start(r.id, o.model, o.pdf_output_dir);
+      const r = await PR.api("/api/import-url", { method: "POST", body: { ref, kind: pdfOnly ? "pdf" : kind, ...o } });
+      if (!interactive && o.pdf_export) await PR.pdfExport.start(r.id, o.model, o.pdf_output_dir);
       close();
       await L.load();
       L.select(r.id);
+      if (interactive && window.parent.easyreadTabs) {
+        await window.parent.easyreadTabs.open("/read/" + encodeURIComponent(r.id), { interactive: true });
+        return;
+      }
       PR.toast(r.new ? (o.read ? PR.t("已导入，后台开始整理原文") : o.translate ? PR.t("已导入，后台开始翻译") : PR.t("已导入")) : r.queued ? PR.t("已重新加入准备队列") : PR.t("这篇已经在库里了"), { label: PR.t("打开"), fn: () => L.openReader(r.id) }, 6000);
     } catch (e) {
       PR.toast(PR.t("导入失败：{msg}", { msg: PR.esc(e.message) }), null, 8000);

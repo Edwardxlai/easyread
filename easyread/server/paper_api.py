@@ -20,6 +20,9 @@ def post(app, ws, parts: list[str], body: dict):
         if action == "suggest-categories":
             return category_suggestions.suggest(app.lib, ws)
         return category_suggestions.resolve(ws, body)
+    if action == "translate-visible":
+        from ..weblog.translation import translate_visible
+        return translate_visible(ws, body)
     if action == "translate-selection":
         from ..translate.selection import translate
         return translate(ws, body)

@@ -220,7 +220,10 @@
       const paragraphs = [];
       for (const part of parts) {
         const block = PR.blockById[part.anchor];
-        if (!block) continue;
+        if (!block) {
+          if (part.anchor === "head" && part.quote?.trim()) paragraphs.push({type:"paragraph", content:[{type:"text", text:part.quote}]});
+          continue;
+        }
         const title = PR.t("第 {page} 页", { page: block.page || 1 });
         paragraphs.push({ type: "paragraph", content: [
           ...(block.type === "math" && block.tex ? [{ type: "inlineMath", attrs: { latex: block.tex } }, { type: "text", text: " " }] : [...(part.quoteContent || [{ type: "text", text: part.quote }]), { type: "text", text: " " }]),

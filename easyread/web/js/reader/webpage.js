@@ -103,10 +103,11 @@
   function register() {
     const d = doc();
     runs.clear(); hosts.clear(); codeRoots.clear();
+    const byRun = new Map(Array.from(d.querySelectorAll('[data-easyread-run]'), el => [el.dataset.easyreadRun, el]));
     for (const b of S.paper.blocks || []) {
       const elements = [];
       for (const r of b.web_runs || []) {
-        const el = d.querySelector('[data-easyread-run="' + r.id + '"]');
+        const el = byRun.get(r.id);
         if (!el) continue;
         const zh = d.createElement("span"), en = d.createElement("span");
         zh.dataset.easyreadSide = "zh"; en.dataset.easyreadSide = "en";
@@ -165,8 +166,8 @@
         entry.zh.hidden = !translated || view === "original";
         entry.en.hidden = translated && view === "translation" && !hosts.get(b.id)?.classList.contains("show-en");
         entry.en.style.display = view === "both" ? "block" : "contents";
-        if (originalFirst) entry.el.replaceChildren(entry.en, entry.zh);
-        else entry.el.replaceChildren(entry.zh, entry.en);
+        const first = originalFirst ? entry.en : entry.zh;
+        if (entry.el.firstChild !== first) entry.el.replaceChildren(first, originalFirst ? entry.zh : entry.en);
       }
     }
     PR.applyMarks();
@@ -338,7 +339,7 @@
   }
   function setLayout(value) {
     const next = value === "native";
-    if (next === nativeMode) return;
+    if (next === nativeMode) { if (next) PR.enableInlineWeb?.(); return; }
     if (PR.editingKey) {
       (doc()?.querySelector("[data-easyread-editor] textarea") || PR.$("#paper textarea.editor"))?.focus();
       return;
@@ -354,6 +355,7 @@
     PR.prefs[preference] = value;
     if (PR.store.mode === "server") PR.savePrefs("reader", { [preference]: value });
     syncLayout();
+    if (!PR.syncInlineWeb?.() && nativeMode) PR.loadWebSnapshot?.();
     PR.applyReadingLanguage(); PR.applyMarks(); PR.renderMargin();
     if (nativeMode && !loaded) pendingPosition = position;
     else { alignPosition(position); requestAnimationFrame(() => alignPosition(position)); }
@@ -362,7 +364,7 @@
   }
 
   function setup() {
-    if (!isWeb()) return;
+    if (!isWeb() || window.frameElement?.classList.contains("live-covered")) return;
     if (!frame) {
       document.body.classList.add("web-article");
       nativeMode = (PR.prefs["web_layout_" + PR.pid] || PR.ls.get("easyread-web-layout-" + PR.pid, "native")) !== "reader";
@@ -377,14 +379,25 @@
       PR.$("#stage").before(frame);
       syncLayout();
       frame.addEventListener("load", () => {
+        if (!frame.hasAttribute("src") && !frame.hasAttribute("srcdoc")) return;
         loaded = true; register(); bind(); updateText();
+        if (doc()?.querySelector('canvas, input[type="range"], [role="slider"], [data-easyread-interactive]')) PR.detectInlineWeb?.();
         if (!nativeMode) return;
         if (pendingPosition) { alignPosition(pendingPosition); pendingPosition = null; }
         else if (location.hash.startsWith("#b-")) PR.jumpTo(location.hash.slice(1), { noBack: true, instant: true });
         else PR.restoreProgress();
       });
-      if (S.web_snapshot) frame.srcdoc = S.web_snapshot;
-      else frame.src = "/p/" + PR.pid + "/source.html";
+      PR.loadWebSnapshot = () => {
+        if (frame.hasAttribute("src") || frame.hasAttribute("srcdoc")) return;
+        if (S.web_snapshot) frame.srcdoc = S.web_snapshot;
+        else frame.src = "/p/" + PR.pid + "/source.html";
+      };
+      if (window.frameElement?.dataset.requestInline) {
+        delete window.frameElement.dataset.requestInline;
+        if (!nativeMode) setLayout("native");
+        PR.enableInlineWeb?.();
+      }
+      if (!PR.syncInlineWeb?.() && nativeMode) PR.loadWebSnapshot();
       const originalReadingBlock = PR.readingBlock;
       PR.readingBlock = () => {
         if (!nativeMode || !loaded) return originalReadingBlock();
@@ -406,6 +419,7 @@
     updateText();
   }
   PR.on("margin-rendered", renderPins);
+  PR.resumeWebSnapshot = () => { if (!frame && isWeb()) setup(); };
   PR.on("rendered", setup);
   PR.on("reader", op => { if (!op || op.op === "edit") updateText(); });
   PR.on("block-rendered", updateText);

@@ -108,6 +108,10 @@ Your browser opens `http://127.0.0.1:8765`. The server only listens on localhost
 
 **Web articles and deployment.** Paste a blog URL to read, annotate and export the archived page. Dynamic pages need Chrome or Edge. [Web article details](web-articles.md). Deployments can set `EASYREAD_TARGET=zh-Hant` to default to Traditional Chinese. A saved language preference takes precedence.
 
+On desktop, **Web layout** opens recognized interactive articles in place. Use the existing **Original**, **Translation** and **Bilingual** controls while operating the original charts. Click **Web layout** again to enable this for an older article. Translation and Bilingual automatically translate visible buttons, chart labels and newly opened popups. Saved translations work offline. New labels use the configured translation engine.
+
+Select text in interactive Web layout to highlight or underline it in four colors, add a note or question, quote it in a paper note, translate it, ask AI, or copy it. Select text within one translated paragraph to see its original.
+
 1. Open Settings (top right) → Model: add the models you want and choose "Use for translation" on one card. Models for translation and Ask AI are managed on the same page.
 2. Drag a PDF into the window, or paste an arXiv ID, arXiv / OpenReview link or a direct PDF link (`Ctrl+V` on the library page works too). For long papers you can translate just the main text, or a page range such as pages 5–12. You can also pick the model and target language for this import, or choose "Read the English original" to lay out the paper without translating; use "Translate to…" any time later. Whole-paper jobs above 60 pages ask for confirmation by default; change the limit in Settings → Model.
 3. Translation runs in the background page by page. Translated parts are readable immediately; untranslated pages show the original. Importing more than 5 PDFs at once asks before translating them all (the default is "Import only"); "Stop translation" at the top of the list stops every running job and keeps what is already translated.

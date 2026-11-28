@@ -16,9 +16,16 @@
     };
   };
   /* 切换显示方式：mode 和 lead / biOrder 一起改，再走 setPref 保住阅读位置 */
-  PR.setView = function (view) {
+  PR.setView = function (view, fromButton = false) {
     if (view !== "both") PR.prefs.lead = view;
     PR.setPref("mode", view === "both" ? "bi" : "zh");
+    if (fromButton && view !== "original" && document.body.classList.contains("web-inline") &&
+        !document.querySelector(".translation-dialog") && !["running","queued","confirm"].includes(S.job?.state) &&
+        !S.paper.blocks.some(b => PR.hasZh(b) || b.web_runs?.some(run => run.zh))) {
+      if (!PR.canAsk()) return PR.toast(PR.t("没有可用的翻译模型"));
+      const options = S.job?.state === "partial" ? {failed:true} : S.job?.read || S.paper.translation?.en_pages?.length ? {en:true} : {};
+      PR.startTranslation(PR.pid, options).then(started => { if (started) PR.poll(); }).catch(error => PR.toast(error.message));
+    }
   };
   PR.setBiOrder = function (first) {
     PR.prefs.biOrder = first;
@@ -117,6 +124,7 @@
     document.body.classList.toggle("original-first", first);
     syncBar();
     PR.refreshDockResource?.();
+    PR.syncInlineWeb?.();
     if (!S.paper) return;
     PR.prepareReadingBlocks(PR.$("#paper"));
     const title = PR.$("#paper .paper-head h1"), meta = S.paper.meta;

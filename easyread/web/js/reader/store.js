@@ -190,8 +190,9 @@
   PR.canAsk = () => mode === "server" && S.engine && S.engine !== "none";
 
   /* ---------- 轮询：翻译方追加讨论/译文、后台翻译进度、另一个标签页改了笔记 ---------- */
+  let pollingPaused = false;
   async function poll() {
-    if (mode !== "server" || document.hidden) return;
+    if (mode !== "server" || document.hidden || pollingPaused) return;
     let v;
     try {
       v = await (await fetch(base() + "/versions", { cache: "no-store" })).json();
@@ -200,6 +201,7 @@
       if (!outbox.length) setStatus("offline", PR.t("未连上本地服务（只读）"));
       return;
     }
+    if (pollingPaused) return;
     const changed = [];
     for (const name of ["paper", "discussion", "layout", "reader", "job"]) if (v[name] && v[name] !== S.versions[name]) changed.push(name);
     const imagesChanged = S.figure_images_enabled !== (v.figure_images_enabled === true);
@@ -216,6 +218,11 @@
     if (imagesChanged) PR.emit("figure-images-setting");
   }
   PR.poll = poll;
+  PR.setPollingPaused = paused => {
+    if (pollingPaused === paused) return;
+    pollingPaused = paused;
+    if (!paused) void poll();
+  };
   PR.startPolling = function () {
     if (mode !== "server") return;
     setInterval(poll, 2500);

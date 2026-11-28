@@ -48,11 +48,13 @@
   }
 
   function jump(it) {
-    if (!it || !document.getElementById("b-" + it.anchor)) return;
+    if (!it) return;
+    const onOriginal = it.src === "mine" && it.data.quote && PR.revealLiveMark?.(it.data.id);
+    if (!onOriginal && !document.getElementById("b-" + it.anchor)) return;
     if (editing) stopEditing();
     active = itemId(it);
     PR.$$("#paper .flash").forEach((el) => el.classList.remove("flash"));
-    PR.jumpTo("b-" + it.anchor, { noFlash: true, instant: true });
+    if (!onOriginal) PR.jumpTo("b-" + it.anchor, { noFlash: true, instant: true });
     PR.flashCard(it.data.id);
     PR.renderNotesPanel();
     const card = panel().querySelector('.card[aria-current="true"]');

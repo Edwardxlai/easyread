@@ -127,6 +127,11 @@
       if (owner(key) >= 0) b.insertAdjacentHTML("beforeend", PR.icon("check", "sm"));
       return b;
     }));
+    if (PR.canOpenInteractiveWeb?.()) {
+      const button = PR.el("button", { type: "button", text: PR.t("互动网页") });
+      button.onclick = () => { g.menu.hidePopover(); PR.openInteractiveWeb(); };
+      g.menu.firstElementChild.append(button);
+    }
     if (g.tabs.length > 1 || !divider.hidden) {
       for (const [axis, label] of [["columns", PR.t("左右分栏")], ["rows", PR.t("上下分栏")]]) {
         const b = document.createElement("button"); b.type = "button";
