@@ -92,6 +92,23 @@ class WebTest(unittest.TestCase):
         render.assert_called_once()
         self.assertGreater(len(blocks), 2)
 
+    def test_empty_main_falls_back_to_text_elsewhere_in_body(self):
+        raw = f'<html><body><main><svg></svg></main><section><h1>Guide</h1><p>{TEXT}</p></section></body></html>'
+        with patch.object(snapshot.sources, '_get', return_value=(raw.encode(), 'text/html', 'https://example.com/guide')):
+            _, _, blocks = snapshot.fetch('https://example.com/guide', interactive=True)
+        self.assertEqual([b['en'] for b in blocks], ['Guide', TEXT])
+
+    def test_space_import_uses_only_its_hosted_article(self):
+        outer = 'https://huggingface.co/spaces/nanotron/ultrascale-playbook'
+        inner = 'https://nanotron-ultrascale-playbook.static.hf.space/index.html'
+        wrapper = f'<html><body><iframe src="https://unrelated.example/"></iframe><iframe src="{inner}"></iframe></body></html>'
+        with patch.object(snapshot.sources, '_get', side_effect=[(wrapper.encode(), 'text/html', outer),
+                              (HTML.encode(), 'text/html', inner)]) as request:
+            _, meta, blocks = snapshot.fetch(outer, interactive=True)
+        self.assertEqual([c.args[0] for c in request.call_args_list], [outer, inner])
+        self.assertEqual((meta['url'], meta['live_url'], meta['interactive']), (outer, inner, True))
+        self.assertTrue(any(b['en'].startswith(TEXT) for b in blocks))
+
     def test_translation_is_atomic_retryable_and_keeps_dom(self):
         ws = self.imported()
         before = (ws.root / 'source.html').read_bytes()
@@ -120,6 +137,27 @@ class WebTest(unittest.TestCase):
         self.assertIn('web_snapshot', exported)
         self.assertIn('webSnapshot', exported)
         self.assertNotIn('src="/web/', exported)
+
+    def test_translation_accepts_an_omitted_article_before_inline_markup(self):
+        html = HTML.replace('<pre>', '<p>The <em>model</em> is ready.</p><pre>')
+        article = snapshot.freeze(BeautifulSoup(html, 'html.parser'), 'https://example.com/blog/post')
+        with patch.object(snapshot, 'fetch', return_value=article):
+            ws = self.lib.import_reference('https://example.com/blog/post', 'web')[0]
+        runs = [r for b in ws.load('paper')['blocks'] for r in b.get('web_runs', [])
+                if any(c.isalpha() for c in r['en'])]
+        article_id = next(r['id'] for r in runs if r['en'].strip() == 'The')
+        model_id = next(r['id'] for r in runs if r['en'] == 'model')
+        translated = {r['id']: '中文' for r in runs}
+        translated[article_id] = ''
+        cfg = {'engine': 'test', 'target': 'zh'}
+        with patch.object(engines, 'run', return_value=json.dumps({**translated, model_id: ''})):
+            self.assertIn(1, translate_pages(ws, cfg, [1], threading.Event(), lambda *a: None))
+        with patch.object(engines, 'run', return_value=json.dumps(translated)) as run:
+            self.assertEqual(translate_pages(ws, cfg, [1], threading.Event(), lambda *a: None), {})
+            run.assert_called_once()
+        output = {r['id']: r.get('zh') for b in ws.load('paper')['blocks'] for r in b.get('web_runs', [])}
+        self.assertEqual(output[article_id], '')
+        self.assertEqual(output[model_id], '中文')
 
 
 if __name__ == '__main__':

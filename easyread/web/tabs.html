@@ -12,9 +12,20 @@
     <nav id="tabs" role="tablist" aria-label="打开的论文"></nav>
     <button id="newTab" title="选择另一篇论文" aria-label="选择另一篇论文">+</button>
   </header>
+  <section id="interactiveToolbar" class="interactive-toolbar" aria-label="交互阅读" hidden>
+    <button class="btn" id="interactiveSnapshot" type="button">返回阅读器</button>
+    <button class="btn" id="interactiveLanguage" type="button">显示原文</button>
+    <button class="btn" id="interactiveTranslate" type="button">开始翻译</button>
+    <button class="btn" id="interactiveVisible" type="button">翻译画面文字</button>
+    <button class="btn" id="interactiveArchive" type="button">保存离线网页</button>
+    <button class="btn" id="interactiveNetwork" type="button" hidden></button>
+    <button class="btn" id="interactiveRetry" type="button" hidden>重试</button>
+    <span id="interactiveStatus" role="status"></span>
+  </section>
   <main id="panes"></main>
   <div id="message" role="status" hidden></div>
   <script src="/web/js/common/i18n.js"></script>
+  <script src="/web/js/tabs-interactive.js"></script>
   <script src="/web/js/tabs.js"></script>
 </body>
 </html>

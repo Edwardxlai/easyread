@@ -1,5 +1,9 @@
 #webSnapshot { display:block; border:0; width:100%; min-height:calc(100vh - 70px); margin-top:var(--bar-h); background:white; }
-#webSnapshot[hidden] { display:none; }
+#webSnapshot[hidden], .web-inline #webSnapshot { display:none; }
+body.web-inline { overflow:hidden; }
+.web-inline #selbar[data-live] { visibility:hidden; }
+.web-popover-backdrop { display:none; position:fixed; pointer-events:none; }
+.web-inline:has(#popover.open) .web-popover-backdrop[src] { display:block; }
 .web-native #stage { display:none; }
 .web-article #bar [data-act="pages"], .web-article .pgmark { display:none; }
 @media (min-width:1180px) {

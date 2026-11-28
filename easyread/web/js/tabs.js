@@ -38,10 +38,17 @@
       tab.button.setAttribute("aria-selected", String(selected));
       tab.button.tabIndex = selected ? 0 : -1;
       tab.frame.classList.toggle("inactive", !selected);
-      tab.frame.setAttribute("aria-hidden", String(!selected));
-      tab.frame.inert = !selected;
+      const hidden = !selected || tab.frame.classList.contains("live-covered");
+      tab.frame.setAttribute("aria-hidden", String(hidden));
+      tab.frame.inert = hidden;
     }
     const tab = tabs.get(id);
+    window.easyreadLiveTabs?.select(id);
+    if (tab.needsSnapshot && !tab.frame.classList.contains("live-covered")) {
+      tab.needsSnapshot = false;
+      const reader = tab.frame.contentWindow.PR;
+      (reader?.resumeDeferredReader || reader?.resumeWebSnapshot)?.();
+    }
     syncTheme(tab);
     document.title = tab.button.textContent + " · EasyRead";
     tab.node.scrollIntoView({ block: "nearest", inline: "nearest" });
@@ -63,6 +70,7 @@
       if (!await save(tab)) throw new Error("save failed");
       const ids = [...tabs.keys()], index = ids.indexOf(id);
       if (active === id) select(ids[index - 1] || "library");
+      await window.easyreadLiveTabs?.drop(id);
       tab.observer?.disconnect(); tab.themeObserver?.disconnect();
       tab.frame.remove(); tab.node.remove(); tabs.delete(id);
       rememberTabs();
@@ -79,7 +87,7 @@
       e.preventDefault(); e.stopImmediatePropagation(); void close(active);
     }
   }
-  async function open(raw) {
+  async function open(raw, options = {}) {
     const url = new URL(raw, location.origin);
     if (url.origin !== location.origin) return;
     if (url.pathname === "/open") {
@@ -89,7 +97,7 @@
         const target = new URL(response.url);
         const block = url.searchParams.get("block");
         if (block) target.hash = block;
-        return open(target.href);
+        return open(target.href, options);
       } catch (error) { notify(error.message); return; }
     }
     const match = url.pathname.match(/^\/read\/([a-zA-Z0-9_-]+)$/);
@@ -98,6 +106,11 @@
     const existing = tabs.has(id);
     if (!existing) create(id, url.href, t("正在打开…"));
     select(id);
+    if (options.interactive) {
+      const frame = tabs.get(id).frame;
+      frame.dataset.requestInline = "true";
+      frame.contentDocument?.querySelector('[data-web-layout="native"]')?.click();
+    }
     if (!existing) return;
     const frame = tabs.get(id).frame, win = frame.contentWindow;
     if (url.searchParams.has("cite_from") || url.searchParams.has("cite_return")) {
@@ -113,6 +126,7 @@
   }
   function bind(tab) {
     const win = tab.frame.contentWindow, doc = win.document;
+    win.PR?.setPollingPaused?.(tab.frame.classList.contains("live-covered"));
     if (win.PR?.lib) win.PR.lib.openReader = id => open("/read/" + encodeURIComponent(id));
     if (win.PR?.citationNav) win.PR.openPaperTab = open;
     doc.addEventListener("click", e => {
@@ -170,7 +184,32 @@
   }
   document.addEventListener("keydown", keyboard, true);
   document.querySelector("#newTab").onclick = () => select("library");
-  window.easyreadTabs = { open, select, close, saveAll: () => Promise.all([...tabs.values()].map(save)), keyboard };
+  function setSnapshotCovered(id, covered) {
+    const tab = tabs.get(id);
+    if (!tab) return;
+    tab.frame.classList.toggle("live-covered", covered);
+    tab.frame.inert = id !== active || covered;
+    tab.frame.setAttribute("aria-hidden", String(tab.frame.inert));
+    const pr = tab.frame.contentWindow.PR;
+    pr?.setPollingPaused?.(covered);
+    tab.needsSnapshot = !covered && id !== active;
+    if (!covered && id === active) (pr?.resumeDeferredReader || pr?.resumeWebSnapshot)?.();
+  }
+  async function translateInteractive(id) {
+    const pr = tabs.get(id)?.frame.contentWindow.PR;
+    if (!pr?.canAsk?.()) { notify(t("没有可用的翻译模型")); return; }
+    try {
+      const failed = pr.state.job?.state === "partial";
+      if (await pr.startTranslation(id, failed ? { failed: true } : {})) await pr.poll();
+    } catch (error) { notify(error.message); }
+  }
+  async function translateVisible(id, texts) {
+    const pr = tabs.get(id)?.frame.contentWindow.PR;
+    if (!pr?.canAsk?.()) throw new Error(t("没有可用的翻译模型"));
+    return pr.api("/api/p/" + id + "/translate-visible", { method: "POST", body: { texts } });
+  }
+  window.easyreadTabs = { open, select, close, translateInteractive, translateVisible, setSnapshotCovered,
+    saveAll: () => Promise.all([...tabs.values()].map(save)), keyboard };
   window.easyreadDesktop?.onBeforeQuit(() => window.easyreadTabs.saveAll());
   create("library", "/", t("文献库")); select("library");
   for (const id of new Set(saved.getAll("paper"))) {

@@ -18,6 +18,9 @@ from ..pdf import sources
 from .cover import image_tags
 
 MAX_HTML = 8 * 1024 * 1024
+MIN_BODY_TEXT = 160
+REMOVED_TAGS = ('script', 'noscript', 'base', 'iframe', 'object', 'embed', 'form', 'template')
+NON_PROSE_TAGS = (*REMOVED_TAGS, 'style', 'pre', 'code', 'svg', 'math', 'nav', 'footer', 'button', 'textarea', 'select')
 CSP = ("default-src 'none'; style-src 'unsafe-inline' https: http:; "
        "img-src data: https: http:; font-src data: https: http:; "
        "media-src data: https: http:; base-uri 'none'; form-action 'none'; frame-src 'none'; script-src 'none'")
@@ -54,24 +57,91 @@ def render(url: str) -> str:
     return result.stdout.decode('utf-8', 'replace')
 
 
-def fetch(url: str):
-    if urlparse(url).scheme not in ('http', 'https'):
-        raise ValueError('博客导入只支持 HTTP / HTTPS 链接。')
+def _load_html(url):
     data, ctype, final = sources._get(url, 'text/html,application/xhtml+xml', 30, MAX_HTML)
     if 'html' not in ctype.lower() and not data.lstrip().lower().startswith((b'<!doctype html', b'<html')):
         raise ValueError('这个链接不是 HTML 网页。')
-    soup = BeautifulSoup(data, 'html.parser')
-    body = soup.body or soup
-    if len(body.get_text(' ', strip=True)) < 160 and soup.find('script'):
+    return BeautifulSoup(data, 'html.parser'), final
+
+
+def _space_host(url):
+    parsed = urlparse(url)
+    return (parsed.scheme == 'https' and not parsed.username and not parsed.password
+            and bool(re.fullmatch(r'[\w-]+(?:\.static)?\.hf\.space', parsed.hostname or '')))
+
+
+def _space_frame(soup, url):
+    parsed = urlparse(url)
+    if parsed.hostname not in ('huggingface.co', 'www.huggingface.co') or not re.fullmatch(r'/spaces/[^/]+/[^/]+/?', parsed.path):
+        return None
+    for frame in soup.find_all('iframe', src=True):
+        target = urljoin(url, frame['src'])
+        if _space_host(target):
+            return target
+    return None
+
+
+def _visible(node):
+    return not (node.has_attr('hidden') or node.get('aria-hidden') == 'true' or
+                re.search(r'display\s*:\s*none|visibility\s*:\s*hidden', node.get('style', ''), re.I))
+
+
+def _prose(node):
+    return (not isinstance(node, (Comment, Tag)) and bool(str(node).strip()) and
+            all(p.name not in NON_PROSE_TAGS and _visible(p) and p.get('translate') != 'no' and
+                not {'katex', 'MathJax'}.intersection(p.get('class', [])) for p in node.parents))
+
+
+def _has_prose(scope):
+    length = 0
+    for node in scope.strings:
+        if _prose(node):
+            length += len(str(node).strip())
+            if length >= MIN_BODY_TEXT:
+                return True
+    return False
+
+
+def _body_scope(soup):
+    for name in ('article', 'main'):
+        for candidate in soup.find_all(name):
+            if _has_prose(candidate):
+                return candidate
+    return soup.body or soup
+
+
+def fetch(url: str, *, interactive=False):
+    if urlparse(url).scheme not in ('http', 'https'):
+        raise ValueError('博客导入只支持 HTTP / HTTPS 链接。')
+    if interactive and urlparse(url).scheme != 'https':
+        raise ValueError('交互网页需要公开的 HTTPS 链接。')
+    soup, original = _load_html(url)
+    final = original
+    target = _space_frame(soup, original)
+    if target:
+        soup, final = _load_html(target)
+        if not _space_host(final):
+            raise ValueError('无法识别 Hugging Face Space 的正文地址。')
+    if interactive and urlparse(final).scheme != 'https':
+        raise ValueError('交互网页需要公开的 HTTPS 链接。')
+    if not _has_prose(_body_scope(soup)) and soup.find('script'):
         soup = BeautifulSoup(render(final), 'html.parser')
-    return freeze(soup, final)
+    has_controls = soup.select_one('article input[type="range"], main input[type="range"], canvas, [role="slider"], d-figure input, article select') is not None
+    result, meta, blocks = freeze(soup, final, assets=Assets(archive=not interactive))
+    if has_controls and urlparse(final).scheme == 'https':
+        meta['interactive'] = True
+    if final != original or interactive:
+        meta.update(url=original, source=original, live_url=final)
+    if interactive:
+        meta['interactive'] = True
+    return result, meta, blocks
 
 
 class Assets:
     """Best-effort self-contained styles/images, bounded to 32 MB per snapshot."""
-    def __init__(self):
+    def __init__(self, archive=True):
         self.cache = {}
-        self.remaining = 32 * 1024 * 1024
+        self.remaining = 32 * 1024 * 1024 if archive else 0
         self.requests = 0
         self.missing = []
 
@@ -127,6 +197,9 @@ def freeze(soup, url, *, assets=None):
         soup.html.insert(0, soup.new_tag('head'))
     if not soup.body:
         raise ValueError('网页没有正文。')
+    scope = _body_scope(soup)
+    if not _has_prose(scope):
+        raise ValueError('没有找到足够的博客正文；网页可能需要登录或无法在浏览器中加载。')
     title_tag = soup.find('meta', property='og:title') or soup.find('meta', attrs={'name': 'twitter:title'})
     title = title_tag.get('content', '') if title_tag else ''
     title = title or (soup.title.get_text() if soup.title else urlparse(url).hostname)
@@ -145,7 +218,7 @@ def freeze(soup, url, *, assets=None):
         src = image.get('src') or image.get('data-src')
         if src:
             assets.get(urljoin(base_url, src))
-    for el in list(soup.select('script, noscript, base, iframe, object, embed, form, template')):
+    for el in list(soup.select(', '.join(REMOVED_TAGS))):
         el.decompose()
     for el in list(soup.find_all('meta')):
         if el.has_attr('http-equiv'):
@@ -195,12 +268,9 @@ def freeze(soup, url, *, assets=None):
         if el.name == 'a' and not el.get('href', '').startswith('#'):
             el['target'], el['rel'] = '_blank', 'noopener noreferrer'
     blocks, groups = [], {}
-    scope = soup.find('article') or soup.find('main') or soup.body
     for node in list(scope.descendants):
         ancestors = list(node.parents)
-        if any(p.has_attr('hidden') or p.get('aria-hidden') == 'true'
-               or re.search(r'display\s*:\s*none|visibility\s*:\s*hidden', p.get('style', ''), re.I)
-               for p in ancestors):
+        if not all(map(_visible, ancestors)):
             continue
         if isinstance(node, Tag):
             if node.name == 'img' and node.get('src') and not (str(node.get('width', '')).isdigit() and int(node['width']) <= 150):
@@ -210,11 +280,7 @@ def freeze(soup, url, *, assets=None):
                 blocks.append({'id': f'web-{len(blocks) + 1:04d}', 'type': 'para',
                                'en': '```\n' + node.get_text() + '\n```', 'page': 1})
             continue
-        if isinstance(node, Comment) or not str(node).strip():
-            continue
-        if any(p.name in ('script', 'style', 'pre', 'code', 'svg', 'math', 'nav', 'footer', 'button', 'textarea', 'select')
-               or p.has_attr('hidden') or p.get('aria-hidden') == 'true' or p.get('translate') == 'no'
-               or 'katex' in p.get('class', []) or 'MathJax' in p.get('class', []) for p in node.parents):
+        if not _prose(node):
             continue
         parent = node.find_parent(re.compile(r'^h[1-6]$')) or node.find_parent(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'figcaption', 'td', 'th', 'blockquote']) or node.parent
         key = id(parent)
@@ -234,8 +300,6 @@ def freeze(soup, url, *, assets=None):
         span = soup.new_tag('span', attrs={'data-easyread-run': rid, 'style': 'display:contents'})
         span.string = text
         node.replace_with(span)
-    if sum(len(b.get('en', '')) for b in blocks) < 160:
-        raise ValueError('没有找到足够的博客正文；网页可能需要登录或无法在浏览器中加载。')
     # Logical batches only; never manufacture a PDF or change the blog's layout.
     page, size = 1, 0
     for block in blocks:

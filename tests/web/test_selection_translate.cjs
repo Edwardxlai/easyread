@@ -96,7 +96,10 @@ function selectionToolbar(mode, side) {
   };
   const selection = { isCollapsed: false, rangeCount: 1, getRangeAt: () => range, removeAllRanges() { this.isCollapsed = true; } };
   const classes = new Set();
+  const attributes = new Set();
   const bar = { classList: { add: s => classes.add(s), remove: s => classes.delete(s), contains: s => classes.has(s) },
+    toggleAttribute: (name, on) => on ? attributes.add(name) : attributes.delete(name),
+    hasAttribute: name => attributes.has(name),
     offsetWidth: 400, offsetHeight: 36, style: {}, addEventListener: (event, fn) => { clicks[event] = fn; } };
   const PR = {
     state: {}, store: { mode }, prefs: {}, HL_COLORS: [], keysOn: false,
@@ -114,8 +117,20 @@ function selectionToolbar(mode, side) {
     Node: { TEXT_NODE: 3 }, NodeFilter: { SHOW_TEXT: 4 }, innerWidth: 1000, innerHeight: 800, setTimeout: fn => fn(),
   });
   events.mouseup({ target: { closest: () => null } });
-  return { bar, calls, selection, click: () => clicks.click({ target: { closest: s => s === 'button[data-s]' ? { dataset: { s: 'translate' } } : null } }) };
+  return { PR, bar, rect, calls, selection, click: () => clicks.click({ target: { closest: s => s === 'button[data-s]' ? { dataset: { s: 'translate' } } : null } }) };
 }
+
+test('a live page selection uses the reader toolbar and clears its overlay on dismissal', () => {
+  const { PR, bar, rect } = selectionToolbar('server', 'en');
+  const displayed = [];
+  PR.displayLiveSelection = (element, token) => displayed.push([element, token]);
+  PR.showSelectionBar({anchor: 'p1', quote: 'live text', side: 'en', rect, liveToken: 'selection-1'});
+  assert.deepEqual(displayed, [[bar, 'selection-1']]);
+  assert.equal(bar.hasAttribute('data-live'), true);
+  PR.closeLiveSelection();
+  assert.equal(bar.classList.contains('open'), false);
+  assert.equal(bar.hasAttribute('data-live'), false);
+});
 
 test('selecting original or translated text exposes translation and passes the captured quote to the popup', () => {
   for (const side of ['en', 'zh']) {

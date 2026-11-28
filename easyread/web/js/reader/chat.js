@@ -35,8 +35,8 @@
   const focusInput = () => setTimeout(() => { const t = PR.$("#chatInput"); if (PR.chatOpen() && t) t.focus(); }, 300);
 
   function addRef(anchor, quote) {
-    if (!PR.blockById[anchor]) return false;
     quote = (quote || "").trim();
+    if (!PR.blockById[anchor] && !(anchor === "head" && quote)) return false;
     if (st.refs.some((r) => r.anchor === anchor && r.quote === quote)) return false;
     st.refs = st.refs.filter((r) => !(r.anchor === anchor && !r.quote && quote)).concat({ anchor, quote });  // 同段先引整段、再选一句：换成那句
     return true;
@@ -98,7 +98,7 @@
     return (t || "").replace(/\$\$?([^$]*)\$\$?/g, (m, x) => x.replace(/\\([a-zA-Z]+)\s*/g, (y, name) => ({ mu: "μ", sigma: "σ", epsilon: "ε", alpha: "α", beta: "β", theta: "θ", pi: "π", sum: "Σ", mid: "|", succ: "≻", log: "log ", exp: "exp " })[name] || "").replace(/[{}\\^_]/g, ""));
   }
   function ctxLabel(c) {
-    if (!c || !PR.blockById[c.anchor]) return "";
+    if (!c || !PR.blockById[c.anchor]) return c?.anchor === "head" ? (c.quote || "").slice(0, 45) : "";
     const b = PR.blockById[c.anchor];
     if (b.type === "math" && !c.quote) return (PR.sectionOf ? PR.sectionOf(c.anchor) + " · " : "") + (b.tag ? PR.t("公式 ({tag})", { tag: b.tag }) : PR.t("一个公式"));
     const text = plainTex(c.quote || PR.textFor(PR.blockKeys(b)[0] || b.id) || b.caption_zh || b.tex || "").replace(/\*\*|`/g, "");  // 先去公式记号再去粗体，不然 $ 已被 PR.plain 去掉、TeX 原样露出来

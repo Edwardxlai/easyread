@@ -9,7 +9,7 @@
 #orderMenu { position: fixed; min-width: 150px; }
 #orderMenu .tick { display: inline-flex; width: 16px; color: var(--accent); }
 #orderMenu .tick .i { width: 15px; height: 15px; }
-body.en-only .view-seg { display: none; }
+body.en-only:not(.web-inline) .view-seg { display: none; }
 
 /* 译文在前：标题里的原文一行放在译文下面，小一号 */
 body:not(.original-first) #paper .heading-original {
@@ -62,5 +62,5 @@ html[lang="en"] #settings.menu .slider { grid-template-columns: 6.6em minmax(0, 
   #settings .view-row-narrow [data-view="both"] { border-radius: 7px; padding-right: 6px; }
   #settings .order-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
   #settings .order-line > span { color: var(--ink-3); font-size: 12.5px; white-space: nowrap; }
-  body.en-only #settings .view-row-narrow { display: none !important; }
+  body.en-only:not(.web-inline) #settings .view-row-narrow { display: none !important; }
 }

@@ -1,5 +1,26 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
+function subscribe(channel, callback) {
+  const listener = (_event, data) => callback(data);
+  ipcRenderer.on(channel, listener);
+  return () => ipcRenderer.removeListener(channel, listener);
+}
+
+// Only the trusted desktop tab shell uses this bridge. The guest has a different preload.
+contextBridge.exposeInMainWorld("easyreadInteractive", {
+  open: (id, mode) => ipcRenderer.invoke("easyread:interactive-open", id, mode),
+  archive: id => ipcRenderer.invoke("easyread:interactive-archive", id),
+  visibleTexts: id => ipcRenderer.invoke("easyread:interactive-visible-texts", id),
+  display: (id, rect) => ipcRenderer.invoke("easyread:interactive-display", id, rect),
+  close: id => ipcRenderer.invoke("easyread:interactive-close", id),
+  language: (id, translated) => ipcRenderer.invoke("easyread:interactive-language", id, translated),
+  selection: (id, command, data) => ipcRenderer.invoke("easyread:reader-selection", id, command, data),
+  onSelection: callback => subscribe("easyread:reader-selection", callback),
+  onState: callback => subscribe("easyread:interactive-state", callback),
+  onLabels: callback => subscribe("easyread:label-batch", callback),
+  onShortcut: callback => subscribe("easyread:interactive-shortcut", callback),
+});
+
 contextBridge.exposeInMainWorld("easyreadDesktop", {
   isElectron: true,
   platform: process.platform,

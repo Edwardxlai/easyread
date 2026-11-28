@@ -191,7 +191,7 @@ class Library:
         """Keep scholarly/PDF resolution; fall back to a frozen web article for ordinary URLs."""
         from ..weblog import snapshot
         ref = (ref or "").strip().strip("<>")
-        if kind not in ("auto", "web", "pdf"):
+        if kind not in ("auto", "web", "pdf", "interactive"):
             raise ValueError("Unknown import type")
         canonical = urldefrag(ref)[0]
         digest = sha256_bytes(("web:" + canonical).encode())
@@ -199,7 +199,7 @@ class Library:
             existing = self.ws(digest[:12])
             if existing and existing.load("paper").get("meta", {}).get("source_type") == "web":
                 return existing, False
-        if kind != "web":
+        if kind not in ("web", "interactive"):
             try:
                 data, name, meta = self.fetch(ref)
                 return self.create_from_pdf(data, name, meta)
@@ -211,7 +211,8 @@ class Library:
         ws = self.ws(digest[:12])
         if ws:
             return ws, False
-        html, meta, blocks = snapshot.fetch(canonical)
+        html, meta, blocks = (snapshot.fetch(canonical, interactive=True) if kind == "interactive"
+                              else snapshot.fetch(canonical))
         ws = Workspace(self.root / digest[:12])
         ws.root.mkdir(parents=True, exist_ok=True)
         with dir_lock(ws.root):

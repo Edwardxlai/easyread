@@ -24,6 +24,8 @@
 
 `meta.pages`、`page_count`、`source_sha256`、`pdf` 由导入时写，不要手改。文献库页里改的标题、作者等存在 `item.json` 的 `meta_override`，不改 paper.json。
 
+网页文章使用 `meta.source_type = "web"`。`meta.url` 保存导入链接，可选的 `meta.live_url` 保存交互阅读加载的最终网页地址。`meta.interactive = true` 表示使用交互模式导入或在导入时检测到了网页控件。旧条目没有 `live_url` 时，桌面阅读器用 `meta.url` 打开公开 HTTPS 网页。交互阅读和快照共用正文块中的 `web_runs` 译文。可选的 `paper.web_visible[target]` 保存补译的画面文字，由原文映射到译文。桌面版的离线交互资源按文章保存在 Electron 用户目录的 `OfflineWeb`，文件清单记录原 URL、响应头和内容哈希。
+
 `references` 的 `id` 通常是论文的引用键：编号式列表是编号（`"13"`），作者-年份式是用连字符连接的姓和年份（如 `Jimenez-2024`、`Chen-Jiang-2025`、`Chen-2026a`），字母标签式是标签（`JYW+24`）。缺少引用键时按条目内容生成 ID。同一键有不同条目时，每条保留独立 ID，原键写在 `cite_key` 中，正文不跳转到有歧义的目标。`page` 是翻译时这条所在那批的第一页，条目按它排序。参考文献表仅显示编号式、字母标签式的原标签。
 
 ### 块

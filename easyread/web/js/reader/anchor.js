@@ -107,6 +107,7 @@
   PR.markNote = (n) => PR.noteBlocks(n).forEach((a) => PR.applyMarks(a));
 
   PR.applyMarks = function (onlyBlock) {
+    PR.emit("original-marks", onlyBlock);
     const scope = onlyBlock ? document.getElementById("b-" + onlyBlock) : PR.$("#paper");
     if (!scope) return;
     PR.$$("mark.hl", scope).forEach((m) => m.replaceWith(...m.childNodes));
@@ -228,9 +229,10 @@
     e.preventDefault();
   });
 
-  function showSelbar() {
-    pendingSel = readSelection();
+  function showSelbar(selected = readSelection()) {
+    pendingSel = selected;
     const bar = selbar();
+    bar.toggleAttribute("data-live", !!selected?.liveToken);
     if (!pendingSel) { bar.classList.remove("open"); return; }
     PR.hideBlockbar && PR.hideBlockbar();
     const pen = PR.prefs.pen === "underline" ? "underline" : "marker";
@@ -251,13 +253,17 @@
     const above = r.top - bar.offsetHeight - 8;
     const y = Math.max(58, Math.min(innerHeight - bar.offsetHeight - 8, above < 58 ? r.bottom + 8 : above));
     bar.style.left = x + "px"; bar.style.top = y + "px";
+    if (selected.liveToken) PR.displayLiveSelection?.(bar, selected.liveToken);
   }
   PR.showSelectionBar = showSelbar;
+  PR.closeLiveSelection = () => { if (pendingSel?.liveToken || selbar().hasAttribute("data-live")) showSelbar(null); };
   document.addEventListener("mouseup", (e) => { if (!(e.target.closest && e.target.closest("#selbar, #blockbar"))) setTimeout(showSelbar, 10); });
   document.addEventListener("keyup", (e) => { if (e.shiftKey && e.key.startsWith("Arrow")) showSelbar(); });
-  document.addEventListener("selectionchange", PR.debounce(() => { const s = getSelection(); if ((!s || s.isCollapsed) && !PR.webReadSelection?.()) selbar().classList.remove("open"); }, 120));
+  document.addEventListener("selectionchange", PR.debounce(() => { const s = getSelection(); if (!pendingSel?.liveToken && (!s || s.isCollapsed) && !PR.webReadSelection?.()) selbar().classList.remove("open"); }, 120));
 
   function resolveHighlight(part) {
+    const original = PR.resolveLiveHighlight?.(part, findQuote);
+    if (original) return original;
     const at = locate(part);
     return at && { part, el: Array.isArray(at.el) ? at.el[0] : at.el, text: fullText(at.el), start: at.i, end: at.i + (at.length ?? part.quote.length) };
   }
@@ -277,7 +283,8 @@
 
   PR.selectionAction = function (kind, color, selectedPen) {
     if (!pendingSel) return;
-    const { anchor, key, start, quote, prefix, suffix, side, parts, rect, quoteContent } = pendingSel;
+    const { anchor, key, start, quote, prefix, suffix, side, parts, rect, quoteContent, liveToken, originalSurface, sourceText } = pendingSel;
+    if (liveToken) PR.clearLiveSelection?.(liveToken);
     pendingSel = null;
     if (kind !== "highlight") {
       selbar().classList.remove("open");
@@ -286,7 +293,11 @@
     }
     if (kind === "paper-note") { PR.openPaperNote(); PR.paperNoteEditor.insertSources(parts || [{ anchor, quote, quoteContent }]); return; }
     if (kind === "translate") { PR.translateSelection({ anchor, quote, rect }); return; }
-    if (kind === "en") { PR.toggleEn(anchor, true); return; }
+    if (kind === "en") {
+      if (originalSurface && sourceText) PR.popover({getBoundingClientRect:() => rect}, '<div class="hd">' + PR.t("原文") + '</div><div class="ref">' + PR.md(sourceText) + '</div>', {sticky:true});
+      else PR.toggleEn(anchor, true);
+      return;
+    }
     if (kind === "copy") { navigator.clipboard.writeText(quote).then(() => PR.toast(PR.t("已复制"))); return; }
     if (kind === "chat") { PR.chatAsk({ anchor, quote, ...(parts ? { refs: parts.map(p => ({ anchor: p.anchor, quote: p.quote })) } : {}) }); return; }
     const pen = selectedPen || (PR.prefs.pen === "underline" ? "underline" : "marker");
@@ -308,7 +319,10 @@
         selbar().classList.remove("open");
         if (sel.rangeCount) sel.removeAllRanges();
       }, 0);
-    } else PR.startNote(note);
+    } else {
+      if (originalSurface && !PR.notesPanelOpen()) PR.toggleNotesPanel(true);
+      PR.startNote(note);
+    }
   };
   selbar().addEventListener("mousedown", (e) => e.preventDefault()); // 点按钮时别丢掉选区
   selbar().addEventListener("click", (e) => {
@@ -357,7 +371,11 @@
       if (!b) return;
       PR.hidePopover();
       if (b.dataset.hl === "del") paintHighlight(n, "erase");
-      else { PR.saveNote(Object.assign({}, n, { kind: b.dataset.hl })); PR.openNoteEditor(n.id); }
+      else {
+        PR.saveNote(Object.assign({}, n, {kind:b.dataset.hl}));
+        if (document.body.classList.contains("web-inline") && !PR.notesPanelOpen()) PR.toggleNotesPanel(true);
+        PR.openNoteEditor(n.id);
+      }
     };
   };
 })(window.PR);
